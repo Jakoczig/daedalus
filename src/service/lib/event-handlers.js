@@ -27,6 +27,7 @@ const Video = require('./event-handlers/video')
 const Galnet = require('./event-handlers/galnet')
 const Media = require('./event-handlers/media')
 const Engineering = require('./event-handlers/engineering')
+const Mining = require('./event-handlers/mining')
 const covasPlayer = require('./covas-player')
 
 class EventHandlers {
@@ -54,6 +55,7 @@ class EventHandlers {
     this.galnet = this._register(new Galnet())
     this.media = this._register(new Media())
     this.engineering = this._register(new Engineering())
+    this.mining = this._register(new Mining({ eliteLog, eliteJson }))
     this.textToSpeech = new TextToSpeech({ eliteLog, eliteJson, cmdrStatus: this.cmdrStatus, shipStatus: this.shipStatus })
   }
 
@@ -100,10 +102,23 @@ class EventHandlers {
       if (global.DEV_MODE) global.devLog(`[HANDLER] → invalidateRouteCache (${logEvent.event})`)
       this.exploration.invalidateRouteCache()
     }
+    const MINING_EVENTS = [
+      'ProspectedAsteroid', 'MiningRefined', 'LaunchDrone', 'BuyDrones',
+      'SellDrones', 'EjectCargo', 'Synthesis', 'Cargo', 'Loadout', 'Scan',
+      'SAASignalsFound', 'FSDJump', 'Location', 'LoadGame', 'AsteroidCracked',
+      'SupercruiseEntry', 'SupercruiseExit', 'Undocked'
+    ]
+    if (MINING_EVENTS.includes(logEvent.event)) {
+      this.mining.logEventHandler(logEvent)
+    }
   }
 
   gameStateChangeHandler (event) {
     this.textToSpeech.gameStateChangeHandler(event)
+    // Keep mining weapon-pip state in sync with live Status.json
+    if (event?.Status) {
+      this.mining.updateFromStatus(event.Status)
+    }
     // Invalidate route cache when NavRoute file changes (player plotted a new route)
     if (event?.NavRoute) {
       if (global.DEV_MODE) global.devLog('[HANDLER] → invalidateRouteCache (NavRoute file changed)')

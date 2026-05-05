@@ -617,6 +617,18 @@ class Exploration {
             body._predictedSpecies = predictions
           }
         }
+
+        // Fallback: if the predictor found nothing (body has bio signals but no species matched),
+        // try Brain Trees specifically. Brain Trees grow on bodies that don't fit other species
+        // criteria, so they serve as a catch-all when the criteria tree comes up empty.
+        // Mirrors the Warboard approach of always returning at least one candidate.
+        if (!body._predictedSpecies) {
+          const brainTreePredictions = predictSpecies(body, bodies, starPos, 'Brain Trees')
+          if (brainTreePredictions.length > 0) {
+            body._predictedSpecies = brainTreePredictions
+            body._predictedSpeciesIsFallback = true
+          }
+        }
       } catch (e) {
         // Predictor error shouldn't break the whole handler
       }
@@ -1604,6 +1616,28 @@ class Exploration {
               const predDesc = codexDescriptions[fullSpecies] || codexDescriptions[pred.genus] || {}
               pred.description = predDesc.description || null
               pred.terrain = predDesc.terrain || null
+            }
+          }
+
+          // Fallback: if nothing was predicted, try Brain Trees specifically.
+          // Brain Trees grow on bodies that don't satisfy other species criteria,
+          // so they serve as a catch-all — mirrors the Warboard approach.
+          if (predictions.length === 0) {
+            const brainTreePredicted = predictSpecies(body, allBodies, starPos, 'Brain Trees')
+            if (brainTreePredicted.length > 0) {
+              predictions = brainTreePredicted.map(p => {
+                const fullName = `${p.genus} ${p.species}`
+                const reward = SPECIES_REWARDS[fullName] ?? SPECIES_REWARDS[p.species] ?? UNKNOWN_VALUE
+                return {
+                  genus: p.genus,
+                  species: p.species,
+                  probability: Math.round(p.probability * 10) / 10,
+                  colonyDistance: GENUS_COLONY_DISTANCE[p.genus] ?? DEFAULT_COLONY_DISTANCE,
+                  reward,
+                  imageUrl: null,
+                  isFallback: true
+                }
+              })
             }
           }
         }

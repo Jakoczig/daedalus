@@ -282,6 +282,11 @@ function MiningPanelNavItems (activePanel) {
       url: '/mining/status'
     },
     {
+      name: 'Rings',
+      icon: 'planet-ringed',
+      url: '/mining/rings'
+    },
+    {
       name: 'Log',
       icon: 'table-inspector',
       url: '/mining/log'

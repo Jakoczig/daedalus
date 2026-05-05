@@ -372,7 +372,17 @@ function evaluateClause (clause, bodyProps) {
     case 'not': result = evaluateNot(clause, bodyValue, bodyProps); break
     case 'all': result = evaluateAll(clause, bodyValue); break
     case 'range': result = evaluateRange(clause, bodyValue); break
-    case 'composition': result = evaluateComposition(clause, bodyValue); break
+    case 'composition': {
+      const pass = evaluateComposition(clause, bodyValue)
+      // If the composition check fails but the data came from EDSM (not a journal Scan),
+      // treat it as uncertain rather than a hard fail. EDSM composition data is often
+      // incomplete (missing trace gases) and would incorrectly eliminate real species.
+      if (!pass && !bodyProps._compositionAuthoritative) {
+        return { pass: true, confident: false }
+      }
+      result = pass
+      break
+    }
     default: result = true
   }
 
@@ -531,8 +541,13 @@ function evaluateAll (clause, bodyValue) {
 function evaluateRange (clause, bodyValue) {
   const num = typeof bodyValue === 'number' ? bodyValue : parseFloat(bodyValue)
   if (isNaN(num)) return false
-  if (clause.min != null && num < clause.min) return false
-  if (clause.max != null && num > clause.max) return false
+  // Allow a tiny epsilon on range bounds to handle the precision gap between
+  // EDSM gravity (2 d.p.) and journal-derived gravity (full precision).
+  // Criteria were calibrated against EDSM data, so a planet at 0.6102 g
+  // must match a "gravity [ ~ 0.61 ]" bound that was derived from 0.61 g.
+  const EPSILON = 0.005
+  if (clause.min != null && num < clause.min - EPSILON) return false
+  if (clause.max != null && num > clause.max + EPSILON) return false
   return true
 }
 
@@ -722,6 +737,13 @@ function buildBodyProps (body, allBodies, starPos) {
   // Parent body distance: SMA of the immediate parent body in AU
   const parentDistanceAU = resolveParentDistanceAU(body, allBodies)
 
+  // Track whether atmosphere composition came from a journal Scan event (authoritative/complete)
+  // vs EDSM data (may be missing trace gases). Used by evaluateClause to decide whether a
+  // failing atmosComp check is a hard fail or should be treated as uncertain.
+  // body._wasScanned is set by _enrichBodiesWithJournalData when a journal Scan event was found.
+  // For live-play (normalizeJournalScan path), _wasScanned is undefined → defaults to true.
+  const compositionAuthoritative = body._wasScanned ?? true
+
   return {
     planetClass,
     surfaceGravity: gravity,
@@ -730,6 +752,7 @@ function buildBodyProps (body, allBodies, starPos) {
     atmosphere: (body.atmosphereType || '').replace(/ atmosphere$/i, ''),
     atmosphereType: atmosType,
     atmosphereComposition: atmosComp,
+    _compositionAuthoritative: compositionAuthoritative,
     distanceFromArrivalLS: body.distanceToArrival ?? body.distanceFromArrivalLS ?? 0,
     volcanism,
     materials,
@@ -838,9 +861,10 @@ function sortByBrightness (parentStarBodies, body) {
  * @param {object} body - Body data (from EDSM or journal)
  * @param {Array} allBodies - All bodies in the system
  * @param {Array} starPos - System star position [x, y, z]
+ * @param {string|null} genusFilter - If set, only return predictions for this genus (case-insensitive)
  * @returns {Array} Array of { genus, species, variant, hitCount, probability } for all viable species
  */
-function predictSpecies (body, allBodies, starPos) {
+function predictSpecies (body, allBodies, starPos, genusFilter = null) {
   try {
   // Only landable bodies can have biologicals
   // Stars and gas giants can't have biologicals
@@ -857,7 +881,9 @@ function predictSpecies (body, allBodies, starPos) {
   const bodyProps = buildBodyProps(body, allBodies, starPos)
   const predictions = []
 
+  const filterGenus = genusFilter?.toLowerCase() ?? null
   for (const criteria of allCriteria) {
+    if (filterGenus && criteria.genus?.toLowerCase() !== filterGenus) continue
     const matches = walkCriteria(criteria, bodyProps, null, null, null, null, 0)
     predictions.push(...matches)
   }

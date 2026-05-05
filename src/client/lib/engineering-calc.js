@@ -581,25 +581,88 @@ function genericCollectionHint (type) {
 }
 
 /**
- * Determine which engineers from `engineers` (getEngineers() result) are
- * required to apply the wishlist blueprints, and return them sorted by
- * distance from `currentPos` using nearest-neighbour ordering.
+ * Build prerequisite route stops for a non-unlocked engineer based on their
+ * incomplete unlock stages.  Returns only the steps that still need doing.
  *
- * @param {Array}  wishlist    — wishlist items
- * @param {Array}  blueprints  — getBlueprints() result
- * @param {Array}  engineers   — getEngineers() result
- * @param {Array}  currentPos  — [x, y, z]
- * @returns {Array} engineer RouteStop objects, ordered nearest-first
+ * @param {object} eng            — engineer entry from getEngineers()
+ * @param {object} prerequisites  — getEngineerPrerequisites() result
+ * @param {object} unlockStations — getEngineerUnlockStations() result
+ * @returns {Array} route stop objects (activity or commodity_purchase)
  */
-export function buildEngineerRoute (wishlist, blueprints, engineers, currentPos) {
-  // Find which engineers are needed for the wishlist
-  const requiredBlueprintsByEngineer = {}  // engineerId → [{ symbol, name, grade, moduleName }]
+function buildUnlockPrereqStops (eng, prerequisites, unlockStations) {
+  const prereq = prerequisites[String(eng.id)]
+  if (!prereq) return []
+
+  const status = (eng.progress.status ?? '').toLowerCase()
+  const learnDone = status !== 'unknown' && status !== ''
+  const inviteDone = status === 'invited' || status === 'unlocked'
+  const unlockDone = status === 'unlocked'
+
+  const stops = []
+
+  if (prereq.learn && !learnDone) {
+    stops.push({
+      type: 'activity',
+      forEngineer: eng.name,
+      unlockStage: 'learn',
+      description: prereq.learn.description,
+      system: null
+    })
+  }
+
+  if (prereq.invite && !inviteDone) {
+    stops.push({
+      type: 'activity',
+      forEngineer: eng.name,
+      unlockStage: 'invite',
+      description: prereq.invite.description,
+      system: null
+    })
+  }
+
+  if (prereq.unlock && !unlockDone) {
+    if (prereq.unlock.type === 'commodity') {
+      const stationData = (unlockStations ?? {})[prereq.unlock.symbol]
+      stops.push({
+        type: 'commodity_purchase',
+        forEngineer: eng.name,
+        unlockStage: 'unlock',
+        commodity: {
+          symbol: prereq.unlock.symbol,
+          name: prereq.unlock.name,
+          amount: prereq.unlock.amount
+        },
+        system: stationData ? { name: stationData.system, position: stationData.position } : null,
+        station: stationData ? { name: stationData.station, distanceToArrival: stationData.distanceToArrival } : null
+      })
+    } else {
+      stops.push({
+        type: 'activity',
+        forEngineer: eng.name,
+        unlockStage: 'unlock',
+        description: prereq.unlock.description ??
+          `Provide ${prereq.unlock.amount ?? '?'}× ${prereq.unlock.name ?? prereq.unlock.symbol}`,
+        system: null
+      })
+    }
+  }
+
+  return stops
+}
+
+/**
+ * Resolve which engineer handles which blueprint, choosing exactly one per item.
+ * Prefer unlocked engineers, then known/invited, then any; within tier, pick nearest.
+ *
+ * @returns {Object} engineerId → [{ symbol, grade, name, moduleName }]
+ */
+function resolveEngineerAssignments (wishlist, blueprints, engineers, currentPos) {
+  const assignments = {}
 
   for (const item of wishlist) {
-    // Explicitly requested engineer unlocks
     if (item.type === 'engineer_unlock') {
       const eng = engineers.find(e => String(e.id) === String(item.engineerId) || e.name === item.engineerName)
-      if (eng && !requiredBlueprintsByEngineer[eng.id]) requiredBlueprintsByEngineer[eng.id] = []
+      if (eng && !assignments[eng.id]) assignments[eng.id] = []
       continue
     }
 
@@ -607,24 +670,81 @@ export function buildEngineerRoute (wishlist, blueprints, engineers, currentPos)
     const bp = blueprints.find(b => b.symbol.toLowerCase() === item.blueprintSymbol.toLowerCase())
     if (!bp) continue
 
+    const candidates = []
     for (const [engineerName, engineerInfo] of Object.entries(bp.engineers ?? {})) {
-      // Match engineer by name
+      const grades = (engineerInfo.grades ?? []).map(String)
+      if (!grades.includes(String(item.grade))) continue
       const eng = engineers.find(e => e.name === engineerName)
       if (!eng) continue
-      if (!requiredBlueprintsByEngineer[eng.id]) requiredBlueprintsByEngineer[eng.id] = []
-      requiredBlueprintsByEngineer[eng.id].push({
-        symbol: bp.symbol,
-        name: bp.name,
-        grade: item.grade,
-        moduleName: Array.isArray(bp.appliedToModules?.[0]) ? bp.appliedToModules[0] : bp.appliedToModules?.[0] ?? ''
-      })
+      candidates.push(eng)
     }
+    if (candidates.length === 0) continue
+
+    const unlocked = candidates.filter(e => (e.progress.status ?? '').toLowerCase() === 'unlocked')
+    const notUnknown = candidates.filter(e => (e.progress.status ?? '').toLowerCase() !== 'unknown')
+    const pool = unlocked.length > 0 ? unlocked : notUnknown.length > 0 ? notUnknown : candidates
+
+    const chosen = pool.reduce((best, eng) =>
+      calculateDistance(currentPos, eng.system.position) < calculateDistance(currentPos, best.system.position) ? eng : best
+    )
+
+    if (!assignments[chosen.id]) assignments[chosen.id] = []
+    assignments[chosen.id].push({
+      symbol: bp.symbol,
+      name: bp.name,
+      grade: item.grade,
+      moduleName: Array.isArray(bp.appliedToModules?.[0]) ? bp.appliedToModules[0] : bp.appliedToModules?.[0] ?? ''
+    })
   }
 
-  if (Object.keys(requiredBlueprintsByEngineer).length === 0) return []
+  return assignments
+}
 
-  // Build stop objects for required engineers
-  const stops = Object.entries(requiredBlueprintsByEngineer).map(([engId, bps]) => {
+/**
+ * Compute total material costs for a list of blueprint items.
+ * Returns { symbol → amount }.
+ */
+function computeMaterialsForBlueprintList (bpItems, blueprints) {
+  const result = {}
+  for (const bpItem of bpItems) {
+    const bp = blueprints.find(b => b.symbol.toLowerCase() === bpItem.symbol.toLowerCase())
+    if (!bp) continue
+    const gradeData = bp.grades?.find(g => g.grade === bpItem.grade)
+    if (!gradeData) continue
+    for (const comp of gradeData.components ?? []) {
+      if (!comp.symbol) continue
+      result[comp.symbol] = (result[comp.symbol] ?? 0) + comp.cost
+    }
+  }
+  return result
+}
+
+/**
+ * Determine which engineers from `engineers` (getEngineers() result) are
+ * required to apply the wishlist blueprints, and return them sorted by
+ * distance from `currentPos` using nearest-neighbour ordering.
+ *
+ * For each blueprint item, exactly ONE engineer is chosen:
+ *   - Among engineers who support the requested grade, prefer unlocked ones.
+ *   - Among the preferred tier, pick the nearest by Euclidean distance.
+ * When a non-unlocked engineer is chosen (no unlocked alternative exists),
+ * their pending unlock prerequisite steps are inserted before their stop.
+ *
+ * @param {Array}  wishlist       — wishlist items
+ * @param {Array}  blueprints     — getBlueprints() result
+ * @param {Array}  engineers      — getEngineers() result
+ * @param {Array}  currentPos     — [x, y, z]
+ * @param {object} prerequisites  — getEngineerPrerequisites() result (optional)
+ * @param {object} unlockStations — getEngineerUnlockStations() result (optional)
+ * @returns {Array} route stop objects ordered nearest-first, prereq stops inserted before their engineer
+ */
+export function buildEngineerRoute (wishlist, blueprints, engineers, currentPos, prerequisites = {}, unlockStations = {}) {
+  const assignments = resolveEngineerAssignments(wishlist, blueprints, engineers, currentPos)
+
+  if (Object.keys(assignments).length === 0) return []
+
+  // Build engineer stops
+  const engineerStops = Object.entries(assignments).map(([engId, bps]) => {
     const eng = engineers.find(e => String(e.id) === String(engId))
     if (!eng) return null
     return {
@@ -639,14 +759,39 @@ export function buildEngineerRoute (wishlist, blueprints, engineers, currentPos)
     }
   }).filter(Boolean)
 
-  // Nearest-neighbour sort
-  return nearestNeighbourSort(stops, currentPos)
+  // Sort engineer stops nearest-neighbour
+  const sortedEngineers = nearestNeighbourSort(engineerStops, currentPos)
+
+  // Interleave: insert prerequisite stops immediately before each non-unlocked engineer
+  const result = []
+  for (const engStop of sortedEngineers) {
+    const isUnlocked = (engStop.unlockStatus ?? '').toLowerCase() === 'unlocked'
+    if (!isUnlocked) {
+      const eng = engineers.find(e => String(e.id) === String(engStop.engineerId))
+      if (eng) {
+        const prereqStops = buildUnlockPrereqStops(eng, prerequisites, unlockStations)
+        result.push(...prereqStops)
+      }
+    }
+    result.push(engStop)
+  }
+
+  return result
 }
 
 /**
  * Generate the full Smart Route from wishlist shortfalls, sources, and trades.
  *
- * Returns a sorted array of RouteStop objects ready for timeline rendering.
+ * Uses a phase-based, dependency-aware ordering:
+ *   Phase A (per batch): Collect materials   (collection stops, sorted by distance)
+ *   Phase B (per batch): Trade materials     (trade stops, sorted by distance)
+ *   Phase C (per batch): Visit engineers     (engineer stops, prereqs interleaved)
+ *
+ * Engineers are grouped into batches based on material-cap constraints:
+ * if the combined shortfall for a set of engineers would exceed any single
+ * material's carry cap (using Elite Dangerous standard caps derived from
+ * material.maxCount), a new batch is started so the player collects → trades →
+ * engineers, then repeats for the next batch.
  *
  * @param {Array}  allocatedShortfalls — result of allocateTradeSuggestions()
  * @param {Array}  engineers           — getEngineers() result
@@ -656,6 +801,9 @@ export function buildEngineerRoute (wishlist, blueprints, engineers, currentPos)
  * @param {Object} materialTraders     — getMaterialTraders() result
  * @param {Array}  currentPos          — [x, y, z]
  * @param {Set}    enabledMethods      — set of enabled collection method keys
+ * @param {Object} prerequisites       — getEngineerPrerequisites() result (optional)
+ * @param {Object} unlockStations      — getEngineerUnlockStations() result (optional)
+ * @param {Array}  materials           — getMaterials() result (current inventory)
  * @returns {Array} ordered RouteStop array
  */
 export function generateSmartRoute ({
@@ -666,48 +814,224 @@ export function generateSmartRoute ({
   materialSources,
   materialTraders,
   currentPos,
-  enabledMethods
+  enabledMethods,
+  prerequisites = {},
+  unlockStations = {},
+  materials = []
 }) {
-  const stops = []
+  // ── Build current inventory map (symbol → count, all lowercase keys) ─────
+  const inventory = {}
+  for (const mat of (materials ?? [])) {
+    if (mat.symbol) inventory[mat.symbol.toLowerCase()] = mat.count ?? 0
+  }
 
-  // ── Trade stops ──────────────────────────────────────────────────────────
-  const tradesByType = { Raw: [], Encoded: [], Manufactured: [] }
-  for (const sfEntry of allocatedShortfalls) {
-    if (!sfEntry.trades?.length) continue
-    const t = (sfEntry.type ?? '').toLowerCase()
-    const key = t === 'raw' ? 'Raw' : t === 'encoded' ? 'Encoded' : t === 'manufactured' ? 'Manufactured' : null
-    if (!key) continue
-    for (const trade of sfEntry.trades) {
-      tradesByType[key].push({
-        give: { ...trade.from, amount: trade.give },
-        receive: { symbol: sfEntry.symbol, name: sfEntry.name, grade: sfEntry.grade, amount: trade.receive }
+  // Build a per-symbol cap lookup from material maxCount (or grade-based fallback)
+  const capBySymbol = {}
+  for (const mat of (materials ?? [])) {
+    if (mat.symbol) capBySymbol[mat.symbol.toLowerCase()] = mat.maxCount ?? (mat.grade >= 5 ? 100 : mat.grade >= 4 ? 150 : 300)
+  }
+  function capFor (sym) { return capBySymbol[sym.toLowerCase()] ?? 300 }
+
+  // ── Resolve engineer assignments and visit order ──────────────────────────
+  const assignments = resolveEngineerAssignments(wishlist, blueprints, engineers, currentPos)
+  const sortedEngIds = nearestNeighbourSort(
+    Object.keys(assignments).map(engId => {
+      const eng = engineers.find(e => String(e.id) === String(engId))
+      return { engineerId: engId, system: { position: eng?.system?.position ?? null } }
+    }),
+    currentPos
+  ).map(s => s.engineerId)
+
+  // ── Inner helper: build trade stops for a specific symbol set ─────────────
+  function buildTradeStopsForSymbols (symbolSet, refPos) {
+    const tradesByType = { Raw: [], Encoded: [], Manufactured: [] }
+    for (const sfEntry of allocatedShortfalls) {
+      if (!sfEntry.trades?.length || !symbolSet.has(sfEntry.symbol)) continue
+      const t = (sfEntry.type ?? '').toLowerCase()
+      const key = t === 'raw' ? 'Raw' : t === 'encoded' ? 'Encoded' : t === 'manufactured' ? 'Manufactured' : null
+      if (!key) continue
+      for (const trade of sfEntry.trades) {
+        tradesByType[key].push({
+          give: { ...trade.from, amount: trade.give },
+          receive: { symbol: sfEntry.symbol, name: sfEntry.name, grade: sfEntry.grade, amount: trade.receive }
+        })
+      }
+    }
+    const traders = materialTraders?.traders ?? []
+    const stops = []
+    for (const [type, trades] of Object.entries(tradesByType)) {
+      if (!trades.length) continue
+      const nearest = findNearestTrader(traders, type, refPos)
+      if (!nearest) continue
+      stops.push({
+        type: 'trade',
+        system: { name: nearest.name, position: [nearest.coords.x, nearest.coords.y, nearest.coords.z] },
+        station: { name: nearest.station.name, distanceToArrival: nearest.station.distanceToArrival },
+        traderType: type,
+        trades
       })
+    }
+    return stops
+  }
+
+  // ── Inner helper: flush one batch of engineers ────────────────────────────
+  // Inserts: [collection stops] → [trade stops] → [engineer stops with prereqs]
+  const result = []
+  let routePos = currentPos
+
+  function flushBatch (batchEngIds, batchNeededMaterials) {
+    if (batchEngIds.length === 0) return
+
+    // Determine shortfalls for this batch given current simulated inventory
+    const shortfallSymbols = new Set()
+    const batchShortfalls = {}
+    for (const [sym, needed] of Object.entries(batchNeededMaterials)) {
+      const have = inventory[sym.toLowerCase()] ?? 0
+      if (needed > have) {
+        batchShortfalls[sym] = needed - have
+        shortfallSymbols.add(sym)
+      }
+    }
+
+    if (shortfallSymbols.size > 0) {
+      // Subset allocatedShortfalls to this batch's symbols (keep original trade/collection split)
+      const batchAllocated = allocatedShortfalls
+        .filter(sf => shortfallSymbols.has(sf.symbol))
+
+      // Phase A: collection stops (skip materials with no known source)
+      const collStops = groupCollectionsBySystem(batchAllocated, materialSources, enabledMethods)
+        .filter(s => !s.noSource)
+      const sortedColl = nearestNeighbourSort(collStops, routePos)
+      if (sortedColl.length) {
+        result.push(...sortedColl)
+        routePos = sortedColl[sortedColl.length - 1].system?.position ?? routePos
+      }
+
+      // Phase B: trade stops (only for materials that have a trade path)
+      const tradeStops = buildTradeStopsForSymbols(shortfallSymbols, routePos)
+      const sortedTrade = nearestNeighbourSort(tradeStops, routePos)
+      if (sortedTrade.length) {
+        result.push(...sortedTrade)
+        routePos = sortedTrade[sortedTrade.length - 1].system?.position ?? routePos
+      }
+
+      // Update simulated inventory after acquiring this batch's shortfalls
+      for (const sym of shortfallSymbols) {
+        const symL = sym.toLowerCase()
+        inventory[symL] = (inventory[symL] ?? 0) + (batchShortfalls[sym] ?? 0)
+      }
+    }
+
+    // Phase C: engineer stops with prereqs
+    for (const engId of batchEngIds) {
+      const eng = engineers.find(e => String(e.id) === String(engId))
+      if (!eng) continue
+      const bpItems = assignments[engId] ?? []
+
+      const isUnlocked = (eng.progress.status ?? '').toLowerCase() === 'unlocked'
+      if (!isUnlocked) {
+        const prereqStops = buildUnlockPrereqStops(eng, prerequisites, unlockStations)
+        // Skip this engineer entirely if any unfulfilled prerequisite has no known location
+        if (prereqStops.some(s => !s.system?.position)) continue
+        const commStops = nearestNeighbourSort(prereqStops.filter(s => s.type === 'commodity_purchase'), routePos)
+        if (commStops.length) routePos = commStops[commStops.length - 1].system?.position ?? routePos
+        result.push(...commStops)
+      }
+
+      result.push({
+        type: 'engineer',
+        engineerId: eng.id,
+        engineerName: eng.name,
+        system: { name: eng.system.name, position: eng.system.position },
+        unlockStatus: eng.progress.status,
+        rank: eng.progress.rank,
+        rankProgress: eng.progress.rankProgress,
+        blueprints: bpItems
+      })
+
+      // Consume materials from simulated inventory
+      const engMats = computeMaterialsForBlueprintList(bpItems, blueprints)
+      for (const [sym, amount] of Object.entries(engMats)) {
+        const symL = sym.toLowerCase()
+        inventory[symL] = Math.max(0, (inventory[symL] ?? 0) - amount)
+      }
+      routePos = eng.system.position ?? routePos
     }
   }
 
-  const traders = materialTraders?.traders ?? []
-  for (const [type, trades] of Object.entries(tradesByType)) {
-    if (!trades.length) continue
-    const nearest = findNearestTrader(traders, type, currentPos)
-    if (!nearest) continue
-    stops.push({
-      type: 'trade',
-      system: { name: nearest.name, position: [nearest.coords.x, nearest.coords.y, nearest.coords.z] },
-      station: { name: nearest.station.name, distanceToArrival: nearest.station.distanceToArrival },
-      traderType: type,
-      trades
-    })
+  // ── Group engineers into batches by material-cap constraint ───────────────
+  // A new batch starts when adding the next engineer would require collecting
+  // more of any single material than its carry cap in one trip.
+  let batchEngIds = []
+  let batchNeededMaterials = {}
+
+  for (const engId of sortedEngIds) {
+    const bpItems = assignments[engId] ?? []
+    const engMats = computeMaterialsForBlueprintList(bpItems, blueprints)
+
+    let wouldExceedCap = false
+    if (batchEngIds.length > 0) {
+      for (const [sym, needed] of Object.entries(engMats)) {
+        const have = inventory[sym.toLowerCase()] ?? 0
+        const alreadyNeeded = batchNeededMaterials[sym] ?? 0
+        const totalShortfall = Math.max(0, needed + alreadyNeeded - have)
+        if (totalShortfall > capFor(sym)) { wouldExceedCap = true; break }
+      }
+    }
+
+    if (wouldExceedCap) {
+      flushBatch(batchEngIds, batchNeededMaterials)
+      batchEngIds = []
+      batchNeededMaterials = {}
+    }
+
+    batchEngIds.push(engId)
+    for (const [sym, amount] of Object.entries(engMats)) {
+      batchNeededMaterials[sym] = (batchNeededMaterials[sym] ?? 0) + amount
+    }
   }
 
-  // ── Collection stops ─────────────────────────────────────────────────────
-  const collectionStops = groupCollectionsBySystem(allocatedShortfalls, materialSources, enabledMethods)
-  stops.push(...collectionStops)
+  flushBatch(batchEngIds, batchNeededMaterials)
 
-  // ── Engineer stops ────────────────────────────────────────────────────────
-  const engineerStops = buildEngineerRoute(wishlist, blueprints, engineers, currentPos)
-  stops.push(...engineerStops)
+  // ── Fallback: if no engineers in wishlist, still generate collection/trade ─
+  if (sortedEngIds.length === 0) {
+    const collStops = groupCollectionsBySystem(allocatedShortfalls, materialSources, enabledMethods)
+      .filter(s => !s.noSource)
+    const tradesByType = { Raw: [], Encoded: [], Manufactured: [] }
+    for (const sfEntry of allocatedShortfalls) {
+      if (!sfEntry.trades?.length) continue
+      const t = (sfEntry.type ?? '').toLowerCase()
+      const key = t === 'raw' ? 'Raw' : t === 'encoded' ? 'Encoded' : t === 'manufactured' ? 'Manufactured' : null
+      if (!key) continue
+      for (const trade of sfEntry.trades) {
+        tradesByType[key].push({
+          give: { ...trade.from, amount: trade.give },
+          receive: { symbol: sfEntry.symbol, name: sfEntry.name, grade: sfEntry.grade, amount: trade.receive }
+        })
+      }
+    }
+    const traders = materialTraders?.traders ?? []
+    const tradeStops = []
+    for (const [type, trades] of Object.entries(tradesByType)) {
+      if (!trades.length) continue
+      const nearest = findNearestTrader(traders, type, currentPos)
+      if (!nearest) continue
+      tradeStops.push({
+        type: 'trade',
+        system: { name: nearest.name, position: [nearest.coords.x, nearest.coords.y, nearest.coords.z] },
+        station: { name: nearest.station.name, distanceToArrival: nearest.station.distanceToArrival },
+        traderType: type,
+        trades
+      })
+    }
+    const sorted = nearestNeighbourSort([...collStops, ...tradeStops], currentPos)
+    return twoOptImprove(sorted, currentPos)
+  }
 
-  // ── Sort (nearest-neighbour then 2-opt) ──────────────────────────────────
-  const sorted = nearestNeighbourSort(stops, currentPos)
-  return twoOptImprove(sorted, currentPos)
+  // ── Recompute distanceFromPrev linearly ───────────────────────────────────
+  return result.map((stop, idx) => {
+    const prevPos = idx === 0 ? currentPos : result[idx - 1].system?.position
+    const dist = parseFloat(calculateDistance(prevPos, stop.system?.position).toFixed(1))
+    return { ...stop, distanceFromPrev: isFinite(dist) ? dist : undefined }
+  })
 }

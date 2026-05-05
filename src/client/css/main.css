@@ -31,6 +31,7 @@
 @import "panels/video-panel.css";
 @import "panels/music-panel.css";
 @import "panels/galnet-panel.css";
+@import "panels/mining-panel.css";
 
 @import "overrides/safari.css";
 @import "overrides/firefox.css";
@@ -60,7 +61,7 @@ a,
 }
 
 html {
-  zoom: 100%;
+  zoom: 0.8;
   background: black;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: subpixel-antialiased;
@@ -203,6 +204,8 @@ html::after {
 
 html, body {
   -ms-content-zooming: none;
+  overflow: clip;
+  overflow-anchor: none;
 }
 
 body {
@@ -212,17 +215,16 @@ body {
   font-weight: bold;
   padding: 0;
   margin: 0;
-  zoom: 0.8;
 }
 
 @media only screen and (max-width: 799px) {
-  body {
+  html {
     zoom: 0.7;
   }
 }
 
 @media only screen and (max-width: 599px) {
-  body {
+  html {
     zoom: 0.6;
   }
 }

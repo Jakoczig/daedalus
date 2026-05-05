@@ -40,7 +40,7 @@ header h1 {
   padding-top: .5rem;
   transition: opacity .25s ease-in-out;
   opacity: 0;
-  overflow: hidden;
+  overflow: clip;
   z-index: 10;
   contain: layout style;
 }

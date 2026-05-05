@@ -119,8 +119,11 @@ function RouteStopCard ({ stop, index }) {
         {/* Stop header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem', flexWrap: 'wrap' }}>
           <i className={`icon ${iconClass}`} style={{ fontSize: '1rem' }} />
-          <strong>{stop.system?.name ?? 'Unknown System'}</strong>
-          <span className='text-muted' style={{ fontSize: '.9em' }}>({label})</span>
+          <strong>{stop.type === 'engineer' && stop.engineerName ? stop.engineerName : stop.system?.name ?? 'Unknown System'}</strong>
+          {stop.type === 'engineer' && stop.system?.name &&
+            <span className='text-muted' style={{ fontSize: '.9em' }}>{stop.system.name}</span>}
+          {stop.type !== 'engineer' &&
+            <span className='text-muted' style={{ fontSize: '.9em' }}>({label})</span>}
           {stop.distanceFromPrev != null && stop.distanceFromPrev !== Infinity && index > 0 &&
             <span className='text-muted' style={{ fontSize: '.85em', marginLeft: 'auto' }}>
               {stop.distanceFromPrev} Ly
@@ -192,18 +195,8 @@ function TradeStopBody ({ stop }) {
 }
 
 function EngineerStopBody ({ stop }) {
-  const isUnlocked = (stop.unlockStatus ?? '').toLowerCase() === 'unlocked'
   return (
     <>
-      <div style={{ display: 'flex', gap: '.75rem', marginBottom: '.4rem', flexWrap: 'wrap' }}>
-        <span className={isUnlocked ? 'text-success' : 'text-warning'} style={{ fontSize: '.9em' }}>
-          {isUnlocked ? '✓ Unlocked' : `⚠ ${stop.unlockStatus ?? 'Locked'}`}
-        </span>
-        {stop.rank > 0 &&
-          <span className='text-muted' style={{ fontSize: '.9em' }}>
-            Rank {stop.rank} (+{stop.rankProgress ?? 0}%)
-          </span>}
-      </div>
       <div className='text-muted' style={{ marginBottom: '.4rem', fontSize: '.9em' }}>
         <i className='icon daedalus-terminal-location' style={{ marginRight: '.2rem' }} />Dock → Contacts → Engineers
       </div>
@@ -297,7 +290,7 @@ function CollectionMethodSettings ({ methods, onChange }) {
   )
 }
 
-function SmartRouteTab ({ wishlist, blueprints, materials, engineers, materialSources, materialTraders, currentSystem }) {
+function SmartRouteTab ({ wishlist, blueprints, materials, engineers, materialSources, materialTraders, currentSystem, prerequisites, unlockStations }) {
   const [methods, setMethods] = useState(loadCollectionMethods)
 
   function handleMethodChange (newMethods) {
@@ -323,7 +316,10 @@ function SmartRouteTab ({ wishlist, blueprints, materials, engineers, materialSo
       materialSources: materialSources ?? {},
       materialTraders: materialTraders ?? {},
       currentPos,
-      enabledMethods
+      enabledMethods,
+      prerequisites: prerequisites ?? {},
+      unlockStations: unlockStations ?? {},
+      materials: materials ?? []
     })
 
     const totalDist = stops.reduce((sum, s) => {
@@ -460,11 +456,12 @@ function TraderPlannerTab ({ wishlist, blueprints, materials, materialTraders, c
 
 // ── Tab: Engineer Route ─────────────────────────────────────────────────────
 
-function EngineerRouteTab ({ wishlist, blueprints, engineers, currentSystem }) {
+function EngineerRouteTab ({ wishlist, blueprints, engineers, currentSystem, prerequisites, unlockStations }) {
   const engineerStops = useMemo(() => {
     if (!wishlist.length || !blueprints.length || !engineers.length) return []
-    return buildEngineerRoute(wishlist, blueprints, engineers, currentSystem?.position ?? null)
-  }, [wishlist, blueprints, engineers, currentSystem])
+    const stops = buildEngineerRoute(wishlist, blueprints, engineers, currentSystem?.position ?? null, prerequisites ?? {}, unlockStations ?? {})
+    return stops.filter(s => s.type === 'engineer')
+  }, [wishlist, blueprints, engineers, currentSystem, prerequisites, unlockStations])
 
   if (!wishlist.length) {
     return <div className='text-muted' style={{ padding: '2rem 0' }}>No wishlist — add blueprints in the Wishlist tab first.</div>
@@ -647,18 +644,19 @@ function CollectionGuideTab ({ wishlist, blueprints, materials, materialSources 
 // ── Page ────────────────────────────────────────────────────────────────────
 
 const MATERIAL_EVENTS = ['Materials', 'MaterialCollected', 'MaterialDiscarded', 'MaterialTrade', 'EngineerCraft']
-const TABS = ['Smart Route', 'Trader Planner', 'Engineer Route', 'Collection Guide']
+
 
 export default function EngineeringMaterialPlannerPage () {
   const { connected, active, ready } = useSocket()
   const [componentReady, setComponentReady] = useState(false)
-  const [activeTab, setActiveTab] = useState(0)
   const [blueprints, setBlueprints] = useState([])
   const [materials, setMaterials] = useState([])
   const [engineers, setEngineers] = useState([])
   const [currentSystem, setCurrentSystem] = useState(null)
   const [materialSources, setMaterialSources] = useState({})
   const [materialTraders, setMaterialTraders] = useState({})
+  const [prerequisites, setPrerequisites] = useState({})
+  const [unlockStations, setUnlockStations] = useState({})
   const [wishlist, setWishlist] = useState([])
 
   useEffect(animateTableEffect)
@@ -667,13 +665,15 @@ export default function EngineeringMaterialPlannerPage () {
     ;(async () => {
       if (!connected) return
 
-      const [newBlueprints, newMaterials, newEngineers, newSystem, newSources, newTraders] = await Promise.all([
+      const [newBlueprints, newMaterials, newEngineers, newSystem, newSources, newTraders, newPrereqs, newUnlockStations] = await Promise.all([
         sendEvent('getBlueprints'),
         sendEvent('getMaterials'),
         sendEvent('getEngineers'),
         sendEvent('getSystem'),
         sendEvent('getMaterialSources'),
-        sendEvent('getMaterialTraders')
+        sendEvent('getMaterialTraders'),
+        sendEvent('getEngineerPrerequisites'),
+        sendEvent('getEngineerUnlockStations')
       ])
 
       setBlueprints(newBlueprints ?? [])
@@ -682,6 +682,8 @@ export default function EngineeringMaterialPlannerPage () {
       if (newSystem?.position) setCurrentSystem(newSystem)
       setMaterialSources(newSources ?? {})
       setMaterialTraders(newTraders ?? {})
+      setPrerequisites(newPrereqs ?? {})
+      setUnlockStations(newUnlockStations ?? {})
 
       const shipId = getActiveShipId()
       setWishlist(shipId ? getWishlist(shipId) : [])
@@ -719,60 +721,22 @@ export default function EngineeringMaterialPlannerPage () {
         <h2>Material Collection Planner</h2>
         <h3 className='text-primary'>Plan and optimise your engineering route</h3>
 
-        {/* Sub-tab nav */}
-        <div style={{ display: 'flex', gap: '.25rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          {TABS.map((tab, i) => (
-            <button
-              key={tab}
-              className={`button${activeTab === i ? ' button--active' : ''}`}
-              style={{ fontSize: '.9em', padding: '.3rem .9rem' }}
-              onClick={() => setActiveTab(i)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
         {currentSystem?.name &&
           <div className='text-muted' style={{ fontSize: '.9em', marginBottom: '1rem' }}>
             Current system: <span className='text-primary'>{currentSystem.name}</span>
           </div>}
 
-        {activeTab === 0 &&
-          <SmartRouteTab
-            wishlist={wishlist}
-            blueprints={blueprints}
-            materials={materials}
-            engineers={engineers}
-            materialSources={materialSources}
-            materialTraders={materialTraders}
-            currentSystem={currentSystem}
-          />}
-
-        {activeTab === 1 &&
-          <TraderPlannerTab
-            wishlist={wishlist}
-            blueprints={blueprints}
-            materials={materials}
-            materialTraders={materialTraders}
-            currentSystem={currentSystem}
-          />}
-
-        {activeTab === 2 &&
-          <EngineerRouteTab
-            wishlist={wishlist}
-            blueprints={blueprints}
-            engineers={engineers}
-            currentSystem={currentSystem}
-          />}
-
-        {activeTab === 3 &&
-          <CollectionGuideTab
-            wishlist={wishlist}
-            blueprints={blueprints}
-            materials={materials}
-            materialSources={materialSources}
-          />}
+        <SmartRouteTab
+          wishlist={wishlist}
+          blueprints={blueprints}
+          materials={materials}
+          engineers={engineers}
+          materialSources={materialSources}
+          materialTraders={materialTraders}
+          currentSystem={currentSystem}
+          prerequisites={prerequisites}
+          unlockStations={unlockStations}
+        />
       </Panel>
     </Layout>
   )

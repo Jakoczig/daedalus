@@ -1,0 +1,873 @@
+/* Mining Panel Styles */
+
+.mining-panel {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+/* ── Scaled dashboard wrapper (applyScaling pattern) ─────────────────── */
+
+.mining-panel__scaler {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mining-panel__dashboard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  width: 110rem;
+  height: 56rem;
+  opacity: 0;
+  display: grid;
+  grid-template-columns: 32rem 16rem 18.5rem 1fr 6.5rem;
+  grid-template-rows: 18rem 16rem 18rem;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  grid-template-areas:
+    "prosp-col  config   right-col  cargo  limpets"
+    "prosp-col  circle   right-col  cargo  limpets"
+    "prosp-col  target   right-col  cargo  limpets";
+  pointer-events: auto;
+}
+
+/* ── Grid area assignments ────────────────────────────────────────── */
+
+.mining-panel__prosp-col              { grid-area: prosp-col; }
+.mining-panel__circle-wrap            { grid-area: circle; }
+.mining-panel__info-card-wrap--config { grid-area: config; }
+.mining-panel__info-card-wrap--target { grid-area: target; }
+.mining-panel__right-col              { grid-area: right-col; }
+.mining-panel__cargo-bay              { grid-area: cargo; }
+.mining-panel__limpet-column          { grid-area: limpets; }
+
+/* ── Column containers ──────────────────────────────────────────────── */
+
+/* Left column: both prospectors + laser power, spans all 3 grid rows */
+.mining-panel__prosp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.mining-panel__prosp-col > .mining-panel__prospector-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Right column: statistics + refined, spans all 3 grid rows */
+.mining-panel__right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.mining-panel__right-col > .mining-panel__info-card-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Session / refined info cards ────────────────────────────────────── */
+
+/* Wrapper — direct grid item */
+.mining-panel__info-card-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* SVG arc overlay — same pattern as prospector-arc */
+.mining-panel__info-card-arc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.mining-panel__info-card-arc path {
+  fill: none;
+  stroke: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .3);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.mining-panel__info-card {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  background: rgba(15, 5, 5, 0.65);
+  border: .1rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .3);
+  padding: .5rem .75rem;
+  box-sizing: border-box;
+}
+
+/*
+  Notch variants for centre-left column (notch on RIGHT side, circle to the right).
+  Card: 18.5rem × 26.75rem. Circle centre 8rem right of card right edge.
+  Arc r=12rem. Right-edge y-intercept = 18.056rem (67.5%). Bottom/top x-intercept = 14.503rem (78.4%).
+*/
+.mining-panel__info-card--notch-br {
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% 67.5%,
+    94.7% 71.2%,
+    89.9% 75.4%,
+    86.1% 79.8%,
+    82.9% 84.4%,
+    80.6% 89.2%,
+    79.0% 94.6%,
+    78.4% 100%,
+    0% 100%
+  );
+  border-right: none;
+  border-bottom: none;
+}
+.mining-panel__info-card--notch-tr {
+  clip-path: polygon(
+    0% 0%,
+    78.4% 0%,
+    79.0% 5.4%,
+    80.6% 10.8%,
+    82.9% 15.6%,
+    86.1% 20.2%,
+    89.9% 24.6%,
+    94.7% 28.8%,
+    100% 32.5%,
+    100% 100%,
+    0% 100%
+  );
+  border-right: none;
+  border-top: none;
+}
+
+/*
+  Statistics card notch (BOTTOM-LEFT corner, circle to the left).
+  Card: 18.5rem × 26.5rem. Circle centre 12rem left, y=27 local.
+  r=13. Left edge y-entry: 22rem (83.0%). Bottom edge x-exit: 0.99rem (5.4%).
+*/
+/* Stats card — BOTTOM-LEFT corner, 18.5rem×26.5rem, circle local (-9,27), r=12 */
+.mining-panel__info-card--notch-bl {
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 100%,
+    16.2% 100%, 15.3% 94.3%, 12.5% 86.8%, 7.5% 79.2%,
+    0% 71.9%
+  );
+  border-left: none;
+  border-bottom: none;
+}
+/*
+  Refined card notch (TOP-LEFT corner, circle to the left).
+  Card: 18.5rem × 26.5rem. Circle centre 12rem left, y=-0.5 local.
+  r=13. Top edge x-entry: 0.99rem (5.4%). Left edge y-exit: 4.5rem (17.0%).
+*/
+/* Refined card — TOP-LEFT corner, 18.5rem×26.5rem, circle local (-9,-0.5), r=13 */
+.mining-panel__info-card--notch-tl {
+  clip-path: polygon(
+    16.2% 0%, 14.8% 7.5%, 11.5% 15.1%, 5.9% 22.6%, 0% 28.1%,
+    0% 100%, 100% 100%, 100% 0%
+  );
+  border-left: none;
+  border-top: none;
+}
+
+/*
+  Config/Target notches: centre column (BOTTOM/TOP edge), circle directly below/above.
+  Card: 18rem × 15rem. Circle centre x=7rem local, y=27 (12rem below bottom edge).
+  r=13 → intersects bottom at x=2rem (11.1%) and x=12rem (66.7%); depth=1rem at x=7 (93.3%).
+*/
+/* Config — BOTTOM edge, 16rem×18rem, circle local (8,27), r=12 */
+.mining-panel__info-card--notch-bottom {
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 100%,
+    87.5% 92.3%, 75% 87.1%, 62.5% 84.3%, 50% 83.3%, 37.5% 84.3%, 25% 87.1%, 12.5% 92.3%,
+    0% 100%
+  );
+  border-bottom: none;
+}
+/* Target — TOP edge, 16rem×18rem, mirror of config */
+.mining-panel__info-card--notch-top {
+  clip-path: polygon(
+    0% 0%, 12.5% 7.7%, 25% 12.9%, 37.5% 15.7%, 50% 16.7%, 62.5% 15.7%, 75% 12.9%, 87.5% 7.7%,
+    100% 0%, 100% 100%, 0% 100%
+  );
+  border-top: none;
+}
+
+/* ── Mining circle frame ─────────────────────────────────────────────── */
+
+.mining-panel__circle-wrap {
+  width: 22rem;
+  height: 22rem;
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mining-panel__circle-outer {
+  width: 22rem;
+  height: 22rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: .2rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .75);
+  padding: .55rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .02);
+}
+
+.mining-panel__circle-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: .12rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.mining-panel__circle-icon {
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+  opacity: .8;
+  /* SVG fill is already #fa9600 orange — no filter needed */
+}
+
+/* ── Laser power strip (between prospectors) ─────────────────────────── */
+
+.mining-panel__laser-power {
+  width: 91.3%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .4rem .75rem;
+  border-radius: .15rem;
+  border: .1rem solid rgba(80, 200, 100, .3);
+}
+
+.mining-panel__laser-power--warn {
+  border-color: var(--color-danger);
+}
+
+.mining-panel__laser-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mining-panel__laser-text {
+  font-size: .9rem;
+  letter-spacing: .1rem;
+  text-transform: uppercase;
+}
+
+.mining-panel__laser-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: .04rem;
+}
+
+.mining-panel__laser-power--ok .mining-panel__laser-icon,
+.mining-panel__laser-power--ok .mining-panel__laser-text,
+.mining-panel__laser-power--ok .mining-panel__laser-value { color: rgba(80, 200, 100, .8); }
+
+.mining-panel__laser-power--warn .mining-panel__laser-icon,
+.mining-panel__laser-power--warn .mining-panel__laser-text,
+.mining-panel__laser-power--warn .mining-panel__laser-value { color: var(--color-danger); }
+
+/* ── Cargo bay (frame fills full panel height, title inside at top) ────── */
+
+.mining-panel__cargo-bay {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: calc(100% - 1rem);
+  position: relative;
+  padding: .8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mining-panel__cargo-corner {
+  position: absolute;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-color: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .7);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.mining-panel__cargo-corner--tl { top: 0; left: 0; border-width: .15rem 0 0 .15rem; }
+.mining-panel__cargo-corner--tr { top: 0; right: 0; border-width: .15rem .15rem 0 0; }
+.mining-panel__cargo-corner--bl { bottom: 0; left: 0; border-width: 0 0 .15rem .15rem; }
+.mining-panel__cargo-corner--br { bottom: 0; right: 0; border-width: 0 .15rem .15rem 0; }
+
+.mining-panel__cargo-title {
+  flex-shrink: 0;
+  height: 1.5rem;
+  width: 100%;
+  margin-bottom: .35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85rem;
+  letter-spacing: .2rem;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .85);
+  text-align: center;
+}
+
+.mining-panel__cargo-sections-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mining-panel__cargo-sections {
+  display: grid;
+  gap: .35rem;
+}
+
+.mining-panel__cargo-section {
+  display: grid;
+  /* grid-template-columns/rows and gap set via inline style */
+}
+
+.mining-panel__cargo-sq {
+  /* width/height set via inline style */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.mining-panel__cargo-sq--empty {
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .06);
+  border: .07rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .2);
+}
+
+.mining-panel__cargo-sq--material {
+  background: rgba(var(--color-secondary-r), var(--color-secondary-g), var(--color-secondary-b), .18);
+  border: .07rem solid rgba(var(--color-secondary-r), var(--color-secondary-g), var(--color-secondary-b), .55);
+}
+
+.mining-panel__cargo-sq--limpet {
+  background: rgba(var(--color-info-r, 100), var(--color-info-g, 180), var(--color-info-b, 255), .2);
+  border: .07rem solid var(--color-info);
+  opacity: .65;
+}
+
+.mining-panel__cargo-sq--generic {
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .15);
+  border: .07rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .35);
+}
+
+/* X-frame cross lines for generic cargo */
+.mining-panel__cargo-sq--generic::before,
+.mining-panel__cargo-sq--generic::after {
+  content: '';
+  position: absolute;
+  width: 65%;
+  height: .1rem;
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .45);
+  top: 50%;
+  left: 17.5%;
+}
+.mining-panel__cargo-sq--generic::before { transform: translateY(-50%) rotate(45deg); }
+.mining-panel__cargo-sq--generic::after  { transform: translateY(-50%) rotate(-45deg); }
+
+.mining-panel__cargo-abbrev {
+  font-size: .62rem;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--color-secondary);
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Prospector cards ────────────────────────────────────────────────── */
+
+.mining-panel__prospector-card {
+  flex: 1;
+  min-height: 0;
+  background: rgba(15, 5, 5, 0.65);
+  border: .1rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .4);
+  padding: .6rem .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  overflow: hidden;
+}
+
+/* Wrapper — direct grid item */
+.mining-panel__prospector-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+  SVG arc drawn at r=12rem — same radius as the clip-path polygon notch.
+  viewBox="0 0 30 25.1" + preserveAspectRatio="none" means 1 SVG unit = 1rem,
+  so arc path coordinates map directly to rem values and the endpoints land
+  exactly where the clip-path polygon cuts the card border.
+*/
+.mining-panel__prospector-arc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.mining-panel__prospector-arc path {
+  fill: none;
+  stroke: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .4);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/*
+  Prospector card notches.
+  Each card: 30rem × ~24.75rem (flex:1 inside prosp-col; laser-power ~2.5rem takes middle).
+  Circle centre at (38, 27) in prosp-top local; (38, -2.25) in prosp-bot local.
+  r=12. prosp-top: right-edge entry y=18.056 (73%), bottom exit x=26.21 (87.4%).
+        prosp-bot: top-edge entry x=26.21 (87.4%), right-edge exit y=6.694 (27.1%).
+*/
+/* Prosp-top — BOTTOM-RIGHT corner, 32rem×24.75rem, circle local (41,27), r=12 */
+.mining-panel__prospector-card--notch-br {
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 77%,
+    97.4% 81.3%, 95.7% 84.8%, 94.2% 88.6%, 92.9% 92.5%, 91.9% 96.5%, 91.3% 100%,
+    0% 100%
+  );
+  border-right: none;
+  border-bottom: none;
+}
+/* Prosp-bot — TOP-RIGHT corner, 32rem×24.75rem, circle local (41,-2.25), r=12 */
+.mining-panel__prospector-card--notch-tr {
+  clip-path: polygon(
+    0% 0%, 91.3% 0%,
+    91.9% 2.4%, 92.9% 6.4%, 94.2% 10.4%, 95.7% 14.1%, 97.4% 17.7%, 100% 23%,
+    100% 100%, 0% 100%
+  );
+  border-right: none;
+  border-top: none;
+}
+
+.mining-panel__prospector-card--good {
+  border-color: var(--color-secondary);
+  box-shadow: inset 0 0 1rem rgba(var(--color-secondary-r), var(--color-secondary-g), var(--color-secondary-b), .08);
+}
+
+/* Arc SVG follows the card highlight colour when the rock is good */
+.mining-panel__prospector-card--good ~ .mining-panel__prospector-arc path {
+  stroke: var(--color-secondary);
+  opacity: .7;
+}
+
+.mining-panel__prospector-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.05rem;
+  letter-spacing: .1rem;
+  text-transform: uppercase;
+  opacity: .6;
+  flex-shrink: 0;
+}
+
+.mining-panel__prospector-title--good {
+  opacity: 1;
+  color: var(--color-secondary);
+}
+
+.mining-panel__prospector-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  letter-spacing: .3rem;
+}
+
+.mining-panel__prospector-empty--offline {
+  color: rgba(200, 80, 80, .45);
+  font-size: 1.4rem;
+  letter-spacing: .3rem;
+}
+
+.mining-panel__prospector-empty--ready {
+  color: rgba(80, 200, 100, .45);
+  font-size: 1.4rem;
+  letter-spacing: .3rem;
+}
+
+.mining-panel__material-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr 4rem 1.5rem;
+  align-items: center;
+  gap: .4rem;
+}
+
+.mining-panel__material-name {
+  font-size: 1.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mining-panel__material-pct {
+  font-size: 1.1rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mining-panel__material-target {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.mining-panel__content-badge {
+  font-size: .95rem;
+  padding: .1rem .4rem;
+  border: .1rem solid currentColor;
+  border-radius: .1rem;
+  display: inline-block;
+  opacity: .7;
+  letter-spacing: .05rem;
+}
+
+.mining-panel__content-badge--High {
+  color: var(--color-secondary);
+  opacity: 1;
+}
+
+.mining-panel__content-badge--Medium {
+  color: var(--color-primary);
+}
+
+.mining-panel__content-badge--Low {
+  color: var(--color-info);
+  opacity: .5;
+}
+
+/* ── Pie chart (top prospector card) ───────────────────────────────── */
+
+.mining-panel__pie-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  overflow: hidden;
+}
+
+.mining-panel__pie-chart {
+  width: 9rem;
+  height: 9rem;
+  flex-shrink: 0;
+}
+
+.mining-panel__pie-legend {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  overflow: hidden;
+}
+
+.mining-panel__pie-legend-row {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.mining-panel__pie-dot {
+  width: .65rem;
+  height: .65rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mining-panel__pie-legend-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .95rem;
+}
+
+.mining-panel__pie-legend-pct {
+  font-size: .9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Prospector history log (bottom card) ───────────────────────── */
+
+.mining-panel__history-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  overflow: hidden;
+}
+
+.mining-panel__history-row {
+  display: grid;
+  grid-template-columns: 3.5rem 2rem 1fr;
+  gap: .35rem;
+  align-items: center;
+  font-size: 1.2rem;
+  opacity: .45;
+  padding: .2rem 0;
+  border-bottom: .05rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .12);
+}
+
+.mining-panel__history-row--good {
+  opacity: 1;
+}
+
+.mining-panel__history-time {
+  text-align: right;
+  font-size: 1.1rem;
+  letter-spacing: .02rem;
+  color: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .7);
+}
+
+.mining-panel__history-level {
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: .04rem;
+}
+
+.mining-panel__history-level--High  { color: var(--color-secondary); }
+.mining-panel__history-level--Medium { color: var(--color-primary); }
+.mining-panel__history-level--Low    { opacity: .5; }
+
+.mining-panel__history-mats {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.1rem;
+}
+
+/* ── Animated material percentage bars ────────────────────────────────── */
+
+.mining-panel__bar-track {
+  height: 1rem;
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .12);
+  border: .07rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .3);
+  overflow: hidden;
+  position: relative;
+}
+
+.mining-panel__bar-fill {
+  height: 100%;
+  width: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.mining-panel__bar-fill--info {
+  background: var(--color-info);
+  opacity: .55;
+}
+
+.mining-panel__bar-fill--secondary {
+  background: var(--color-secondary);
+  opacity: .75;
+  box-shadow: 0 0 .6rem rgba(var(--color-secondary-r), var(--color-secondary-g), var(--color-secondary-b), .4);
+}
+
+/* ── Session / refined stats ─────────────────────────────────────────── */
+
+.mining-panel__stat-placeholder {
+  opacity: .2;
+  font-size: 1.1rem;
+  letter-spacing: .1rem;
+  margin-top: .15rem;
+}
+
+.mining-panel__section-title {
+  font-size: 1rem;
+  letter-spacing: .15rem;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: .4rem;
+}
+
+.mining-panel__stat-row {
+  display: grid;
+  grid-template-columns: 13rem 1fr;
+  font-size: 1.15rem;
+}
+
+.mining-panel__stat-label {
+  opacity: .55;
+  letter-spacing: .05rem;
+}
+
+.mining-panel__stat-value {
+  color: var(--color-info);
+}
+
+.mining-panel__stat-value--highlight {
+  color: var(--color-secondary);
+}
+
+/* ── Limpet column (right side, tall vertical bar) ───────────────────── */
+
+.mining-panel__limpet-column {
+  flex-shrink: 0;
+  width: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+}
+
+.mining-panel__limpet-bar-wrap {
+  flex: 1;
+  width: 3rem;
+  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .1);
+  border: .1rem solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .35);
+  position: relative;
+  overflow: hidden;
+}
+
+.mining-panel__limpet-bar-wrap--warn {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 .6rem rgba(255, 60, 60, .2);
+}
+
+/* Other cargo fills from top (grey), dotted line at its base */
+.mining-panel__other-cargo-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(180, 180, 180, .25);
+  border-bottom: .15rem dashed rgba(180, 180, 180, .6);
+  transition: height .5s ease;
+}
+
+/* Limpets fill from bottom (white) */
+.mining-panel__limpet-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(220, 230, 240, .75);
+  transition: height .5s ease;
+}
+
+.mining-panel__limpet-fill--warn {
+  background: var(--color-danger);
+  opacity: .95;
+}
+
+/* Individual limpet segments (one div per limpet, stacked from bottom) */
+.mining-panel__limpet-seg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(220, 230, 240, .75);
+}
+
+.mining-panel__limpet-seg--warn {
+  background: var(--color-danger);
+  opacity: .95;
+}
+
+.mining-panel__limpet-count {
+  font-size: 1.5rem;
+  letter-spacing: .05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-info);
+}
+
+.mining-panel__limpet-label {
+  font-size: .85rem;
+  letter-spacing: .12rem;
+  text-transform: uppercase;
+  opacity: .5;
+  color: var(--color-info);
+}
+
+/* ── Profit estimate ─────────────────────────────────────────────────── */
+
+.mining-panel__profit {
+  font-size: 1.5rem;
+  letter-spacing: .1rem;
+  color: var(--color-secondary);
+  text-align: center;
+  padding: .35rem .5rem;
+  border: .1rem solid rgba(var(--color-secondary-r), var(--color-secondary-g), var(--color-secondary-b), .4);
+  margin-bottom: .25rem;
+}
+
+/* ── Ring type badge (used on /mining/rings page) ────────────────────── */
+
+.mining-panel__ring-type-badge {
+  font-size: .9rem;
+  padding: .05rem .35rem;
+  border: .1rem solid currentColor;
+  border-radius: .1rem;
+  flex-shrink: 0;
+}
+
+.mining-panel__ring-type-badge--Icy     { color: #5ab9ea; }
+.mining-panel__ring-type-badge--Metallic { color: #aabac4; }
+.mining-panel__ring-type-badge--MetalRich { color: #c8a84b; }
+.mining-panel__ring-type-badge--Rocky   { color: #a0826d; }
+
+/* ── Inactive / empty state ──────────────────────────────────────────── */
+
+.mining-panel__inactive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: .3;
+  font-size: 1.5rem;
+  letter-spacing: .2rem;
+  text-transform: uppercase;
+}

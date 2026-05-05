@@ -268,6 +268,7 @@ export default function EngineeringEngineersPage () {
     if (!engineers || !blueprints || !wishlist.length) return []
     const stops = buildEngineerRoute(wishlist, blueprints, engineers, currentSystem?.position ?? null)
     return stops
+      .filter(s => s.type === 'engineer')
       .map(stop => engineers.find(e => String(e.id) === String(stop.engineerId)))
       .filter(Boolean)
   }, [engineers, blueprints, wishlist, currentSystem])
