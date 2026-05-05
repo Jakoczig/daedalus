@@ -213,6 +213,7 @@ class Powerplay {
   constructor ({ eliteLog, shipStatus }) {
     this.eliteLog = eliteLog
     this.shipStatus = shipStatus
+    this._nearbyCache = new Map() // key: `${systemType}:${systemName}`
   }
 
   async getPowerplay () {
@@ -271,32 +272,40 @@ class Powerplay {
 
     const timePledged = powerplayEvent?.TimePledged ?? null
 
-    let nearbySources = null
-    const systemType = getSystemType(currentSystem?.powers, currentSystem?.powerState, power)
-    if (systemType && power && currentSystem?.name) {
-      try {
-        // Determine if the ship needs a large pad
-        const shipState = await this.shipStatus?.getShipStatus?.()
-        const shipType = shipState?.type
-        const padSize = shipType ? SHIP_PAD_SIZE[shipType] : null
-        const needsLargePad = padSize === 'L'
+    return { pledged: true, power, rank, merits, timePledged, currentSystem }
+  }
 
-        if (systemType === 'undermining') {
-          nearbySources = buildUnderminingNearby(power, currentSystem.name, needsLargePad)
-        } else if (systemType === 'reinforcement') {
-          nearbySources = buildReinforcementNearby(power, currentSystem.name, needsLargePad)
-        } else if (systemType === 'acquisition') {
-          nearbySources = buildAcquisitionNearby(power, currentSystem.name, needsLargePad)
-        }
-      } catch (e) { /* Spansh unavailable — degrade gracefully */ }
-    }
+  async getNearbySources ({ power, currentSystem }) {
+    if (!power || !currentSystem?.name) return null
 
-    return { pledged: true, power, rank, merits, timePledged, currentSystem, nearbySources }
+    const systemType = getSystemType(currentSystem.powers, currentSystem.powerState, power)
+    if (!systemType) return null
+
+    const cacheKey = `${systemType}:${currentSystem.name}`
+    if (this._nearbyCache.has(cacheKey)) return this._nearbyCache.get(cacheKey)
+
+    try {
+      const shipState = await this.shipStatus?.getShipStatus?.()
+      const shipType = shipState?.type
+      const padSize = shipType ? SHIP_PAD_SIZE[shipType] : null
+      const needsLargePad = padSize === 'L'
+
+      let result = null
+      if (systemType === 'undermining') result = buildUnderminingNearby(power, currentSystem.name, needsLargePad)
+      else if (systemType === 'reinforcement') result = buildReinforcementNearby(power, currentSystem.name, needsLargePad)
+      else if (systemType === 'acquisition') result = buildAcquisitionNearby(power, currentSystem.name, needsLargePad)
+
+      this._nearbyCache.set(cacheKey, result)
+      return result
+    } catch (e) { /* Spansh unavailable — degrade gracefully */ }
+
+    return null
   }
 
   getHandlers () {
     return {
-      getPowerplay: () => this.getPowerplay()
+      getPowerplay: () => this.getPowerplay(),
+      getPowerplayNearbySources: ({ power, currentSystem }) => this.getNearbySources({ power, currentSystem })
     }
   }
 }

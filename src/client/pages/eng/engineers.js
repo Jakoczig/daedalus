@@ -82,8 +82,8 @@ function EngineerCard ({ engineer, currentSystem, prerequisites, onAddToWishlist
 
   return (
     <div style={{
-      border: `${isColonia ? '3px' : '1px'} solid ${isColonia ? COLONIA_GOLD : isUnlocked ? 'var(--color-success)' : isLocked ? 'rgba(255,255,255,.15)' : 'var(--color-primary)'}`,
-      boxShadow: isColonia ? `0 0 14px 3px ${COLONIA_GOLD}88, inset 0 0 8px 0 ${COLONIA_GOLD}22` : undefined,
+      border: `${isColonia ? '3px' : '1px'} solid ${isColonia && isUnlocked ? 'var(--color-secondary)' : isColonia ? COLONIA_GOLD : isUnlocked ? 'var(--color-success)' : isLocked ? 'rgba(255,255,255,.15)' : 'var(--color-primary)'}`,
+      boxShadow: isColonia && isUnlocked ? '0 0 14px 3px rgba(20,245,255,0.55), inset 0 0 8px 0 rgba(20,245,255,0.22)' : isColonia ? `0 0 14px 3px ${COLONIA_GOLD}88, inset 0 0 8px 0 ${COLONIA_GOLD}22` : undefined,
       borderRadius: '4px',
       overflow: 'hidden',
       opacity: isLocked ? 0.45 : 1,

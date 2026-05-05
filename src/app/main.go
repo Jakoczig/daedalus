@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -17,6 +20,7 @@ import (
 	"github.com/rodolfoag/gow32"
 	"github.com/sqweek/dialog"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 var dirname = ""
@@ -145,8 +149,55 @@ type process struct {
 
 var processGroup ProcessGroup
 
+// registerProtocolHandler writes HKCU registry keys so the OS can route
+// daedalus:// URLs back to this executable.
+func registerProtocolHandler(exePath string) {
+	key, _, err := registry.CreateKey(registry.CURRENT_USER,
+		`Software\Classes\daedalus`, registry.SET_VALUE)
+	if err != nil {
+		return
+	}
+	_ = key.SetStringValue("", "URL:DAEDALUS Terminal Protocol")
+	_ = key.SetStringValue("URL Protocol", "")
+	key.Close()
+
+	cmdKey, _, err := registry.CreateKey(registry.CURRENT_USER,
+		`Software\Classes\daedalus\shell\open\command`, registry.SET_VALUE)
+	if err != nil {
+		return
+	}
+	_ = cmdKey.SetStringValue("", fmt.Sprintf(`"%s" "%%1"`, exePath))
+	cmdKey.Close()
+}
+
+// forwardCapiCallback is called when the OS launches us with a
+// daedalus://capi-callback?code=...&state=... URL (i.e. we are the
+// second instance acting as the OAuth redirect handler). We forward
+// the params to the running service's HTTP endpoint and exit.
+func forwardCapiCallback(rawURL string, servicePort int) {
+	u, err := neturl.Parse(rawURL)
+	if err != nil {
+		os.Exit(0)
+	}
+	serviceURL := fmt.Sprintf("http://127.0.0.1:%d/capi-callback?%s", servicePort, u.RawQuery)
+	//nolint: errcheck
+	_, _ = http.Get(serviceURL) //nolint: noctx
+	os.Exit(0)
+}
+
 func main() {
 	startTime := time.Now()
+
+	// Handle daedalus:// protocol callback — OS launches us with the redirect URL
+	// as the first argument when Frontier's auth server redirects after login.
+	// Forward the params to the running service and exit immediately.
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "daedalus://capi-callback") {
+			forwardCapiCallback(arg, defaultPort)
+			// forwardCapiCallback calls os.Exit; this return is unreachable
+			return
+		}
+	}
 
 	_processGroup, err := NewProcessGroup()
 	if err != nil {
@@ -205,6 +256,10 @@ func main() {
 		exitApplication(1)
 	}
 	dirname = filepath.Dir(pathToExecutable)
+
+	// Register daedalus:// as a custom URL scheme so the OS routes
+	// Frontier's OAuth2 redirect back to this executable.
+	registerProtocolHandler(pathToExecutable)
 
 	// Check if is first run after installing, in which case we restart without
 	// elevated privilages to ensure we are not running as the installer, as that

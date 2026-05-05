@@ -136,3 +136,34 @@ export function clearWishlist (shipId) {
     window.localStorage.removeItem(wishlistKey(shipId))
   } catch (_) { /* not in browser */ }
 }
+
+// ---------------------------------------------------------------------------
+// Known ships registry
+// ---------------------------------------------------------------------------
+
+const KNOWN_SHIPS_KEY = 'daedalus_known_ships'
+
+/**
+ * Return all ships that have ever been seen, keyed by ship ID.
+ * Each entry is { name, type }.
+ * @returns {Object.<string, {name: string, type: string}>}
+ */
+export function getAllKnownShips () {
+  try {
+    const raw = window.localStorage.getItem(KNOWN_SHIPS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (_) { return {} }
+}
+
+/**
+ * Persist info about a ship so it appears in the ship selector.
+ * @param {string|number} shipId
+ * @param {{ name: string, type: string }} info
+ */
+export function storeKnownShip (shipId, info) {
+  try {
+    const ships = getAllKnownShips()
+    ships[String(shipId)] = { name: info.name ?? 'Unknown', type: info.type ?? '' }
+    window.localStorage.setItem(KNOWN_SHIPS_KEY, JSON.stringify(ships))
+  } catch (_) { /* quota exceeded / not in browser */ }
+}

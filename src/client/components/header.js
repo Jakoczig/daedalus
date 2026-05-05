@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { socketOptions, setSocketOption, useSocket } from 'lib/socket'
+import { socketOptions, setSocketOption, useSocket, sendEvent } from 'lib/socket'
 import { isWindowFullScreen, toggleFullScreen } from 'lib/window'
 import { eliteDateTime } from 'lib/format'
 import { Settings } from 'components/settings'
@@ -27,6 +27,7 @@ export default function Header () {
 
   const { audioEnabled, toggleAudio } = useAudioToggle()
   const { landingPadEnabled, landingPadData, toggleLandingPad, dismissLandingPad } = useLandingPad()
+  const [integrationWarnings, setIntegrationWarnings] = useState([])
 
   async function fullScreen () {
     const newFullScreenState = await toggleFullScreen()
@@ -87,6 +88,27 @@ export default function Header () {
     return () => { mounted = false }
   }, [])
 
+  // Poll integration status every 60 s — show a warning banner for any enabled
+  // integration that is in an error state.
+  useEffect(() => {
+    let mounted = true
+    const checkStatus = async () => {
+      try {
+        const st = await sendEvent('getIntegrationStatus')
+        if (!mounted) return
+        const warnings = []
+        if (st?.edsm?.enabled && (!st.edsm.configured || st.edsm.status === 'error')) warnings.push('EDSM')
+        if (st?.eddn?.enabled && st.eddn.status === 'error') warnings.push('EDDN')
+        if (st?.inara?.enabled && (!st.inara.configured || st.inara.status === 'error')) warnings.push('Inara')
+        if (st?.capi?.enabled && st.capi.status === 'error') warnings.push('CAPI')
+        setIntegrationWarnings(warnings)
+      } catch { /* service may not be ready yet */ }
+    }
+    checkStatus()
+    const interval = setInterval(checkStatus, 60000)
+    return () => { mounted = false; clearInterval(interval) }
+  }, [])
+
   useEffect(() => {
     const dateTimeInterval = setInterval(async () => {
       setDateTime(eliteDateTime())
@@ -111,6 +133,25 @@ export default function Header () {
       <h1 className='text-info' style={{ padding: '.6rem 0 .25rem 5.5rem' }}>
         <i className='icon daedalus-terminal-logo' style={{ position: 'absolute', fontSize: '5rem', left: '-.5rem', top: '.7rem', textShadow: '0 0 1px' }} />DAEDALUS <span className='hidden-small'>Terminal</span>
       </h1>
+      {integrationWarnings.length > 0 && (
+        <p style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: 'calc(1.5rem + var(--window-chrome-offset, 0px))',
+          margin: 0,
+          fontSize: '1.4rem',
+          fontWeight: 700,
+          letterSpacing: '.06rem',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          color: '#CC2222',
+          animation: 'integration-warning-pulse 2.5s ease-in-out infinite',
+          zIndex: 50
+        }}>
+          Integration error: {integrationWarnings.join(', ')}
+        </p>
+      )}
       <div style={{ position: 'absolute', top: 'calc(1rem + var(--window-chrome-offset, 0px))', right: '.5rem', display: 'flex', alignItems: 'center', zIndex: 100 }}>
         <div className={`header__toolbar ${toolbarOpen ? 'header__toolbar--open' : ''}`}>
           <p

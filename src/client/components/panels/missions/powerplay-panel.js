@@ -33,6 +33,14 @@ const RANK_TICKS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 // ─── Activity category display order ─────────────────────────────────────────
 const CATEGORY_ORDER = ['Combat', 'Finance', 'Social', 'Covert']
 
+// ─── Category icons (colored SVGs, fills baked in) ────────────────────────────
+const CATEGORY_ICON = {
+  combat:  '/icons/category-combat.svg',
+  finance: '/icons/category-finance.svg',
+  social:  '/icons/category-social.svg',
+  covert:  '/icons/category-covert.svg'
+}
+
 // ─── Universal perks (all powers) ────────────────────────────────────────────
 const UNIVERSAL_PERKS = [
   { name: 'Rank decal',                            tiers: [{ rank: 1, value: 'Unlocked' }] },
@@ -287,7 +295,7 @@ const SYSTEM_TYPE_CLASS = {
 
 // Brief contextual description per system type
 const SYSTEM_TYPE_INFO = {
-  reinforcement: 'Your power controls this system. Activities earn merits and control points, building toward Fortified (20Ly acquisition range) or Stronghold (30Ly).',
+  reinforcement: 'Activities earn merits and control points, building toward Fortified (20Ly acquisition range) or Stronghold (30Ly).',
   acquisition:   'Unoccupied system within your acquisition range. Reach 120,000 control points before a rival power to claim it.',
   contested:     'Multiple powers are competing for control of this system. Powerplay Combat Zones may be active. Earn merits and control points to push your power ahead.',
   undermining:   "Enemy power's controlled system. Reduce their control points to push it into Turmoil, opening it for your power to acquire."
@@ -319,41 +327,46 @@ function HeroSection ({ power, rank, merits, timePledged, systemType }) {
             className='powerplay-panel__portrait'
             alt={power}
           />
-          <div className='powerplay-panel__portrait-fade' />
         </div>
       )}
       <div className='powerplay-panel__hero'>
-        <div className='powerplay-panel__hero-title'>
-          <h1 className='powerplay-panel__power-name text-primary'>{power}</h1>
-          <span className='powerplay-panel__rank-badge text-uppercase text-info'>
-            Rank {rank ?? 0}{rank >= 100 && <span className='text-secondary'> ★</span>}
-          </span>
-        </div>
+        <div className='powerplay-panel__hero-top'>
+          <div className='powerplay-panel__hero-left'>
+            <div className='powerplay-panel__hero-title'>
+              <h1 className='powerplay-panel__power-name text-primary'>{power}</h1>
+              <span className='powerplay-panel__rank-badge text-uppercase text-info'>
+                Rank {rank ?? 0}{rank >= 100 && <span className='text-secondary'> ★</span>}
+              </span>
+            </div>
 
-        <div className='powerplay-panel__hero-stats'>
-          {merits != null && (
-            <div className='powerplay-panel__hero-stat'>
-              <span className='powerplay-panel__hero-stat-label text-muted'>Total merits</span>
-              <span className='powerplay-panel__hero-stat-value text-info'>{merits.toLocaleString()}</span>
+            <div className='powerplay-panel__hero-stats'>
+              {merits != null && (
+                <div className='powerplay-panel__hero-stat'>
+                  <span className='powerplay-panel__hero-stat-label text-muted'>Total merits</span>
+                  <span className='powerplay-panel__hero-stat-value text-info'>{merits.toLocaleString()}</span>
+                </div>
+              )}
+              {meritsNeeded != null && (
+                <div className='powerplay-panel__hero-stat'>
+                  <span className='powerplay-panel__hero-stat-label text-muted'>Merits to Rank {rank + 1}</span>
+                  <span className='powerplay-panel__hero-stat-value text-primary'>{meritsNeeded.toLocaleString()}</span>
+                </div>
+              )}
+              {formatTimePledged(timePledged) && (
+                <div className='powerplay-panel__hero-stat'>
+                  <span className='powerplay-panel__hero-stat-label text-muted'>Time pledged</span>
+                  <span className='powerplay-panel__hero-stat-value text-info'>{formatTimePledged(timePledged)}</span>
+                </div>
+              )}
             </div>
-          )}
-          {meritsNeeded != null && (
-            <div className='powerplay-panel__hero-stat'>
-              <span className='powerplay-panel__hero-stat-label text-muted'>Merits to Rank {rank + 1}</span>
-              <span className='powerplay-panel__hero-stat-value text-primary'>{meritsNeeded.toLocaleString()}</span>
-            </div>
-          )}
-          {formatTimePledged(timePledged) && (
-            <div className='powerplay-panel__hero-stat'>
-              <span className='powerplay-panel__hero-stat-label text-muted'>Time pledged</span>
-              <span className='powerplay-panel__hero-stat-value text-info'>{formatTimePledged(timePledged)}</span>
-            </div>
-          )}
+          </div>
+
           {allEthos && (
             <div className='powerplay-panel__hero-ethos'>
               {['reinforcement', 'acquisition', 'undermining'].map(type => (
                 <div key={type} className={`powerplay-panel__hero-ethos-item${systemType === type ? ' powerplay-panel__hero-ethos-item--active' : ''}`}>
-                  <span className='powerplay-panel__hero-ethos-label text-muted'>{SYSTEM_TYPE_LABEL[type]}</span>
+                  <span className='powerplay-panel__hero-ethos-label'>{SYSTEM_TYPE_LABEL[type]}</span>
+                  <img src={CATEGORY_ICON[allEthos[type].toLowerCase()]} className='powerplay-panel__cat-icon' alt='' aria-hidden='true' />
                   <span className={`powerplay-panel__hero-ethos-value powerplay-panel__cat--${allEthos[type].toLowerCase()}`}>
                     {allEthos[type]}
                   </span>
@@ -392,8 +405,11 @@ function HeroSection ({ power, rank, merits, timePledged, systemType }) {
               {RANK_TICKS.map(t => (
                 <div
                   key={t}
-                  className={`powerplay-panel__rank-tick${rank >= t ? ' powerplay-panel__rank-tick--passed' : ''}`}
-                  style={{ left: `${t}%` }}
+                  className={`powerplay-panel__rank-tick${rank >= t ? ' powerplay-panel__rank-tick--passed' : ''}${t === 0 ? ' powerplay-panel__rank-tick--edge-start' : ''}${t === 100 ? ' powerplay-panel__rank-tick--edge-end' : ''}`}
+                  style={{
+                    left: `${t}%`,
+                    transform: t === 0 ? 'translateX(0)' : t === 100 ? 'translateX(-100%)' : 'translateX(-50%)'
+                  }}
                 >
                   <div className='powerplay-panel__rank-tick-line' />
                   <span className='powerplay-panel__rank-tick-label'>{t}</span>
@@ -409,6 +425,9 @@ function HeroSection ({ power, rank, merits, timePledged, systemType }) {
 
 // ─── NearbySourcesSection ─────────────────────────────────────────────────────
 function NearbySourcesSection ({ nearbySources }) {
+  if (nearbySources === undefined) {
+    return <p className='text-muted powerplay-panel__nearby-loading'>Loading systems…</p>
+  }
   if (!nearbySources?.groups?.length) return null
 
   return (
@@ -452,7 +471,7 @@ function SystemSection ({ currentSystem, playerPower, nearbySources }) {
     return (
       <div>
         <h4 className='powerplay-panel__section-title text-primary'>Current System</h4>
-        <p className='text-muted' style={{ fontSize: '.875rem' }}>Location data unavailable.</p>
+        <p className='text-muted' style={{ fontSize: '1.4rem' }}>Location data unavailable.</p>
       </div>
     )
   }
@@ -466,10 +485,35 @@ function SystemSection ({ currentSystem, playerPower, nearbySources }) {
   const commodity = playerPower && systemType ? POWER_COMMODITIES[playerPower]?.[systemType] : null
   const grouped = activities ? groupActivities(activities) : null
 
+  // The controlling power is the sole power when uncontested; null when contested
+  const controllingPower = isContested ? null : (systemType === 'reinforcement' ? playerPower : currentSystem.powers?.[0] ?? null)
+  const playerPresent = playerPower && currentSystem.powers?.includes(playerPower)
+
+  let playerStatusText = null
+  let playerStatusClass = 'text-muted'
+  if (playerPower && currentSystem.powers?.length > 0) {
+    if (systemType === 'reinforcement') {
+      playerStatusText = 'Your power controls this system'
+      playerStatusClass = 'text-success'
+    } else if (isContested && playerPresent) {
+      playerStatusText = 'Your power is competing for control of this system'
+      playerStatusClass = 'text-secondary'
+    } else if (isContested && !playerPresent) {
+      playerStatusText = 'Your power has no influence in this system'
+    } else if (systemType === 'undermining') {
+      playerStatusText = playerPresent
+        ? 'Your power is attempting to acquire this system'
+        : 'Your power has no influence in this system'
+    }
+  }
+
   return (
     <div>
       <h4 className='powerplay-panel__section-title text-primary'>Current System</h4>
 
+      {playerStatusText && (
+        <p className={playerStatusClass} style={{ fontStyle: 'italic', margin: '0 0 .6rem', fontSize: '1.5rem' }}>{playerStatusText}</p>
+      )}
       <div className='powerplay-panel__rows'>
         <div className='powerplay-panel__row'>
           <span className='text-primary'>System</span>
@@ -477,8 +521,15 @@ function SystemSection ({ currentSystem, playerPower, nearbySources }) {
         </div>
         {currentSystem.powers?.length > 0 && (
           <div className='powerplay-panel__row'>
-            <span className='text-primary'>{isContested ? 'Powers present' : currentSystem.powers.length > 1 ? 'Powers present' : 'Controlling power'}</span>
-            <span className='text-info'>{currentSystem.powers.join(', ')}</span>
+            <span className='text-primary'>{isContested ? 'Powers present' : 'Controlling power'}</span>
+            <span>
+              {currentSystem.powers.map((p, i) => (
+                <span key={p}>
+                  {i > 0 && <span className='text-muted'>, </span>}
+                  <span className={p === controllingPower ? 'text-secondary' : 'text-info'}>{p}</span>
+                </span>
+              ))}
+            </span>
           </div>
         )}
         {currentSystem.powerState && (
@@ -587,7 +638,7 @@ function SalarySection () {
   return (
     <div>
       <h4 className='powerplay-panel__section-title text-primary'>Weekly Salary</h4>
-      <p className='text-muted' style={{ fontSize: '.9rem', marginBottom: '.5rem' }}>
+      <p className='text-muted' style={{ fontSize: '1.4rem', marginBottom: '.5rem' }}>
         Awarded each Thursday based on merits earned <em>this cycle</em> vs. all pledged CMDRs. Requires at least 1 merit earned.
       </p>
       <div className='powerplay-panel__salary-table'>
@@ -715,7 +766,7 @@ function PowerBonusSection ({ power, rank, merits }) {
 }
 
 // ─── Main panel ───────────────────────────────────────────────────────────────
-export default function PowerplayPanel ({ powerplay }) {
+export default function PowerplayPanel ({ powerplay, nearbySources }) {
   if (!powerplay) {
     return (
       <div className='powerplay-panel'>
@@ -756,7 +807,7 @@ export default function PowerplayPanel ({ powerplay }) {
       />
       <hr />
       <div className='powerplay-panel__main'>
-        <SystemSection currentSystem={powerplay.currentSystem} playerPower={powerplay.power} nearbySources={powerplay.nearbySources} />
+        <SystemSection currentSystem={powerplay.currentSystem} playerPower={powerplay.power} nearbySources={nearbySources} />
         <div className='powerplay-panel__right-col'>
           <PowerBonusSection power={powerplay.power} rank={powerplay.rank ?? 0} merits={powerplay.merits} />
           <hr style={{ margin: '1.25rem 0' }} />

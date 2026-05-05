@@ -21,7 +21,7 @@ function TradeSuggestions ({ trades, fullyResolved, stillNeeded }) {
 
   if (!trades?.length) {
     return (
-      <p className='text-muted' style={{ margin: '.25rem 0 0', fontSize: '.85rem' }}>
+      <p className='text-muted' style={{ margin: '.25rem 0 0', fontSize: '1.4rem' }}>
         No trade suggestions — collect directly.
       </p>
     )
@@ -35,8 +35,8 @@ function TradeSuggestions ({ trades, fullyResolved, stillNeeded }) {
       {visible.map((trade, i) =>
         <div
           key={`trade_${trade.from.symbol}_${i}`}
-          className='text-primary'
-          style={{ fontSize: '.85rem', lineHeight: '1.5' }}
+          className={fullyResolved ? '' : 'text-primary'}
+          style={{ fontSize: '1.4rem', lineHeight: '1.5' }}
         >
           <i className='icon daedalus-terminal-engineering' style={{ marginRight: '.3rem', fontSize: '.9rem', position: 'relative', top: '.1rem' }} />
           Trade {trade.give.toLocaleString()}×{' '}
@@ -54,13 +54,13 @@ function TradeSuggestions ({ trades, fullyResolved, stillNeeded }) {
       {hasMore &&
         <button
           className='text-link text-uppercase'
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '.8rem', marginTop: '.2rem' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '1.3rem', marginTop: '.2rem' }}
           onClick={() => setExpanded(v => !v)}
         >
           {expanded ? 'Show fewer' : `Show ${trades.length - 2} more…`}
         </button>}
       {!fullyResolved && (stillNeeded ?? 0) > 0 &&
-        <div className='text-warning' style={{ fontSize: '.85rem', marginTop: '.2rem' }}>
+        <div className='text-warning' style={{ fontSize: '1.4rem', marginTop: '.2rem' }}>
           Still need {stillNeeded.toLocaleString()}× from collection.
         </div>}
     </div>
@@ -86,12 +86,12 @@ export default function MaterialRequirement ({ requirement, shortfallMap }) {
   const barValue = Math.min(owned, required)
 
   return (
-    <tr className={hasShortfall ? '' : 'text-secondary'}>
+    <tr className={fullyResolved ? 'text-success' : hasShortfall ? '' : 'text-secondary'}>
       <td>
         {/* Name + type badge row */}
         <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '.4rem', marginBottom: '.25rem' }}>
           <h4 style={{ margin: 0 }}>{name}</h4>
-          <span className='text-muted' style={{ fontSize: '.85rem' }}>
+          <span className='text-muted' style={{ fontSize: '1.4rem' }}>
             {type} · {category} · G{grade}
           </span>
         </div>
@@ -100,13 +100,13 @@ export default function MaterialRequirement ({ requirement, shortfallMap }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.2rem' }}>
           <div style={{ flex: '0 0 50%', maxWidth: '30rem' }}>
             <progress
-              style={{ height: '1rem', width: '100%' }}
+              style={{ height: '1.2rem', width: '100%' }}
               value={barValue}
               max={required}
-              className={!hasShortfall ? 'progress--secondary' : ''}
+              className={fullyResolved ? 'progress--success' : !hasShortfall ? 'progress--secondary' : ''}
             />
           </div>
-          <span className={hasShortfall ? 'text-warning' : ''} style={{ fontSize: '.9rem', whiteSpace: 'nowrap' }}>
+          <span className={hasShortfall && !fullyResolved ? 'text-warning' : ''} style={{ fontSize: '1.5rem', whiteSpace: 'nowrap' }}>
             {owned.toLocaleString()}/{required.toLocaleString()}
             {hasShortfall && <span className='text-muted'> (need {shortfall.toLocaleString()} more)</span>}
           </span>
@@ -121,7 +121,7 @@ export default function MaterialRequirement ({ requirement, shortfallMap }) {
           />}
       </td>
       <td className='text-right' style={{ width: '3rem', verticalAlign: 'middle' }}>
-        <i className={`icon daedalus-terminal-materials-grade-${grade}`} style={{ fontSize: '2.5rem' }} />
+        <i className={`icon daedalus-terminal-materials-grade-${grade}`} style={{ fontSize: '3rem' }} />
       </td>
     </tr>
   )

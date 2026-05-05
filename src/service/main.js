@@ -230,6 +230,33 @@ function videosMiddleware (req, res, next) {
   next()
 }
 
+// Receives the OAuth2 callback forwarded by the Go app when Frontier redirects
+// to daedalus://capi-callback?code=...&state=...
+// The Go app opens http://localhost:{PORT}/capi-callback?... on the running service.
+function capiCallbackMiddleware (req, res, next) {
+  if (!req.url?.startsWith('/capi-callback')) return next()
+
+  const urlParsed = new URL(req.url, `http://localhost:${PORT}`)
+  const code = urlParsed.searchParams.get('code')
+  const state = urlParsed.searchParams.get('state')
+  const error = urlParsed.searchParams.get('error')
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+  res.end([
+    '<!DOCTYPE html><html><head><meta charset="utf-8">',
+    '<title>DAEDALUS Terminal — Auth Complete</title></head>',
+    '<body style="background:#111;color:#4DFFC9;font-family:monospace;',
+    'text-align:center;padding:4rem;margin:0">',
+    '<h2>DAEDALUS Terminal</h2>',
+    '<p>Authentication complete. You may close this tab.</p>',
+    '</body></html>'
+  ].join(''))
+
+  if (global.HANDLE_CAPI_CALLBACK) {
+    global.HANDLE_CAPI_CALLBACK({ code, state, error })
+  }
+}
+
 function systemMediaArtworkMiddleware (req, res, next) {
   if (req.url && req.url.startsWith('/system-media-artwork/')) {
     const requestPath = new URL(req.url, 'http://localhost').pathname
@@ -283,13 +310,13 @@ if (DEVELOPMENT) {
     if (res.end) res.end('Waiting for Next.js dev server...')
   })
   httpServer = http.createServer((req, res) => {
-    voicelinesMiddleware(req, res, () => videosMiddleware(req, res, () => systemMediaArtworkMiddleware(req, res, () => proxy.web(req, res, { target: 'http://localhost:3000' }))))
+    capiCallbackMiddleware(req, res, () => voicelinesMiddleware(req, res, () => videosMiddleware(req, res, () => systemMediaArtworkMiddleware(req, res, () => proxy.web(req, res, { target: 'http://localhost:3000' })))))
   })
 } else {
   // The default behaviour (i.e. production) is to serve static assets. When the
   // application is compiled to a native executable these assets will be bundled
   // with the executable in a virtual file system.
-  const webServer = connect().use(voicelinesMiddleware).use(videosMiddleware).use(systemMediaArtworkMiddleware).use(serveStatic(WEB_DIR, { extensions: ['html'] }))
+  const webServer = connect().use(capiCallbackMiddleware).use(voicelinesMiddleware).use(videosMiddleware).use(systemMediaArtworkMiddleware).use(serveStatic(WEB_DIR, { extensions: ['html'] }))
   httpServer = http.createServer(webServer)
 }
 

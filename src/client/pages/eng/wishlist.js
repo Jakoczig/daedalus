@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import animateTableEffect from 'lib/animate-table-effect'
 import { useSocket, sendEvent, eventListener } from 'lib/socket'
 import { EngineeringPanelNavItems } from 'lib/navigation-items'
 import Layout from 'components/layout'
 import Panel from 'components/panel'
-import { getActiveShipId, setActiveShipId, setWishlist, getWishlist } from 'lib/wishlist'
+import { getActiveShipId, setActiveShipId, setWishlist, getWishlist, getAllKnownShips, storeKnownShip } from 'lib/wishlist'
 import { aggregateMaterialRequirements, allocateTradeSuggestions, computeItemShortfall } from 'lib/engineering-calc'
 import ModuleEngineeringCard from 'components/panels/eng/module-engineering-card'
 import WishlistItem from 'components/panels/eng/wishlist-item'
@@ -52,13 +52,19 @@ function tokenMatch (haystack, needle) {
   return new RegExp('(?:^|\\s)' + escaped + '(?:\\s|$)').test(haystack)
 }
 
+function camelToWords (str) {
+  return str.replace(/([A-Z])/g, ' $1').trim().toLowerCase()
+}
+
 function getApplicableBlueprints (module, allBlueprints) {
   const nameLower = (module.name ?? '').toLowerCase()
   const slotLower = (module.slot ?? '').toLowerCase()
+  const slotReadable = camelToWords(module.slot ?? '')
   return allBlueprints.filter(bp =>
     (bp.modules ?? []).some(m => {
       const mLower = m.toLowerCase()
-      return tokenMatch(nameLower, mLower) || mLower === slotLower
+      return tokenMatch(nameLower, mLower) || mLower === slotLower ||
+             (slotReadable && tokenMatch(slotReadable, mLower))
     })
   )
 }
@@ -122,6 +128,10 @@ function groupEngineerableModules (modules, allBlueprints) {
   const optional = []
 
   for (const module of Object.values(modules ?? {})) {
+    // Guardian modules are not engineerable via blueprints
+    if ((module.symbol ?? '').toLowerCase().includes('guardian')) continue
+    // Cosmetic/livery slots (paint jobs, weapon colour, decals, etc.) are not engineerable
+    if (/^(WeaponColour|PaintJob|Decal\d|VoicePack|ShipName|ShipID|NamePlate|ShipKit)/i.test(module.slot ?? '')) continue
     const applicable = getApplicableBlueprints(module, allBlueprints)
     if (applicable.length === 0) continue
     const entry = { module, applicable }
@@ -159,11 +169,7 @@ function SectionHeader ({ label, count }) {
 
 function ModuleGroup ({ entries, goals, blueprints, onGoalChange }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 420px), 1fr))',
-      gap: '.75rem'
-    }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.75rem', alignItems: 'stretch' }}>
       {entries.map(({ module, applicable }) => (
         <ModuleEngineeringCard
           key={module.slot}
@@ -187,6 +193,8 @@ export default function EngineeringWishlistPage () {
   const [blueprints, setBlueprints] = useState([])
   const [materials, setMaterials] = useState([])
   const [shipId, setShipId] = useState(null)
+  const [activeShipId, setActiveShipIdState] = useState(null)
+  const [knownShips, setKnownShips] = useState({})
   const [shipStatus, setShipStatus] = useState(null)
   const [moduleGoals, setModuleGoals] = useState({})
   const [manualItems, setManualItems] = useState([])
@@ -218,12 +226,18 @@ export default function EngineeringWishlistPage () {
       const activeId = getActiveShipId() ?? newShipStatus?.shipId
       if (activeId) {
         if (!getActiveShipId() && newShipStatus?.shipId) setActiveShipId(activeId)
+        setActiveShipIdState(activeId)
+        // Store this ship to the known ships registry
+        if (newShipStatus?.name || newShipStatus?.type) {
+          storeKnownShip(activeId, { name: newShipStatus.name, type: newShipStatus.type })
+        }
         setShipId(activeId)
         setModuleGoals(loadModuleGoals(activeId))
         // Only restore manually-added items (no moduleSlot)
         setManualItems(getWishlist(activeId).filter(i => !i.moduleSlot))
       }
 
+      setKnownShips(getAllKnownShips())
       setComponentReady(true)
     })()
   }, [connected, ready])
@@ -236,9 +250,16 @@ export default function EngineeringWishlistPage () {
     if (log.event === 'Loadout' && log.ShipID != null) {
       const id = String(log.ShipID)
       setActiveShipId(id)
-      setShipId(id)
+      setActiveShipIdState(id)
       const newShip = await sendEvent('getShipStatus')
       setShipStatus(newShip ?? null)
+      // Store ship info and refresh known ships list
+      if (newShip) {
+        storeKnownShip(id, { name: newShip.name, type: newShip.type })
+        setKnownShips(getAllKnownShips())
+      }
+      // Always switch view to the newly boarded ship
+      setShipId(id)
       setModuleGoals(loadModuleGoals(id))
       setManualItems(getWishlist(id).filter(i => !i.moduleSlot))
     }
@@ -269,12 +290,22 @@ export default function EngineeringWishlistPage () {
   }, [shipId, wishlist])
 
   // ── Module grouping ───────────────────────────────────────────────────────
+  const isViewingInactiveShip = !!(shipId && activeShipId && shipId !== activeShipId)
+
+  // Only show module cards when viewing the active ship (live module data only available then)
   const { core, hardpoints, optional } = useMemo(
-    () => groupEngineerableModules(shipStatus?.modules, blueprints),
-    [shipStatus, blueprints]
+    () => isViewingInactiveShip ? { core: [], hardpoints: [], optional: [] } : groupEngineerableModules(shipStatus?.modules, blueprints),
+    [shipStatus, blueprints, isViewingInactiveShip]
   )
 
   // ── Handlers ─────────────────────────────────────────────────────────────
+  const handleShipSelect = useCallback((newShipId) => {
+    if (!newShipId || newShipId === shipId) return
+    setShipId(newShipId)
+    setModuleGoals(loadModuleGoals(newShipId))
+    setManualItems(getWishlist(newShipId).filter(i => !i.moduleSlot))
+  }, [shipId])
+
   const handleGoalChange = useCallback((slot, newGoal) => {
     setModuleGoals(prev => {
       const next = { ...prev }
@@ -316,16 +347,56 @@ export default function EngineeringWishlistPage () {
   return (
     <Layout connected={connected} active={active} ready={ready} loader={!componentReady}>
       <Panel layout='full-width' scrollable navigation={EngineeringPanelNavItems('Wishlist')}>
-        <h2>Engineering Wishlist</h2>
-        <h3 className='text-primary'>
-          {hasShip
-            ? (shipStatus?.name && shipStatus.name !== 'Unknown'
-                ? `${shipStatus.name}  ·  ${shipStatus.type}`
-                : `Ship ${shipId}  ·  ${shipStatus?.type ?? ''}`)
-            : shipId
-              ? 'Waiting for ship data…'
-              : 'No active ship — board a ship to activate your wishlist'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
+          <h2 style={{ margin: 0 }}>Engineering Wishlist</h2>
+          {Object.keys(knownShips).length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <label style={{ fontSize: '1.2rem', color: 'var(--color-muted)' }}>Ship:</label>
+              <select
+                value={shipId ?? ''}
+                onChange={e => handleShipSelect(e.target.value)}
+                style={{
+                  background: 'var(--color-bg)',
+                  color: isViewingInactiveShip ? 'var(--color-danger)' : 'var(--color-primary)',
+                  border: `1px solid ${isViewingInactiveShip ? 'var(--color-danger)' : 'var(--color-primary)'}`,
+                  padding: '.3rem .6rem',
+                  fontSize: '1.2rem',
+                  borderRadius: '3px'
+                }}
+              >
+                {Object.entries(knownShips).map(([id, info]) => (
+                  <option key={id} value={id}>
+                    {info.name && info.name !== 'Unknown' ? `${info.name}  (${info.type})` : info.type || `Ship ${id}`}
+                    {id === activeShipId ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <h3 className={isViewingInactiveShip ? 'text-danger' : 'text-primary'}>
+          {isViewingInactiveShip
+            ? (() => {
+                const info = knownShips[shipId]
+                return info
+                  ? (info.name && info.name !== 'Unknown' ? `${info.name}  ·  ${info.type}` : info.type || `Ship ${shipId}`)
+                  : `Ship ${shipId}`
+              })()
+            : hasShip
+              ? (shipStatus?.name && shipStatus.name !== 'Unknown'
+                  ? `${shipStatus.name}  ·  ${shipStatus.type}`
+                  : `Ship ${shipId}  ·  ${shipStatus?.type ?? ''}`)
+              : shipId
+                ? 'Waiting for ship data…'
+                : 'No active ship — board a ship to activate your wishlist'}
         </h3>
+
+        {isViewingInactiveShip && (
+          <div className='text-warning' style={{ fontSize: '1.2rem', marginBottom: '.75rem' }}>
+            ⚠ Viewing wishlist for an inactive ship — module cards not available. Switch ships in game to edit module goals.
+          </div>
+        )}
 
         {/* ── Ship module cards ── */}
         {hasShip && hasModules && (
@@ -409,21 +480,32 @@ export default function EngineeringWishlistPage () {
                   Shortfall only
                 </label>
               </div>
-              <table className='table--animated fx-fade-in'>
-                <thead style={{ display: 'none' }}>
-                  <tr><th>Material</th><th>Progress</th><th>Type</th></tr>
-                </thead>
-                <tbody>
-                  {displayRequirements.map(req => (
-                    <MaterialRequirement
-                      key={`req_${req.symbol}`}
-                      requirement={req}
-                      shortfallMap={shortfallMap}
-                      materials={materials}
-                    />
-                  ))}
-                </tbody>
-              </table>
+              {['Raw', 'Manufactured', 'Encoded', 'Xeno'].map(typeName => {
+                  const typeReqs = displayRequirements.filter(r => (r.type ?? 'Xeno') === typeName)
+                  if (typeReqs.length === 0) return null
+                  return (
+                    <Fragment key={typeName}>
+                      <div className='section-heading' style={{ marginTop: '1rem', marginBottom: '.25rem' }}>
+                        <h5 className='section-heading__text' style={{ fontSize: '1.4rem', opacity: 0.7 }}>{typeName} Materials</h5>
+                      </div>
+                      <table className='table--animated fx-fade-in'>
+                        <thead style={{ display: 'none' }}>
+                          <tr><th>Material</th><th>Progress</th><th>Type</th></tr>
+                        </thead>
+                        <tbody>
+                          {typeReqs.map(req => (
+                            <MaterialRequirement
+                              key={`req_${req.symbol}`}
+                              requirement={req}
+                              shortfallMap={shortfallMap}
+                              materials={materials}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </Fragment>
+                  )
+                })}
             </>
             )
           : hasShip && (

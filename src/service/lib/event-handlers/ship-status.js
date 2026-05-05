@@ -231,6 +231,24 @@ class ShipStatus {
         if (outfittingModule.rating) module.rating = outfittingModule.rating
         if (outfittingModule.mount) module.mount = outfittingModule.mount
         if (outfittingModule.guidance) module.guidance = outfittingModule.guidance
+      } else {
+        // Handle known module types missing from outfitting data
+        if (module.symbol.includes('int_hyperdrive_overcharge')) {
+          module.name = 'SCO Frame Shift Drive'
+        }
+        // Derive class and rating from size/class suffix in the symbol
+        const sizeClassMatch = module.symbol.match(/_size(\d+)_class(\d+)/)
+        if (sizeClassMatch) {
+          module.class = sizeClassMatch[1]
+          const classToRating = { '1': 'E', '2': 'D', '3': 'C', '4': 'B', '5': 'A' }
+          module.rating = classToRating[sizeClassMatch[2]] ?? sizeClassMatch[2]
+        }
+      }
+
+      // Prefix class+rating for display (e.g. "5A Frame Shift Drive", "3E Pulse Laser")
+      // Armour modules use non-standard naming and are skipped
+      if (module.class && module.rating && !module.symbol.includes('_armour_')) {
+        module.name = `${module.class}${module.rating} ${module.name}`
       }
 
       // Each ship has exactly one armour module

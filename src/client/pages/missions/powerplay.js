@@ -11,32 +11,45 @@ const PP_LOG_EVENTS = [
   'FSDJump', 'Location'
 ]
 
+async function fetchNearbySources (power, currentSystem, setNearbySources) {
+  setNearbySources(undefined) // loading
+  const result = await sendEvent('getPowerplayNearbySources', { power, currentSystem })
+  setNearbySources(result ?? null)
+}
+
 export default function MissionsPowerplayPage () {
   const { connected, active, ready } = useSocket()
   const [powerplay, setPowerplay] = useState()
+  const [nearbySources, setNearbySources] = useState(null)
+
+  async function refreshPowerplay () {
+    const data = await sendEvent('getPowerplay')
+    setPowerplay(data)
+    if (data?.pledged && data.power && data.currentSystem) {
+      fetchNearbySources(data.power, data.currentSystem, setNearbySources)
+    } else {
+      setNearbySources(null)
+    }
+  }
 
   useEffect(() => {
-    ;(async () => {
-      if (!connected) return
-      setPowerplay(await sendEvent('getPowerplay'))
-    })()
+    if (!connected) return
+    refreshPowerplay()
   }, [connected, ready])
 
   useEffect(() => eventListener('newLogEntry', async (log) => {
-    if (PP_LOG_EVENTS.includes(log.event)) {
-      setPowerplay(await sendEvent('getPowerplay'))
-    }
+    if (PP_LOG_EVENTS.includes(log.event)) refreshPowerplay()
   }), [])
 
   useEffect(() => eventListener('gameStateChange', async (event) => {
     if (event?._changedFile === 'Status') return
-    setPowerplay(await sendEvent('getPowerplay'))
+    refreshPowerplay()
   }), [])
 
   return (
     <Layout connected={connected} active={active} ready={ready}>
       <Panel layout='full-width' scrollable navigation={MissionsPanelNavItems('Powerplay')}>
-        <PowerplayPanel powerplay={powerplay} />
+        <PowerplayPanel powerplay={powerplay} nearbySources={nearbySources} />
       </Panel>
     </Layout>
   )

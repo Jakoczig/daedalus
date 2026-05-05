@@ -37,18 +37,22 @@
 }
 
 /* Gradient: right edge bleeds into background, bottom edge softens */
-.powerplay-panel__portrait-fade {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(to right,  transparent 45%, var(--color-background-panel) 95%),
-    linear-gradient(to top,    var(--color-background-panel) 0%,  transparent 25%);
-}
 
 /* ── Hero text area (right of portrait) ───────────────────────────────────── */
 .powerplay-panel__hero {
   flex: 1 1 auto;
   padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.powerplay-panel__hero-top {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+}
+
+.powerplay-panel__hero-left {
   display: flex;
   flex-direction: column;
 }
@@ -87,7 +91,7 @@
 }
 
 .powerplay-panel__hero-stat-label {
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
@@ -96,23 +100,20 @@
   font-size: 2rem;
 }
 
-/* ── Ethos display — right-aligned in stats row ──────────────────────────── */
+/* ── Ethos display — right side of hero-top, vertically centred ─────────── */
 .powerplay-panel__hero-ethos {
   display: flex;
-  gap: 4rem;
+  gap: 6rem;
   margin-left: auto;
-  margin-right: 14rem;
-  margin-top: -2rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-self: flex-start;
+  padding-right: 14rem;
+  align-items: center;
 }
 
 .powerplay-panel__hero-ethos-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: .3rem;
+  gap: .5rem;
   opacity: .35;
   transition: opacity .3s, text-shadow .3s;
 }
@@ -125,14 +126,32 @@
 }
 
 .powerplay-panel__hero-ethos-label {
+  font-size: 1.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(255,255,255,0.45);
+}
+
+.powerplay-panel__hero-ethos-item--active .powerplay-panel__hero-ethos-label {
+  color: var(--color-secondary);
+}
+
+.powerplay-panel__hero-ethos-value {
   font-size: 1.5rem;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
 
-.powerplay-panel__hero-ethos-value {
-  font-size: 2.4rem;
-  font-weight: 600;
+.powerplay-panel__cat-icon {
+  width: 5.3rem;
+  height: 5.3rem;
+  display: block;
+}
+
+.powerplay-panel__activity-group-header .powerplay-panel__cat-icon {
+  width: 1.6rem;
+  height: 1.6rem;
 }
 
 /* ── Progress section (bottom of hero) ───────────────────────────────────── */
@@ -161,8 +180,8 @@
 
 .powerplay-panel__merit-bar-label {
   display: block;
-  font-size: 1.3rem;
-  margin: .3rem 0 .8rem;
+  font-size: 1.6rem;
+  margin: .3rem 0 1.5rem;
 }
 
 /* ── 0→100 rank track ─────────────────────────────────────────────────────── */
@@ -183,7 +202,7 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .35);
+  background: rgba(20, 245, 255, .4);
 }
 
 .powerplay-panel__rank-track-marker {
@@ -192,8 +211,8 @@
   transform: translate(-50%, -50%);
   width: .75rem;
   height: .75rem;
-  background: var(--color-primary);
-  box-shadow: 0 0 .6rem rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .9);
+  background: var(--color-secondary);
+  box-shadow: 0 0 .6rem rgba(20, 245, 255, .9);
   border-radius: 50%;
   z-index: 1;
 }
@@ -201,7 +220,18 @@
 .powerplay-panel__rank-tick {
   position: absolute;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   transform: translateX(-50%);
+}
+
+.powerplay-panel__rank-tick--edge-start {
+  align-items: flex-start;
+}
+
+.powerplay-panel__rank-tick--edge-end {
+  align-items: flex-end;
 }
 
 .powerplay-panel__rank-tick-line {
@@ -212,20 +242,19 @@
 }
 
 .powerplay-panel__rank-tick--passed .powerplay-panel__rank-tick-line {
-  background: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .55);
+  background: rgba(20, 245, 255, .7);
 }
 
 .powerplay-panel__rank-tick-label {
   display: block;
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   color: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .35);
-  text-align: center;
   margin-top: .1rem;
   white-space: nowrap;
 }
 
 .powerplay-panel__rank-tick--passed .powerplay-panel__rank-tick-label {
-  color: rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .7);
+  color: rgba(20, 245, 255, .8);
 }
 
 /* ── Two-column main body ─────────────────────────────────────────────────── */
@@ -243,7 +272,7 @@
 
 /* ── Section headings ─────────────────────────────────────────────────────── */
 .powerplay-panel__section-title {
-  font-size: 1.35rem;
+  font-size: 1.8rem;
   letter-spacing: .1em;
   text-transform: uppercase;
   margin: 0 0 .6rem;
@@ -260,9 +289,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: .4rem 0;
+  padding: .5rem 0;
   border-bottom: 1px solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .12);
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   gap: 1rem;
 }
 
@@ -270,12 +299,16 @@
   text-align: right;
 }
 
+.powerplay-panel__row > span {
+  text-shadow: none;
+}
+
 /* ── System type badge ────────────────────────────────────────────────────── */
 .powerplay-panel__type-badge {
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  font-size: 1.15rem;
+  font-size: 1.8rem;
 }
 
 /* ── Activity groups ──────────────────────────────────────────────────────── */
@@ -284,7 +317,7 @@
 }
 
 .powerplay-panel__activities-heading {
-  font-size: 1.3rem;
+  font-size: 1.8rem;
   letter-spacing: .08em;
   text-transform: uppercase;
   margin: 0 0 .4rem;
@@ -299,7 +332,7 @@
   display: flex;
   align-items: center;
   gap: .75rem;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -314,7 +347,7 @@
 }
 
 .powerplay-panel__bonus-tag {
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: .05em;
 }
@@ -330,12 +363,12 @@
 
 .powerplay-panel__activity-name {
   display: block;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
 }
 
 .powerplay-panel__activity-desc {
   display: block;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   line-height: 1.5;
   margin: .15rem 0 0;
   opacity: .6;
@@ -353,14 +386,14 @@
 }
 
 .powerplay-panel__info-block p {
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   margin: .4rem 0;
   line-height: 1.5;
 }
 
 /* ── System type contextual note ────────────────────────────────────────────────── */
 .powerplay-panel__system-type-note {
-  font-size: 1.35rem;
+  font-size: 1.6rem;
   line-height: 1.55;
   margin: .75rem 0 0;
   padding: .5rem .75rem;
@@ -373,7 +406,7 @@
 }
 
 .powerplay-panel__nearby-heading {
-  font-size: 1.25rem;
+  font-size: 1.6rem;
   letter-spacing: .08em;
   text-transform: uppercase;
   margin: 0 0 .2rem;
@@ -381,7 +414,7 @@
 }
 
 .powerplay-panel__nearby-desc {
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   line-height: 1.5;
   margin: 0 0 .4rem;
 }
@@ -394,7 +427,7 @@
 
 .powerplay-panel__nearby-group-power {
   display: block;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   font-weight: 600;
   padding: .2rem 0 0;
 }
@@ -407,15 +440,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: .35rem 0;
+  padding: .4rem 0;
   border-bottom: 1px solid rgba(var(--color-primary-r), var(--color-primary-g), var(--color-primary-b), .08);
-  font-size: 1.35rem;
+  font-size: 1.6rem;
   gap: 1rem;
 }
 
 .powerplay-panel__nearby-row > span:last-child {
   text-align: right;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   white-space: nowrap;
 }
 
@@ -462,7 +495,7 @@
 
 .powerplay-panel__perk-name {
   display: block;
-  font-size: 1.25rem;
+  font-size: 1.6rem;
   margin-bottom: .2rem;
 }
 
@@ -476,7 +509,7 @@
   display: inline-flex;
   align-items: baseline;
   gap: .25rem;
-  font-size: 1.15rem;
+  font-size: 1.5rem;
 }
 
 .powerplay-panel__perk-tier-value {
@@ -484,7 +517,7 @@
 }
 
 .powerplay-panel__perk-tier-rank {
-  font-size: 1rem;
+  font-size: 1.3rem;
   opacity: .5;
 }
 
@@ -547,16 +580,16 @@
 }
 
 .powerplay-panel__reward-rank {
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   white-space: nowrap;
 }
 
 .powerplay-panel__reward-module {
-  font-size: 1.3rem;
+  font-size: 1.6rem;
 }
 
 .powerplay-panel__reward-status {
-  font-size: 1.15rem;
+  font-size: 1.5rem;
   white-space: nowrap;
   text-align: right;
 }

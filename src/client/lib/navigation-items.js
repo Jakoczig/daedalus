@@ -184,6 +184,10 @@ function SettingsNavItems (activePanel) {
     {
       name: 'Exploration',
       icon: 'scan'
+    },
+    {
+      name: 'Integrations',
+      icon: 'route'
     }
   ]
   navigationItems.forEach(item => {

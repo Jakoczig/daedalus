@@ -77,9 +77,9 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
   return (
     <div
       style={{
-        border: `1px solid ${isComplete ? 'var(--color-success)' : goal?.targetGrade ? 'var(--color-primary)' : 'rgba(255,255,255,0.12)'}`,
+        border: `1px solid ${isComplete ? 'var(--color-success)' : goal?.targetGrade ? 'var(--color-secondary)' : 'rgba(255,255,255,0.12)'}`,
         borderRadius: '4px',
-        padding: '.85rem 1rem',
+        padding: '1.2rem 1.5rem',
         background: 'var(--color-background-panel, #0a0f14)',
         display: 'flex',
         flexDirection: 'column',
@@ -87,36 +87,38 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
       }}
     >
       {/* Module header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap' }}>
-        <div>
-          <h4 style={{ margin: 0, fontSize: '1rem' }}>{module.name}</h4>
-          <span className='text-muted' style={{ fontSize: '.85rem' }}>{module.slotName}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '2rem', flexWrap: 'nowrap' }}>
+        <div style={{ flex: '1 1 auto' }}>
+          <h4 style={{ margin: 0, fontSize: '1.6rem', whiteSpace: 'nowrap' }}>{module.name}</h4>
+          <span className='text-muted' style={{ fontSize: '1.4rem' }}>{module.slotName}</span>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {currentEng
             ? (
-              <span style={{ fontSize: '.85rem' }}>
-                <span className='text-primary text-uppercase' style={{ fontSize: '.78rem', border: '1px solid var(--color-primary)', padding: '.1rem .35rem', borderRadius: '2px', marginRight: '.4rem' }}>
-                  G{currentGrade}
+              <div style={{ fontSize: '1.4rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.2rem' }}>
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  <span className='text-secondary text-uppercase' style={{ fontSize: '1.3rem', border: '1px solid var(--color-secondary)', padding: '.1rem .35rem', borderRadius: '2px', marginRight: '.4rem' }}>
+                    G{currentGrade}
+                  </span>
+                  <span className='text-secondary'>{currentEng.name}</span>
                 </span>
-                <span className='text-primary'>{currentEng.name}</span>
                 {currentEng.experimentalEffect &&
-                  <span className='text-muted' style={{ marginLeft: '.35rem' }}>· {currentEng.experimentalEffect}</span>}
-              </span>
+                  <span className='text-info' style={{ fontSize: '1.3rem', whiteSpace: 'nowrap' }}>{currentEng.experimentalEffect}</span>}
+              </div>
               )
-            : <span className='text-muted' style={{ fontSize: '.85rem' }}>Stock</span>}
+            : <span className='text-muted' style={{ fontSize: '1.4rem' }}>Stock</span>}
         </div>
       </div>
 
       {/* Target modification dropdown */}
       <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-          <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '.78rem', marginBottom: '.25rem' }}>
+          <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '1.3rem', marginBottom: '.25rem' }}>
             Target Modification
           </label>
           <select
             className='input'
-            style={{ width: '100%', fontSize: '.9rem' }}
+            style={{ width: '100%', fontSize: '1.5rem' }}
             value={goal?.blueprintSymbol ?? ''}
             onChange={handleBpChange}
           >
@@ -130,7 +132,7 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
         {/* Grade selector — only shows once a blueprint is selected */}
         {selectedBp && (
           <div>
-            <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '.78rem', marginBottom: '.25rem' }}>
+            <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '1.3rem', marginBottom: '.25rem' }}>
               Target Grade
             </label>
             <div style={{ display: 'flex', gap: '.3rem' }}>
@@ -146,11 +148,11 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
                     onClick={() => handleGradeClick(g.grade)}
                     title={baseTarget ? 'Already completed' : `Set G${g.grade} as target`}
                     style={{
-                      padding: '.25rem .6rem',
+                      padding: '.4rem .9rem',
                       cursor: baseTarget ? 'default' : 'pointer',
-                      border: '1px solid var(--color-primary)',
+                      border: '1px solid var(--color-secondary)',
                       background: selected
-                        ? 'var(--color-primary)'
+                        ? 'var(--color-secondary)'
                         : baseTarget
                           ? 'rgba(255,255,255,0.06)'
                           : 'transparent',
@@ -160,7 +162,7 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
                           ? 'rgba(255,255,255,0.3)'
                           : 'inherit',
                       borderRadius: '2px',
-                      fontSize: '.9rem',
+                      fontSize: '1.5rem',
                       fontWeight: selected ? 700 : 'normal',
                       opacity: baseTarget ? 0.4 : 1
                     }}
@@ -177,12 +179,12 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
       {/* Experimental effect — shows when blueprint is selected and experimentals exist */}
       {goal?.blueprintSymbol && experimentals.length > 0 && (
         <div>
-          <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '.78rem', marginBottom: '.25rem' }}>
+          <label className='text-muted text-uppercase' style={{ display: 'block', fontSize: '1.3rem', marginBottom: '.25rem' }}>
             Experimental Effect
           </label>
           <select
             className='input'
-            style={{ width: '100%', fontSize: '.9rem' }}
+            style={{ width: '100%', fontSize: '1.5rem' }}
             value={goal?.experimentalEffect ?? ''}
             onChange={handleExperimentalChange}
           >
@@ -196,10 +198,10 @@ export default function ModuleEngineeringCard ({ module, blueprints, goal, onCha
 
       {/* Summary line */}
       {summary && (
-        <div style={{ fontSize: '.85rem', paddingTop: '.1rem' }}>
+        <div style={{ fontSize: '1.4rem', paddingTop: '.1rem', textAlign: 'center', marginTop: 'auto' }}>
           {summary.complete
             ? <span className='text-success'>✓ Blueprint complete — nothing to add</span>
-            : <span className='text-primary'>{summary.text} ({summary.count} run{summary.count !== 1 ? 's' : ''})</span>}
+            : <span className='text-secondary'>{summary.text} ({summary.count} run{summary.count !== 1 ? 's' : ''})</span>}
         </div>
       )}
     </div>

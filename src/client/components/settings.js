@@ -28,6 +28,7 @@ function Settings ({ visible, toggleVisible = () => {}, defaultActiveSettingsPan
         {activeSettingsPanel === 'Theme' && <ThemeSettings visible={visible} />}
         {activeSettingsPanel === 'Sounds' && <SoundSettings visible={visible} />}
         {activeSettingsPanel === 'Exploration' && <ExplorationSettings visible={visible} />}
+        {activeSettingsPanel === 'Integrations' && <IntegrationsSettings visible={visible} />}
         <div className='modal-dialog__footer'>
           <hr style={{ margin: '1rem 0 .5rem 0' }} />
           <button className='float-right' onClick={toggleVisible}>
@@ -395,6 +396,366 @@ function CreditInput ({ value, disabled, onChange }) {
         onChange(parsed)
       }}
     />
+  )
+}
+
+// ─── Integrations settings ──────────────────────────────────────────────────
+
+const STATUS_COLORS = {
+  ok: 'var(--color-success, #4DFFC9)',
+  error: 'var(--color-danger, #FC4848)',
+  pending: 'var(--color-warning, #FFA500)',
+  disconnected: 'var(--color-muted, #888)'
+}
+
+const STATUS_LABELS = {
+  ok: 'Connected',
+  error: 'Error',
+  pending: 'Authenticating…',
+  disconnected: 'Disconnected'
+}
+
+function StatusBadge ({ status }) {
+  const color = STATUS_COLORS[status] || STATUS_COLORS.disconnected
+  const label = STATUS_LABELS[status] || 'Unknown'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontSize: '.85rem' }}>
+      <span style={{ display: 'inline-block', width: '.7rem', height: '.7rem', borderRadius: '50%', background: color, flexShrink: 0 }} />
+      <span style={{ color }}>{label}</span>
+    </span>
+  )
+}
+
+function ServiceCard ({ title, children }) {
+  return (
+    <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '.75rem 1rem', marginBottom: '.75rem' }}>
+      <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05rem', fontSize: '1rem', color: 'var(--color-info)', marginBottom: '.6rem' }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function IntegrationsSettings ({ visible }) {
+  const [preferences, setPreferences] = useState()
+  const [status, setStatus] = useState(null)
+  const [busy, setBusy] = useState({}) // { edsm: bool, eddn: bool, inara: bool, capi: bool }
+  const [testResult, setTestResult] = useState({}) // per-service last test result msg
+
+  const loadAll = async () => {
+    const [prefs, st] = await Promise.all([
+      sendEvent('getPreferences'),
+      sendEvent('getIntegrationStatus')
+    ])
+    setPreferences(prefs)
+    setStatus(st)
+  }
+
+  useEffect(() => {
+    if (!visible) return
+    loadAll()
+  }, [visible])
+
+  useEffect(() => eventListener('syncMessage', async (event) => {
+    if (event.name === 'preferences') loadAll()
+  }), [])
+
+  const savePref = async (key, value) => {
+    const newPrefs = JSON.parse(JSON.stringify(preferences || {}))
+    if (!newPrefs.integrations) newPrefs.integrations = {}
+    newPrefs.integrations[key] = value
+    setPreferences(await sendEvent('setPreferences', newPrefs))
+  }
+
+  const setBusyFor = (service, val) => setBusy(b => ({ ...b, [service]: val }))
+  const setResult = (service, msg, isError) =>
+    setTestResult(r => ({ ...r, [service]: { msg, isError } }))
+
+  const testEdsm = async () => {
+    setBusyFor('edsm', true)
+    setResult('edsm', null)
+    try {
+      const res = await sendEvent('testEdsmConnection')
+      if (res?.success) {
+        setResult('edsm', 'API key valid', false)
+      } else {
+        setResult('edsm', res?.error || 'Unknown error', true)
+      }
+      setStatus(await sendEvent('getIntegrationStatus'))
+    } finally {
+      setBusyFor('edsm', false)
+    }
+  }
+
+  const testInara = async () => {
+    setBusyFor('inara', true)
+    setResult('inara', null)
+    try {
+      const res = await sendEvent('testInaraConnection')
+      setResult('inara', res?.success ? 'Connected' : (res?.error || 'Test failed'), !res?.success)
+      setStatus(await sendEvent('getIntegrationStatus'))
+    } catch (err) {
+      setResult('inara', err.message || 'Test failed', true)
+    } finally {
+      setBusyFor('inara', false)
+    }
+  }
+
+  const connectCapi = async () => {
+    setBusyFor('capi', true)
+    setResult('capi', null)
+    try {
+      const res = await sendEvent('beginCapiAuth', null, 6 * 60 * 1000)
+      setResult('capi', res?.success ? 'Authenticated successfully' : (res?.error || 'Authentication failed'), !res?.success)
+      setStatus(await sendEvent('getIntegrationStatus'))
+    } catch (err) {
+      setResult('capi', err.message || 'Authentication failed', true)
+    } finally {
+      setBusyFor('capi', false)
+    }
+  }
+
+  const disconnectCapi = async () => {
+    const newPrefs = JSON.parse(JSON.stringify(preferences || {}))
+    if (!newPrefs.integrations) newPrefs.integrations = {}
+    delete newPrefs.integrations.capiRefreshToken
+    newPrefs.integrations.capiEnabled = false
+    setPreferences(await sendEvent('setPreferences', newPrefs))
+    setStatus(await sendEvent('getIntegrationStatus'))
+    setResult('capi', null)
+  }
+
+  const integPrefs = preferences?.integrations || {}
+
+  return (
+    <div className='modal-dialog__panel modal-dialog__panel--with-navigation scrollable'>
+      <h3 className='text-primary'>Integrations</h3>
+      <p>
+        Connect DAEDALUS Terminal to external Elite Dangerous services to share
+        your flight log, market data, and commander status automatically.
+      </p>
+
+      {/* ─── EDSM ───────────────────────────────────────── */}
+      <ServiceCard title='EDSM — Elite Dangerous Star Map'>
+        <p style={{ fontSize: '.9rem', marginTop: 0 }}>
+          Share your flight log and commander status with&nbsp;
+          <a href='https://www.edsm.net' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>edsm.net</a>.
+          Get your API key from the&nbsp;
+          <a href='https://www.edsm.net/settings/api' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>EDSM API settings</a> page.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', marginBottom: '.5rem' }}>
+          <input
+            type='checkbox'
+            checked={integPrefs.edsmEnabled || false}
+            disabled={!preferences}
+            onChange={(e) => savePref('edsmEnabled', e.target.checked)}
+          />
+          Enable EDSM integration
+        </label>
+        <table className='table--layout' style={{ marginBottom: '.5rem' }}>
+          <tbody>
+            <tr>
+              <td style={{ whiteSpace: 'nowrap', paddingLeft: '.5rem' }}>Commander name</td>
+              <td>
+                <input
+                  type='text'
+                  value={integPrefs.edsmCmdrName || ''}
+                  placeholder='Your EDSM commander name'
+                  disabled={!preferences}
+                  style={{ width: '100%', maxWidth: '22rem' }}
+                  onBlur={(e) => savePref('edsmCmdrName', e.target.value.trim())}
+                  onKeyDown={(e) => { if (e.key === 'Enter') savePref('edsmCmdrName', e.target.value.trim()) }}
+                  onChange={(e) => setPreferences(p => {
+                    const n = JSON.parse(JSON.stringify(p || {}))
+                    if (!n.integrations) n.integrations = {}
+                    n.integrations.edsmCmdrName = e.target.value
+                    return n
+                  })}
+                />
+              </td>
+            </tr>
+            <tr>
+              <td style={{ whiteSpace: 'nowrap', paddingLeft: '.5rem' }}>API key</td>
+              <td>
+                <input
+                  type='password'
+                  value={integPrefs.edsmApiKey || ''}
+                  placeholder='Paste EDSM API key here'
+                  disabled={!preferences}
+                  style={{ width: '100%', maxWidth: '22rem' }}
+                  onBlur={(e) => savePref('edsmApiKey', e.target.value.trim())}
+                  onKeyDown={(e) => { if (e.key === 'Enter') savePref('edsmApiKey', e.target.value.trim()) }}
+                  onChange={(e) => setPreferences(p => {
+                    const n = JSON.parse(JSON.stringify(p || {}))
+                    if (!n.integrations) n.integrations = {}
+                    n.integrations.edsmApiKey = e.target.value
+                    return n
+                  })}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={testEdsm}
+            disabled={!integPrefs.edsmApiKey || !integPrefs.edsmCmdrName || busy.edsm}
+          >
+            {busy.edsm ? 'Testing…' : 'Test connection'}
+          </button>
+          {status?.edsm && <StatusBadge status={status.edsm.status} />}
+          {testResult.edsm?.msg && (
+            <span className={testResult.edsm.isError ? 'text-danger' : 'text-secondary'} style={{ fontSize: '.85rem' }}>
+              {testResult.edsm.msg}
+            </span>
+          )}
+        </div>
+      </ServiceCard>
+
+      {/* ─── EDDN ───────────────────────────────────────── */}
+      <ServiceCard title='EDDN — Elite Dangerous Data Network'>
+        <p style={{ fontSize: '.9rem', marginTop: 0 }}>
+          Contribute your jump, scan, and market data to the community&nbsp;
+          <a href='https://github.com/EDCD/EDDN' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>EDDN</a>&nbsp;
+          network. No credentials required.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', marginBottom: '.5rem' }}>
+          <input
+            type='checkbox'
+            checked={integPrefs.eddnEnabled || false}
+            disabled={!preferences}
+            onChange={(e) => savePref('eddnEnabled', e.target.checked)}
+          />
+          Enable EDDN broadcast
+        </label>
+        {status?.eddn && <StatusBadge status={status.eddn.status} />}
+      </ServiceCard>
+
+      {/* ─── Inara ──────────────────────────────────────── */}
+      <ServiceCard title='Inara'>
+        <p style={{ fontSize: '.9rem', marginTop: 0 }}>
+          Sync your flight log, credits, and materials with&nbsp;
+          <a href='https://inara.cz' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>inara.cz</a>.
+          Get your API key from&nbsp;
+          <a href='https://inara.cz/elite/settings' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>Inara settings</a>.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', marginBottom: '.5rem' }}>
+          <input
+            type='checkbox'
+            checked={integPrefs.inaraEnabled || false}
+            disabled={!preferences}
+            onChange={(e) => savePref('inaraEnabled', e.target.checked)}
+          />
+          Enable Inara integration
+        </label>
+        <table className='table--layout' style={{ marginBottom: '.5rem' }}>
+          <tbody>
+            <tr>
+              <td style={{ whiteSpace: 'nowrap', paddingLeft: '.5rem' }}>API key</td>
+              <td>
+                <input
+                  type='password'
+                  value={integPrefs.inaraApiKey || ''}
+                  placeholder='Paste Inara API key here'
+                  disabled={!preferences}
+                  style={{ width: '100%', maxWidth: '22rem' }}
+                  onBlur={(e) => savePref('inaraApiKey', e.target.value.trim())}
+                  onKeyDown={(e) => { if (e.key === 'Enter') savePref('inaraApiKey', e.target.value.trim()) }}
+                  onChange={(e) => setPreferences(p => {
+                    const n = JSON.parse(JSON.stringify(p || {}))
+                    if (!n.integrations) n.integrations = {}
+                    n.integrations.inaraApiKey = e.target.value
+                    return n
+                  })}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={testInara}
+            disabled={!integPrefs.inaraApiKey || busy.inara}
+          >
+            {busy.inara ? 'Testing…' : 'Test connection'}
+          </button>
+          {status?.inara && <StatusBadge status={status.inara.status} />}
+          {testResult.inara?.msg && (
+            <span className={testResult.inara.isError ? 'text-danger' : 'text-secondary'} style={{ fontSize: '.85rem' }}>
+              {testResult.inara.msg}
+            </span>
+          )}
+        </div>
+      </ServiceCard>
+
+      {/* ─── CAPI ───────────────────────────────────────── */}
+      <ServiceCard title='Frontier CAPI — Companion API'>
+        <p style={{ fontSize: '.9rem', marginTop: 0 }}>
+          Authenticate with Frontier's Companion API to retrieve live ship loadout,
+          market prices, and fleet carrier data directly from the game servers.
+          You will be redirected to the Frontier login page in your browser.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', marginBottom: '.75rem' }}>
+          <input
+            type='checkbox'
+            checked={integPrefs.capiEnabled || false}
+            disabled={!preferences}
+            onChange={(e) => savePref('capiEnabled', e.target.checked)}
+          />
+          Enable CAPI integration
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          {status?.capi?.configured
+            ? (
+              <button
+                className='text-danger'
+                onClick={disconnectCapi}
+                disabled={busy.capi}
+              >
+                Disconnect
+              </button>
+              )
+            : (
+              <button
+                onClick={connectCapi}
+                disabled={busy.capi}
+              >
+                {busy.capi ? 'Waiting for browser…' : 'Connect with Frontier'}
+              </button>
+              )}
+          {status?.capi && <StatusBadge status={busy.capi ? 'pending' : status.capi.status} />}
+          {testResult.capi?.msg && (
+            <span className={testResult.capi.isError ? 'text-danger' : 'text-secondary'} style={{ fontSize: '.85rem' }}>
+              {testResult.capi.msg}
+            </span>
+          )}
+        </div>
+        {status?.capi?.configured && (
+          <p style={{ marginTop: '.5rem', fontSize: '.85rem', color: 'var(--color-success)' }}>
+            Frontier authentication stored.
+          </p>
+        )}
+      </ServiceCard>
+
+      {/* ─── Spansh ─────────────────────────────────────── */}
+      <ServiceCard title='Spansh'>
+        <p style={{ fontSize: '.9rem', margin: 0 }}>
+          <a href='https://www.spansh.co.uk' target='_blank' rel='noopener noreferrer' style={{ color: 'var(--color-secondary)' }}>Spansh</a>&nbsp;
+          provides neutron routing, fleet carrier routing, and station finding tools.
+          System and station links in DAEDALUS will open on Spansh when enabled. No credentials required.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', marginTop: '.5rem' }}>
+          <input
+            type='checkbox'
+            checked={integPrefs.spanshEnabled || false}
+            disabled={!preferences}
+            onChange={(e) => savePref('spanshEnabled', e.target.checked)}
+          />
+          Enable Spansh links
+        </label>
+      </ServiceCard>
+    </div>
   )
 }
 

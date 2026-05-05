@@ -222,3 +222,8 @@ html:not([data-fx-crt-text-animated]) .fx-animated-text {
   }
   100% { opacity: 1; }
 }
+
+@keyframes integration-warning-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

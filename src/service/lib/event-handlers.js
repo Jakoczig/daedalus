@@ -28,6 +28,7 @@ const Galnet = require('./event-handlers/galnet')
 const Media = require('./event-handlers/media')
 const Engineering = require('./event-handlers/engineering')
 const Mining = require('./event-handlers/mining')
+const Integrations = require('./event-handlers/integrations')
 const covasPlayer = require('./covas-player')
 
 class EventHandlers {
@@ -56,6 +57,7 @@ class EventHandlers {
     this.media = this._register(new Media())
     this.engineering = this._register(new Engineering())
     this.mining = this._register(new Mining({ eliteLog, eliteJson }))
+    this.integrations = this._register(new Integrations({ eliteLog, eliteJson }))
     this.textToSpeech = new TextToSpeech({ eliteLog, eliteJson, cmdrStatus: this.cmdrStatus, shipStatus: this.shipStatus })
   }
 
@@ -111,6 +113,8 @@ class EventHandlers {
     if (MINING_EVENTS.includes(logEvent.event)) {
       this.mining.logEventHandler(logEvent)
     }
+    // Pipe journal events to external service integrations (EDSM, EDDN, Inara)
+    this.integrations.logEventHandler(logEvent)
   }
 
   gameStateChangeHandler (event) {
@@ -159,6 +163,7 @@ class EventHandlers {
           await fs.writeFile(PREFERENCES_FILE, JSON.stringify(preferences))
           _preferencesCache = preferences
           this.textToSpeech.invalidatePreferencesCache()
+          this.integrations.notifyPreferencesChanged(preferences)
           broadcastEvent('syncMessage', { name: 'preferences' })
           return preferences
         },

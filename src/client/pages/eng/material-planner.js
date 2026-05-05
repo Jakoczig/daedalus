@@ -5,7 +5,7 @@ import { useSocket, sendEvent, eventListener } from 'lib/socket'
 import { EngineeringPanelNavItems } from 'lib/navigation-items'
 import Layout from 'components/layout'
 import Panel from 'components/panel'
-import { getActiveShipId, getWishlist } from 'lib/wishlist'
+import { getActiveShipId, setActiveShipId, getWishlist, getAllKnownShips, storeKnownShip } from 'lib/wishlist'
 import {
   aggregateMaterialRequirements,
   allocateTradeSuggestions,
@@ -463,10 +463,27 @@ function EngineerRouteTab ({ wishlist, blueprints, engineers, currentSystem, pre
     return stops.filter(s => s.type === 'engineer')
   }, [wishlist, blueprints, engineers, currentSystem, prerequisites, unlockStations])
 
+  const unassignableCount = useMemo(() => {
+    if (!wishlist.length || !blueprints.length || !engineers.length) return 0
+    let count = 0
+    for (const item of wishlist) {
+      if (item.type !== 'engineering') continue
+      const bp = blueprints.find(b => b.symbol.toLowerCase() === (item.blueprintSymbol ?? '').toLowerCase())
+      if (!bp) { count++; continue }
+      const hasEngineer = Object.entries(bp.engineers ?? {}).some(([engName, engInfo]) => {
+        const grades = (engInfo.grades ?? []).map(String)
+        if (!grades.includes(String(item.grade))) return false
+        return engineers.some(e => e.name === engName)
+      })
+      if (!hasEngineer) count++
+    }
+    return count
+  }, [wishlist, blueprints, engineers])
+
   if (!wishlist.length) {
     return <div className='text-muted' style={{ padding: '2rem 0' }}>No wishlist — add blueprints in the Wishlist tab first.</div>
   }
-  if (!engineerStops.length) {
+  if (!engineerStops.length && !unassignableCount) {
     return <div className='text-muted' style={{ padding: '2rem 0' }}>No engineers needed for the current wishlist.</div>
   }
 
@@ -509,6 +526,16 @@ function EngineerRouteTab ({ wishlist, blueprints, engineers, currentSystem, pre
           </div>
         )
       })}
+      {engineerStops.some(s => (s.unlockStatus ?? '').toLowerCase() !== 'unlocked') && (
+        <div className='text-danger' style={{ textAlign: 'center', marginTop: '1rem', fontSize: '1.4rem' }}>
+          ⚠ {engineerStops.filter(s => (s.unlockStatus ?? '').toLowerCase() !== 'unlocked').length} engineer(s) required for this wishlist are not yet unlocked
+        </div>
+      )}
+      {unassignableCount > 0 && (
+        <div className='text-warning' style={{ textAlign: 'center', marginTop: '1rem', fontSize: '1.4rem' }}>
+          ⚠ {unassignableCount} blueprint grade(s) in your wishlist have no known engineer — check engineer data is up to date
+        </div>
+      )}
     </>
   )
 }
@@ -658,6 +685,9 @@ export default function EngineeringMaterialPlannerPage () {
   const [prerequisites, setPrerequisites] = useState({})
   const [unlockStations, setUnlockStations] = useState({})
   const [wishlist, setWishlist] = useState([])
+  const [viewShipId, setViewShipId] = useState(null)
+  const [activeShipId, setActiveShipIdState] = useState(null)
+  const [knownShips, setKnownShips] = useState({})
 
   useEffect(animateTableEffect)
 
@@ -665,7 +695,7 @@ export default function EngineeringMaterialPlannerPage () {
     ;(async () => {
       if (!connected) return
 
-      const [newBlueprints, newMaterials, newEngineers, newSystem, newSources, newTraders, newPrereqs, newUnlockStations] = await Promise.all([
+      const [newBlueprints, newMaterials, newEngineers, newSystem, newSources, newTraders, newPrereqs, newUnlockStations, newShipStatus] = await Promise.all([
         sendEvent('getBlueprints'),
         sendEvent('getMaterials'),
         sendEvent('getEngineers'),
@@ -673,7 +703,8 @@ export default function EngineeringMaterialPlannerPage () {
         sendEvent('getMaterialSources'),
         sendEvent('getMaterialTraders'),
         sendEvent('getEngineerPrerequisites'),
-        sendEvent('getEngineerUnlockStations')
+        sendEvent('getEngineerUnlockStations'),
+        sendEvent('getShipStatus')
       ])
 
       setBlueprints(newBlueprints ?? [])
@@ -686,8 +717,18 @@ export default function EngineeringMaterialPlannerPage () {
       setUnlockStations(newUnlockStations ?? {})
 
       const shipId = getActiveShipId()
-      setWishlist(shipId ? getWishlist(shipId) : [])
+      if (shipId) {
+        setActiveShipIdState(shipId)
+        setViewShipId(shipId)
+        setWishlist(getWishlist(shipId))
+        if (newShipStatus?.name || newShipStatus?.type) {
+          storeKnownShip(shipId, { name: newShipStatus.name, type: newShipStatus.type })
+        }
+      } else {
+        setWishlist([])
+      }
 
+      setKnownShips(getAllKnownShips())
       setComponentReady(true)
     })()
   }, [connected, ready])
@@ -703,9 +744,14 @@ export default function EngineeringMaterialPlannerPage () {
     if (log.event === 'EngineerProgress') {
       setEngineers((await sendEvent('getEngineers')) ?? [])
     }
-    if (log.event === 'Loadout') {
-      const shipId = getActiveShipId()
-      setWishlist(shipId ? getWishlist(shipId) : [])
+    if (log.event === 'Loadout' && log.ShipID != null) {
+      const id = String(log.ShipID)
+      setActiveShipId(id)
+      setActiveShipIdState(id)
+      setKnownShips(getAllKnownShips())
+      // Always switch to newly boarded ship
+      setViewShipId(id)
+      setWishlist(getWishlist(id))
     }
   }), [])
 
@@ -715,11 +761,91 @@ export default function EngineeringMaterialPlannerPage () {
     setEngineers(newEngineers ?? [])
   }), [])
 
+  const isViewingInactiveShip = !!(viewShipId && activeShipId && viewShipId !== activeShipId)
+
+  const unassignableItems = useMemo(() => {
+    if (!wishlist.length || !blueprints.length) return []
+    const items = []
+    for (const item of wishlist) {
+      if (item.type !== 'engineering') continue
+      const bp = blueprints.find(b => b.symbol.toLowerCase() === (item.blueprintSymbol ?? '').toLowerCase())
+      if (!bp) continue
+      const engEntries = Object.entries(bp.engineers ?? {})
+      // Skip if service failed to enrich engineer data (empty object = lookup failure, not truly unassignable)
+      if (engEntries.length === 0) continue
+      const hasEngineer = engEntries.some(([, engInfo]) => {
+        const grades = (engInfo.grades ?? []).map(String)
+        return grades.includes(String(item.grade))
+      })
+      if (!hasEngineer) {
+        items.push({
+          blueprintName: item.blueprintName ?? bp.name,
+          moduleSlot: item.moduleSlot ?? '',
+          grade: item.grade
+        })
+      }
+    }
+    return items
+  }, [wishlist, blueprints])
+
+  const lockedItems = useMemo(() => {
+    if (!wishlist.length || !blueprints.length || !engineers.length) return []
+    const stops = buildEngineerRoute(wishlist, blueprints, engineers, currentSystem?.position ?? null, prerequisites ?? {}, unlockStations ?? {})
+    const items = []
+    for (const stop of stops) {
+      if (stop.type !== 'engineer') continue
+      if ((stop.unlockStatus ?? '').toLowerCase() === 'unlocked') continue
+      for (const bp of (stop.blueprints ?? [])) {
+        items.push({ engineerName: stop.engineerName, blueprintName: bp.name, grade: bp.grade })
+      }
+    }
+    return items
+  }, [wishlist, blueprints, engineers, currentSystem, prerequisites, unlockStations])
+
   return (
     <Layout connected={connected} active={active} ready={ready} loader={!componentReady}>
       <Panel layout='full-width' scrollable navigation={EngineeringPanelNavItems('Material Planner')}>
-        <h2>Material Collection Planner</h2>
-        <h3 className='text-primary'>Plan and optimise your engineering route</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
+          <h2 style={{ margin: 0 }}>Material Collection Planner</h2>
+          {Object.keys(knownShips).length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <label style={{ fontSize: '1.2rem', color: 'var(--color-muted)' }}>Ship:</label>
+              <select
+                value={viewShipId ?? ''}
+                onChange={e => {
+                  const id = e.target.value
+                  if (!id) return
+                  setViewShipId(id)
+                  setWishlist(getWishlist(id))
+                }}
+                style={{
+                  background: 'var(--color-bg)',
+                  color: isViewingInactiveShip ? 'var(--color-danger)' : 'var(--color-primary)',
+                  border: `1px solid ${isViewingInactiveShip ? 'var(--color-danger)' : 'var(--color-primary)'}`,
+                  padding: '.3rem .6rem',
+                  fontSize: '1.2rem',
+                  borderRadius: '3px'
+                }}
+              >
+                {Object.entries(knownShips).map(([id, info]) => (
+                  <option key={id} value={id}>
+                    {info.name && info.name !== 'Unknown' ? `${info.name}  (${info.type})` : info.type || `Ship ${id}`}
+                    {id === activeShipId ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <h3 className={isViewingInactiveShip ? 'text-danger' : 'text-primary'}>
+          {isViewingInactiveShip
+            ? (() => {
+                const info = knownShips[viewShipId]
+                return `Viewing: ${info ? (info.name && info.name !== 'Unknown' ? `${info.name}  ·  ${info.type}` : info.type) : `Ship ${viewShipId}`} — not your active ship`
+              })()
+            : 'Plan and optimise your engineering route'}
+        </h3>
 
         {currentSystem?.name &&
           <div className='text-muted' style={{ fontSize: '.9em', marginBottom: '1rem' }}>
@@ -737,8 +863,36 @@ export default function EngineeringMaterialPlannerPage () {
           prerequisites={prerequisites}
           unlockStations={unlockStations}
         />
+
+        {(lockedItems.length > 0 || unassignableItems.length > 0) && (
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            {lockedItems.length > 0 && (
+              <div className='text-danger' style={{ fontSize: '1.4rem', marginBottom: '.75rem' }}>
+                <div className='text-uppercase' style={{ fontWeight: 600, marginBottom: '.4rem' }}>
+                  {lockedItems.length} MODIFICATION(S) REQUIRE AN ENGINEER THAT IS NOT YET UNLOCKED
+                </div>
+                {lockedItems.map((item, i) => (
+                  <div key={i} style={{ fontSize: '1.3rem' }}>
+                    {item.blueprintName} G{item.grade} &rarr; {item.engineerName}
+                  </div>
+                ))}
+              </div>
+            )}
+            {unassignableItems.length > 0 && (
+              <div className='text-warning' style={{ fontSize: '1.4rem' }}>
+                <div className='text-uppercase' style={{ fontWeight: 600, marginBottom: '.4rem' }}>
+                  {unassignableItems.length} MODIFICATION(S) HAVE NO ENGINEER LISTED IN BLUEPRINT DATA
+                </div>
+                {unassignableItems.map((item, i) => (
+                  <div key={i} style={{ fontSize: '1.3rem' }}>
+                    {item.moduleSlot || 'Unknown slot'} &mdash; {item.blueprintName} G{item.grade}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Panel>
     </Layout>
   )
 }
-

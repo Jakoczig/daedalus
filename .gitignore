@@ -7,6 +7,8 @@ TODO*.md
 TESTER_FEEDBACK.md
 .DS_Store
 .env
+.env.*
 .next
+Preferences.json
 *.log
 *.exe

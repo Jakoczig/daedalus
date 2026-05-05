@@ -12,14 +12,14 @@
 function StatusBadge ({ shortfall }) {
   if (shortfall === 0) {
     return (
-      <span className='text-success text-uppercase' style={{ fontSize: '.85rem' }}>
+      <span className='text-success text-uppercase' style={{ fontSize: '1.4rem' }}>
         <i className='icon daedalus-terminal-engineering' style={{ marginRight: '.3rem', position: 'relative', top: '.1rem' }} />
         Ready
       </span>
     )
   }
   return (
-    <span className='text-warning text-uppercase' style={{ fontSize: '.85rem' }}>
+    <span className='text-warning text-uppercase' style={{ fontSize: '1.4rem' }}>
       {shortfall} short
     </span>
   )
@@ -33,16 +33,16 @@ export default function WishlistItem ({ item, shortfall, onRemove, onUpdate }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
             <i className='icon daedalus-terminal-engineer' style={{ opacity: .7 }} />
             <h4 style={{ margin: 0 }}>{item.engineerName}</h4>
-            <span className='text-warning text-uppercase' style={{ fontSize: '.85em' }}>Unlock</span>
+            <span className='text-warning text-uppercase' style={{ fontSize: '1.4em' }}>Unlock</span>
           </div>
         </td>
         <td style={{ width: '10rem' }}>
-          <span className='text-muted text-uppercase' style={{ fontSize: '.85em' }}>Engineer</span>
+          <span className='text-muted text-uppercase' style={{ fontSize: '1.4em' }}>Engineer</span>
         </td>
         <td className='text-right' style={{ width: '2rem' }}>
           <button
             className='button text-danger'
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', padding: '.1rem .3rem' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.8rem', padding: '.1rem .3rem' }}
             title='Remove from wishlist'
             onClick={() => onRemove(item.id)}
             aria-label={`Remove ${item.engineerName} unlock from wishlist`}
@@ -81,10 +81,10 @@ export default function WishlistItem ({ item, shortfall, onRemove, onUpdate }) {
           >
             −
           </button>
-          <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{item.quantity ?? 1}</span>
+          <span style={{ minWidth: '2rem', textAlign: 'center', fontSize: '1.4rem' }}>{item.quantity ?? 1}</span>
           <button
             className='button'
-            style={{ minWidth: '1.75rem', padding: '.1rem .4rem', fontSize: '.85rem' }}
+            style={{ minWidth: '2.5rem', padding: '.2rem .5rem', fontSize: '1.4rem' }}
             onClick={() => onUpdate(item.id, { quantity: Math.min(20, (item.quantity ?? 1) + 1) })}
           >
             +
@@ -97,7 +97,7 @@ export default function WishlistItem ({ item, shortfall, onRemove, onUpdate }) {
       <td className='text-right' style={{ width: '2rem' }}>
         <button
           className='button text-danger'
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', padding: '.1rem .3rem' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.8rem', padding: '.1rem .3rem' }}
           title='Remove from wishlist'
           onClick={() => onRemove(item.id)}
           aria-label={`Remove ${item.blueprintName} G${item.grade} from wishlist`}

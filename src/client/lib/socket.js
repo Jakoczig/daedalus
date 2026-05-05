@@ -361,14 +361,18 @@ function sendEvent (name, message = null, timeout = 30000) {
     let timer = null
     callbackHandlers[requestId] = (event, setSocketState) => {
       if (timer) clearTimeout(timer)
-      const { message } = JSON.parse(event.data)
+      const parsed = JSON.parse(event.data)
       delete callbackHandlers[requestId]
       if (process.env.NODE_ENV === 'development') devLog(`[SEND] ← ${name}  id=${requestId.slice(0,8)}  ${Date.now() - sendStart}ms`)
       setSocketState(prevState => ({
         ...prevState,
         active: socketRequestsPending()
       }))
-      resolve(message)
+      if (parsed.error) {
+        reject(new Error(parsed.error))
+      } else {
+        resolve(parsed.message)
+      }
     }
     if (timeout > 0) {
       timer = setTimeout(() => {
