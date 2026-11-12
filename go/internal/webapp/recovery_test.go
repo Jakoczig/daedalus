@@ -143,3 +143,18 @@ func TestLockedProfileStillPreventsCompetingLocalOwner(t *testing.T) {
 		t.Fatal("locked profile became another local owner")
 	}
 }
+
+func TestUnusableProfileRootStillFailsStartup(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(root, []byte("preserve"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if server, err := StartLocalWithStorage(context.Background(), fixtureFS(), root); err == nil {
+		server.Close(context.Background())
+		t.Fatal("unprotectable profile root started an owner")
+	}
+	bytes, err := os.ReadFile(root)
+	if err != nil || string(bytes) != "preserve" {
+		t.Fatal("invalid profile root changed")
+	}
+}

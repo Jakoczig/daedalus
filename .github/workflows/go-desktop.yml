@@ -79,3 +79,14 @@ jobs:
           else
             go/bin/daedalus.exe --desktop-smoke-test
           fi
+      - name: Package experimental preview
+        id: preview
+        run: node scripts/build/package-go-preview.cjs
+      - name: Upload experimental unsigned offline preview
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: daedalus-g1b-${{ runner.os }}-x64-experimental-unsigned-offline-preview
+          path: ${{ steps.preview.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
