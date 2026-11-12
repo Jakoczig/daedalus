@@ -26,7 +26,7 @@ function ArticleSidebar ({ articles, filter, selected, onSelect, onFilterChange,
           onChange={e => onFilterChange(e.target.value.toLowerCase())}
           placeholder='Filter articles…'
         />
-        <button onClick={onRefresh} disabled={loading} title='Refresh articles'>
+        <button onClick={onRefresh} disabled={loading || !onRefresh} title={onRefresh ? 'Refresh articles' : 'Forced refresh is managed on the Windows PC'}>
           <i className='icon daedalus-terminal-sync' />
         </button>
       </div>
@@ -84,7 +84,7 @@ function ArticleReader ({ article }) {
 }
 
 export default function MediaGalNetPage () {
-  const { connected, active, ready } = useSocket()
+  const { connected, active, ready, role } = useSocket()
   const [articles, setArticles] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -126,7 +126,7 @@ export default function MediaGalNetPage () {
                 selected={selected}
                 onSelect={setSelected}
                 onFilterChange={setFilter}
-                onRefresh={() => fetchArticles(true)}
+                onRefresh={role === 'owner' ? () => fetchArticles(true) : null}
                 loading={loading}
               />
               <ArticleReader article={selected} />

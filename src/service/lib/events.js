@@ -52,7 +52,9 @@ eventHandlers.hostInfo = () => {
       if (nameDiff !== 0) return nameDiff
       return left.address.localeCompare(right.address)
     })
-    .map(({ address }) => `http://${address}:${PORT}`)
+    .map(({ address }) => process.env.DAEDALUS_REMOTE_PORT
+      ? `https://${address}:${Number(process.env.DAEDALUS_REMOTE_PORT)}`
+      : `http://localhost:${PORT}`)
     .filter((url, index, allUrls) => allUrls.indexOf(url) === index)
   return { urls }
 }

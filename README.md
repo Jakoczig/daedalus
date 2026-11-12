@@ -90,13 +90,19 @@ The self-contained installer is around 20 MB and has no dependencies. If you are
 ### Notes
 
 * The application will run against the latest version of Elite Dangerous (Odyssey) and older releases (e.g. Horizons), but it is currently explicitly designed for use with the latest versions. Changes to the game API may impact functionality when using DAEDALUS Terminal with older versions of the game.
-* The application includes a web interface to allow access from remote devices. The web interface is enabled by default while the application is running.
+* The local web interface is enabled while the application is running. Remote displays require explicitly configured HTTPS and pairing from the Windows PC. See [secure browser setup and acceptance tests](docs/testing/phase-1a-windows-smoke.md).
 
 The web interface relies on advanced browser functionality for rendering and works best on native Google Chrome browsers (e.g. Google Chrome for Windows, Mac, ChromeOS, Android). Other browsers (e.g. Safari, Firefox, Chromium) may use fallback rendering and/or lack required features for full compatibility / optimal user experience.
 
 ## Developer Documentation
 
 For developer documentation see [BUILD.md](BUILD.md).
+
+Regression checks: `npm test`, `npm run lint:security`, and `npm run build:client`.
+The security tests use synthetic data and block external HTTP/HTTPS/fetch traffic.
+Global legacy lint remains advisory while all changed security files have a
+blocking lint gate. See the [Phase 1B Inara investigation](docs/handoffs/phase-1b-inara-scope.md)
+for confirmed integration defects that remain deferred.
 
 ### Developer Quickstart
 

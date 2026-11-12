@@ -58,9 +58,16 @@ const KEY_NAME_MAP = {
   Slash: '/',
   BackQuote: '`',
   // Numpad
-  Numpad0: 'Num0', Numpad1: 'Num1', Numpad2: 'Num2', Numpad3: 'Num3',
-  Numpad4: 'Num4', Numpad5: 'Num5', Numpad6: 'Num6', Numpad7: 'Num7',
-  Numpad8: 'Num8', Numpad9: 'Num9',
+  Numpad0: 'Num0',
+  Numpad1: 'Num1',
+  Numpad2: 'Num2',
+  Numpad3: 'Num3',
+  Numpad4: 'Num4',
+  Numpad5: 'Num5',
+  Numpad6: 'Num6',
+  Numpad7: 'Num7',
+  Numpad8: 'Num8',
+  Numpad9: 'Num9',
   NumpadAdd: 'Num+',
   NumpadSubtract: 'Num-',
   NumpadMultiply: 'Num*',
@@ -68,9 +75,18 @@ const KEY_NAME_MAP = {
   NumpadDecimal: 'Num.',
   NumpadEnter: 'Num Enter',
   // Function keys
-  F1: 'F1', F2: 'F2', F3: 'F3', F4: 'F4',
-  F5: 'F5', F6: 'F6', F7: 'F7', F8: 'F8',
-  F9: 'F9', F10: 'F10', F11: 'F11', F12: 'F12',
+  F1: 'F1',
+  F2: 'F2',
+  F3: 'F3',
+  F4: 'F4',
+  F5: 'F5',
+  F6: 'F6',
+  F7: 'F7',
+  F8: 'F8',
+  F9: 'F9',
+  F10: 'F10',
+  F11: 'F11',
+  F12: 'F12',
   // Print / scroll / pause
   PrintScreen: 'PrtSc',
   ScrollLock: 'ScrLk',
@@ -416,6 +432,7 @@ class Keybinds {
   }
 
   async getKeybinds ({ preset }) {
+    if (typeof preset !== 'string' || !preset.trim() || preset.length > 256 || /[\\/:\0]/.test(preset) || ['.', '..'].includes(preset)) throw new Error('Invalid preset')
     let content
     try {
       content = await fs.readFile(path.join(BINDINGS_DIR, `${preset}.binds`), 'utf8')

@@ -4,6 +4,7 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
+const { spawnMetadata } = require('./metadata-process')
 
 const { BROADCAST_EVENT: broadcastEvent } = global
 
@@ -92,10 +93,9 @@ function probeChannel (channelUrl) {
       url,
       '--dump-json',
       '--playlist-end', '1',
-      '--no-warnings',
-      '--no-check-certificates'
+      '--no-warnings'
     ]
-    const proc = spawn(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
+    const proc = spawnMetadata(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
     let stdout = ''
     proc.stdout.on('data', d => { stdout += d.toString() })
     proc.on('close', code => {
@@ -125,11 +125,10 @@ function search (query, maxResults = 8) {
       `ytsearch${maxResults}:${query}`,
       '--dump-json',
       '--flat-playlist',
-      '--no-warnings',
-      '--no-check-certificates'
+      '--no-warnings'
     ]
 
-    const proc = spawn(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
+    const proc = spawnMetadata(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
     let stdout = ''
     let stderr = ''
 
@@ -190,11 +189,10 @@ function getVideoInfo (urlOrId) {
       target,
       '--dump-json',
       '--no-download',
-      '--no-warnings',
-      '--no-check-certificates'
+      '--no-warnings'
     ]
 
-    const proc = spawn(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
+    const proc = spawnMetadata(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
     let stdout = ''
     let stderr = ''
 
@@ -232,11 +230,10 @@ function getChannelVideos (channelUrl, maxResults = 12) {
       '--dump-json',
       '--flat-playlist',
       '--playlist-end', String(maxResults),
-      '--no-warnings',
-      '--no-check-certificates'
+      '--no-warnings'
     ]
 
-    const proc = spawn(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
+    const proc = spawnMetadata(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })
     let stdout = ''
     let stderr = ''
 
@@ -324,11 +321,13 @@ function download (urlOrId) {
       '--no-warnings',
       '--no-check-certificates',
       '--newline', // Force progress on new lines (easier to parse)
-      ...(FFMPEG_BIN ? [
-        '--ffmpeg-location', FFMPEG_BIN,
-        '--merge-output-format', 'mp4',
-        '--postprocessor-args', 'ffmpeg:-movflags +faststart'
-      ] : [])
+      ...(FFMPEG_BIN
+        ? [
+            '--ffmpeg-location', FFMPEG_BIN,
+            '--merge-output-format', 'mp4',
+            '--postprocessor-args', 'ffmpeg:-movflags +faststart'
+          ]
+        : [])
     ]
 
     const proc = spawn(YTDLP_BIN, args, { windowsHide: true, cwd: CACHE_DIR })

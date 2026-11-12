@@ -1,5 +1,3 @@
-const os = require('os')
-const fs = require('fs').promises
 const fsSync = require('fs')
 const path = require('path')
 const { UNKNOWN_VALUE } = require('../../shared/consts')
@@ -7,9 +5,7 @@ const { UNKNOWN_VALUE } = require('../../shared/consts')
 const { BROADCAST_EVENT: broadcastEvent } = global
 
 // Preferences handling
-const PREFERENCES_DIR = path.join(os.homedir(), 'AppData', 'Local', 'DAEDALUS Terminal')
-const PREFERENCES_FILE = path.join(PREFERENCES_DIR, 'Preferences.json')
-let _preferencesCache = null
+const { preferencesStore, publicPreferences } = require('./preferences-store')
 
 const System = require('./event-handlers/system')
 const ShipStatus = require('./event-handlers/ship-status')
@@ -132,6 +128,7 @@ class EventHandlers {
 
   // Return handlers for events that are fired from the client
   getEventHandlers () {
+    const store = this.preferencesStore || preferencesStore
     if (!this.eventHandlers) {
       this.eventHandlers = {
         getCmdr: async () => {
@@ -149,28 +146,31 @@ class EventHandlers {
           }
         },
         getPreferences: async () => {
-          if (_preferencesCache) return _preferencesCache
-          try {
-            const data = await fs.readFile(PREFERENCES_FILE, 'utf8')
-            _preferencesCache = JSON.parse(data)
-          } catch (e) {
-            _preferencesCache = {}
-          }
-          return _preferencesCache
+          return publicPreferences(await store.read())
         },
         setPreferences: async (preferences) => {
-          await fs.mkdir(PREFERENCES_DIR, { recursive: true })
-          await fs.writeFile(PREFERENCES_FILE, JSON.stringify(preferences))
-          _preferencesCache = preferences
+          const result = await store.savePublic(preferences)
           this.textToSpeech.invalidatePreferencesCache()
-          this.integrations.notifyPreferencesChanged(preferences)
+          this.integrations.notifyPreferencesChanged(await store.read())
           broadcastEvent('syncMessage', { name: 'preferences' })
-          return preferences
+          return result
+        },
+        setIntegrationSecret: async ({ provider, secret }) => {
+          const raw = await store.setSecret(provider, secret)
+          this.integrations.notifyPreferencesChanged(raw)
+          broadcastEvent('syncMessage', { name: 'preferences' })
+          return { configured: !!secret }
+        },
+        disconnectCapi: async () => {
+          const raw = await this.integrations.disconnectCapi()
+          this.integrations.notifyPreferencesChanged(raw)
+          broadcastEvent('syncMessage', { name: 'preferences' })
+          return { configured: false }
         },
         detectVoicepackDir: () => detectVoicepackDir(),
         validateVoicepackDir: ({ dir }) => validateVoicepackDir(dir),
         testAudio: async () => covasPlayer.testWav('confirmed.wav'),
-        testMessage: ({name, message}) => {
+        testMessage: ({ name, message }) => {
           // Method to simulate messages, intended for developers
           if (name !== 'testMessage') broadcastEvent(name, message)
         },

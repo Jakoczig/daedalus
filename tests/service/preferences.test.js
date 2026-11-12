@@ -1,0 +1,33 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs/promises')
+const os = require('node:os')
+const path = require('node:path')
+const { createPreferencesStore, publicPreferences } = require('../../src/service/lib/preferences-store')
+
+test('public preferences are allowlisted, omit nested secrets and do not mutate storage', () => {
+  const raw = { covasExtendedEnabled: true, futureToken: 'fake-secret', integrations: { edsmApiKey: 'fake-edsm', inaraApiKey: 'fake-inara', capiRefreshToken: 'fake-refresh', capiAccessToken: 'fake-access', edsmCmdrName: 'Synthetic', inaraEnabled: true } }
+  assert.deepEqual(publicPreferences(raw), { covasExtendedEnabled: true, integrations: { inaraEnabled: true } })
+  assert.equal(raw.integrations.inaraApiKey, 'fake-inara')
+})
+
+test('ordinary saves preserve secrets and token rotation; explicit secret clear works', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'daedalus-test-'))
+  t.after(() => fs.rm(dir, { recursive: true, force: true }))
+  const store = createPreferencesStore(path.join(dir, 'Preferences.json'))
+  assert.equal((await store.savePublic({ integrations: { spanshEnabled: true } })).integrations.spanshEnabled, true)
+  await store.update(raw => ({ ...raw, integrations: { capiRefreshToken: 'synthetic-old', edsmApiKey: 'synthetic-key' } }))
+  const staleView = publicPreferences(await store.read())
+  await store.update(raw => ({ ...raw, integrations: { ...raw.integrations, capiRefreshToken: 'synthetic-rotated' } }))
+  await store.savePublic({ ...staleView, covasExtendedEnabled: true })
+  assert.equal((await store.read()).integrations.capiRefreshToken, 'synthetic-rotated')
+  assert.equal((await store.read()).integrations.edsmApiKey, 'synthetic-key')
+  await assert.rejects(store.savePublic({ integrations: { inaraApiKey: 'injected' } }))
+  await store.setSecret('inara', 'synthetic-new')
+  assert.equal((await store.read()).integrations.inaraApiKey, 'synthetic-new')
+  await store.setSecret('inara', '')
+  assert.equal((await store.read()).integrations.inaraApiKey, undefined)
+  await store.disconnectCapi()
+  assert.equal((await store.read()).integrations.capiRefreshToken, undefined)
+  assert.equal((await store.read()).integrations.capiEnabled, false)
+})
