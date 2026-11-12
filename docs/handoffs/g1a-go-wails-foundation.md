@@ -123,6 +123,9 @@ because it hardcodes Layout connected/ready. Reconnect state is tracked by the
 socket layer, but this preview label does not yet reflect it. No gameplay or
 privileged operation is exposed by this display defect.
 
+**Update:** this connection-status defect is now fixed by
+`348b9f992bcf7792136bef680bac218d89747b51`; see the follow-up verification below.
+
 Verification limits:
 
 - Native smoke proves renderer bootstrap and programmatic quit; Windows also had
@@ -156,9 +159,63 @@ Do not merge, release, deploy or replace the legacy Windows installer based on
 G1A. No production API calls, credentials or game uploads were used.
 G1B is the recommended next separately authorized milestone: secure remote HTTPS
 and pairing for the secondary laptop, with full Phase 1A authorization parity.
-Keep tablets read-only. Address the disconnected preview label and perform manual
+Keep tablets read-only. Perform manual
 Windows/Linux navigation/close/multiple-window checks before distribution.
 Journal migration, Steam/Proton paths, commander state, Inara/CAPI, game controls,
 plugins, media and new modules remain unimplemented and outside G1A.
 
 Reproduction: [Windows/Linux runbook](../testing/g1a-windows-linux-smoke.md).
+
+## External review follow-up — connection status (2026-11-12)
+
+Review: https://github.com/Jakoczig/daedalus/pull/4#issuecomment-6824382348.
+Confirmed against head `1ce33c0a15f091285bb8497aff2b24f94e047cd1`: the socket's
+close handler already cleared connected/ready, but PrototypeShell hardcoded both
+Layout props and always claimed a healthy service. No authentication defect was
+identified. Fix commit: `348b9f992bcf7792136bef680bac218d89747b51`.
+
+PrototypeShell now consumes connected/ready from useSocket, passes those actual
+values to the existing Layout, and displays disconnected/reconnecting,
+connected/waiting-for-ready, or connected-and-ready text. Its status paragraph is
+outside Layout so the existing loading fade cannot hide the disconnect message.
+Every status labels G1A as an offline preview; gameplay remains unimplemented.
+The legacy children path, shared Layout implementation, transport/retry logic,
+owner/viewer model, Go server and loopback security boundary are unchanged.
+
+TDD: before the fix, the three display-state cases and connection lifecycle test
+failed against the old healthy message. After the fix, all six prototype tests
+pass. The regression harness executes the actual provider/socket close handler,
+scheduled five-second reconnect callback, new socket open handler and loading RPC
+response with deterministic fake browser transport/timers. It renders the real
+Layout/Loader to verify visibility and readiness, without adding dependencies or
+making network/provider calls. Legacy children still render unchanged for all
+three connection states when no G1A marker is supplied.
+
+Local Windows verification after correction:
+
+- `npm test`: **33 passed**, 0 failed/skipped, including six G1A/legacy tests.
+- `npm run lint:security`: **PASS** (test-fixture curly-brace lint error corrected).
+- `npm run test:go-assets`: **4 passed**, 0 failed/skipped.
+- `npm run build:go-assets`: **PASS**, all 62 routes / 278 assets rebuilt/exported.
+- `go test -count=1 ./...`: **PASS**, all four packages.
+- `go vet ./...`: **PASS**.
+- `go build -o bin/daedalus.exe ./cmd/daedalus`: **PASS**.
+- Rebuilt executable `--smoke-test`: **PASS**.
+- Rebuilt executable `--desktop-smoke-test`: **PASS**, actual WebView2 React
+  bootstrap/shutdown. The previously documented nonfatal cleanup warning remains.
+
+Correction-commit CI evidence (head `348b9f992bcf7792136bef680bac218d89747b51`):
+
+| Run | Result |
+| --- | --- |
+| [Desktop CI 43226575483](https://github.com/Jakoczig/daedalus/actions/runs/43226575483) | **PASS on Windows and Ubuntu 24.04**: 33 service tests, 4 build tests, security/build lint, React asset build, Go tests/vet, binary build, headless HTTP/WS smoke and actual native React bootstrap/shutdown; Linux `go test -race ./...` also PASS |
+| [Legacy/security CI 43226575864](https://github.com/Jakoczig/daedalus/actions/runs/43226575864) | **PASS**: Windows/Linux regressions and security lint, React build, original Windows launcher build/smoke |
+
+The subsequent handoff-only commit reruns the same checks; see PR #4 for its
+latest check links. No application changes follow the verified correction.
+
+The review's static-allocation observation is not a measured defect; no unmeasured
+optimization was made. Linux distribution/AppArmor packaging and real Wayland
+acceptance remain limitations. Long-idle/heartbeat policy remains future G1B work;
+this follow-up tests client reconnect/status only. PR #4 remains draft and stacked
+on PR #2. No merge, release, deployment, provider calls or G1B work occurred.
