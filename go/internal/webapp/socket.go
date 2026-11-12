@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -19,9 +20,39 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", 403)
 		return
 	}
+	s.serveSocket(w, r, socketPrincipal{role: "owner", url: s.url, valid: func() bool { return s.sessions.valid(token) }})
+}
+
+type socketPrincipal struct {
+	role, url, deviceID, token string
+	valid                      func() bool
+	remote                     *remoteManager
+	epoch                      uint64
+}
+
+func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal socketPrincipal) {
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
+	}
+	if principal.remote != nil {
+		m := principal.remote
+		m.mu.Lock()
+		_, valid := m.findLocked(principal.token)
+		count := 0
+		for _, id := range m.connections {
+			if id == principal.deviceID {
+				count++
+			}
+		}
+		if !valid || m.epoch != principal.epoch || m.http == nil || len(m.connections) >= 64 || count >= 4 {
+			m.mu.Unlock()
+			conn.CloseNow()
+			return
+		}
+		m.connections[conn] = principal.deviceID
+		m.mu.Unlock()
+		defer func() { m.mu.Lock(); delete(m.connections, conn); m.mu.Unlock() }()
 	}
 	s.socketMu.Lock()
 	if s.closing {
@@ -34,6 +65,9 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = conn.CloseNow(); s.socketMu.Lock(); delete(s.sockets, conn); s.socketMu.Unlock() }()
 	conn.SetReadLimit(1 << 20)
 	send := func(value any) error {
+		if !principal.valid() {
+			return context.Canceled
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		data, err := json.Marshal(value)
@@ -50,7 +84,7 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
-		if !s.sessions.valid(token) {
+		if !principal.valid() {
 			_ = conn.Close(websocket.StatusPolicyViolation, "Session expired")
 			return
 		}
@@ -70,14 +104,14 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 		case "getLoadingStatus":
 			response["message"] = loadingStatus()
 		case "hostInfo":
-			response["message"] = map[string]any{"urls": []string{s.url}}
+			response["message"] = map[string]any{"urls": []string{principal.url}}
 		default:
-			response["error"] = "Not implemented in G1A"
+			response["error"] = "Not implemented in this offline preview"
 		}
 		if send(response) != nil {
 			return
 		}
-		if request.Name == "getLoadingStatus" {
+		if request.Name == "getLoadingStatus" && principal.role == "owner" {
 			s.readyOnce.Do(func() { close(s.clientReady) })
 		}
 	}
@@ -93,6 +127,10 @@ func (s *Server) handler(assets http.Handler) http.Handler {
 		}
 		if r.URL.Path == "/auth/session" {
 			s.session(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/owner/") {
+			s.ownerRemote(w, r)
 			return
 		}
 		if r.Header.Get("Upgrade") != "" {

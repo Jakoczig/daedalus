@@ -32,7 +32,11 @@ func ownerClient(t *testing.T, s *Server) *http.Client {
 			Offline bool   `json:"offline"`
 		} `json:"prototype"`
 	}
-	if json.NewDecoder(response.Body).Decode(&body) != nil || body.Role != "owner" || body.Prototype.Stage != "G1A" || !body.Prototype.Offline {
+	expectedStage := "G1A"
+	if s.remote != nil {
+		expectedStage = "G1B"
+	}
+	if json.NewDecoder(response.Body).Decode(&body) != nil || body.Role != "owner" || body.Prototype.Stage != expectedStage || !body.Prototype.Offline {
 		t.Fatalf("incorrect bootstrap: %+v", body)
 	}
 	cookies := response.Cookies()

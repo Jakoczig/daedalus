@@ -24,9 +24,16 @@ type Server struct {
 	closing     bool
 	clientReady chan struct{}
 	readyOnce   sync.Once
+	remote      *remoteManager
 }
 
 func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
+	return startLocal(ctx, assets, "")
+}
+func StartLocalWithStorage(ctx context.Context, assets fs.FS, dir string) (*Server, error) {
+	return startLocal(ctx, assets, dir)
+}
+func startLocal(ctx context.Context, assets fs.FS, dir string) (*Server, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -45,6 +52,14 @@ func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
 	server.sessions = newSessionStore(port, time.Now)
 	server.sockets = make(map[*websocket.Conn]struct{})
 	server.http = &http.Server{Handler: server.handler(NewStaticHandler(assets)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	if dir != "" {
+		manager, err := newRemote(server, assets, dir)
+		if err != nil {
+			listener.Close()
+			return nil, err
+		}
+		server.remote = manager
+	}
 	go func() { _ = server.http.Serve(listener) }()
 	go func() {
 		select {
@@ -66,6 +81,10 @@ func (s *Server) ClientReady() <-chan struct{} { return s.clientReady }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
 		s.sessions.clear()
+		var remoteErr error
+		if s.remote != nil {
+			remoteErr = s.remote.close()
+		}
 		s.socketMu.Lock()
 		s.closing = true
 		connections := make([]*websocket.Conn, 0, len(s.sockets))
@@ -80,6 +99,7 @@ func (s *Server) Close(ctx context.Context) error {
 		if s.closeErr != nil {
 			_ = s.http.Close()
 		}
+		s.closeErr = errors.Join(s.closeErr, remoteErr)
 		close(s.done)
 	})
 	return s.closeErr
