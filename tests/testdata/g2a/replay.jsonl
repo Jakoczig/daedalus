@@ -1,0 +1,5 @@
+{"timestamp":"2026-01-01T00:00:00Z","event":"Fileheader","gameversion":"synthetic","build":"fixture"}
+{"timestamp":"2026-01-01T00:00:01Z","event":"LoadGame","FID":"SYNTHETIC-A"}
+{"timestamp":"2026-01-01T00:00:02Z","event":"Location","StarSystem":"Fixture Alpha","SystemAddress":9223372036854775807,"MarketID":9007199254740993}
+{"timestamp":"2026-01-01T00:00:02Z","event":"StartJump","StarSystem":"Fixture Beta"}
+{"timestamp":"2026-01-01T00:00:03Z","event":"FSDJump","StarSystem":"Fixture Beta","SystemAddress":9007199254740993}
