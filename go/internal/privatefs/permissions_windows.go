@@ -4,7 +4,7 @@ import (
 	"errors"
 	"golang.org/x/sys/windows"
 	"os"
-	"strings"
+	"unsafe"
 )
 
 func reparse(path string) bool {
@@ -62,18 +62,39 @@ func checkPrivate(path string) error {
 	if err != nil || owner.String() != sid {
 		return errors.New("private file owner mismatch")
 	}
-	// Files created by this package have exactly these two full-access principals.
-	sddl := descriptor.String()
-	for _, entry := range strings.Split(sddl, "(")[1:] {
-		ace := strings.TrimSuffix(entry, ")")
-		fields := strings.Split(ace, ";")
-		if len(fields) != 6 || fields[0] != "A" || (fields[5] != "SY" && fields[5] != sid) {
-			return errors.New("private file ACL is too broad")
-		}
-	}
 	dacl, _, err := descriptor.DACL()
 	if err != nil || dacl == nil {
 		return errors.New("missing private file ACL")
+	}
+	ownerSID, err := windows.StringToSid(sid)
+	if err != nil {
+		return err
+	}
+	return validatePrivateACL(dacl, ownerSID)
+}
+
+func validatePrivateACL(dacl *windows.ACL, owner *windows.SID) error {
+	if dacl == nil || dacl.AceCount == 0 {
+		return errors.New("missing private file ACL")
+	}
+	system, err := windows.StringToSid("S-1-5-18")
+	if err != nil {
+		return err
+	}
+	for i := uint16(0); i < dacl.AceCount; i++ {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		if err := windows.GetAce(dacl, uint32(i), &ace); err != nil {
+			return err
+		}
+		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
+			return errors.New("unexpected private file ACE")
+		}
+		// SidStart is the first DWORD of the variable-length SID in the Windows
+		// ACCESS_ALLOWED_ACE layout. Compare binary SIDs, not localized/aliased SDDL.
+		trustee := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+		if !trustee.Equals(owner) && !trustee.Equals(system) {
+			return errors.New("private file ACL is too broad")
+		}
 	}
 	return nil
 }

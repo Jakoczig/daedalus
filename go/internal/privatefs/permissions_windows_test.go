@@ -35,3 +35,29 @@ func TestWindowsRejectsBroadPrivateFileACL(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWindowsPrivateACLRecognizesCanonicalSIDAlias(t *testing.T) {
+	descriptor, err := windows.SecurityDescriptorFromString("D:P(A;;FA;;;SY)(A;;FA;;;LA)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	administrator, err := windows.StringToSid("LA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acl, _, err := descriptor.DACL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePrivateACL(acl, administrator); err != nil {
+		t.Fatal("canonical local administrator SID rejected", err)
+	}
+	broad, err := windows.SecurityDescriptorFromString("D:P(A;;FA;;;SY)(A;;FA;;;WD)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acl, _, _ = broad.DACL()
+	if validatePrivateACL(acl, administrator) == nil {
+		t.Fatal("Everyone allowed by alias validation")
+	}
+}
