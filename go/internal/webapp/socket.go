@@ -64,6 +64,30 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	s.socketMu.Unlock()
 	defer func() { _ = conn.CloseNow(); s.socketMu.Lock(); delete(s.sockets, conn); s.socketMu.Unlock() }()
 	conn.SetReadLimit(1 << 20)
+	readCtx, cancelRead := context.WithCancel(context.Background())
+	defer cancelRead()
+	go func() {
+		ticker := time.NewTicker(s.pingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-readCtx.Done():
+				return
+			case <-ticker.C:
+				if !principal.valid() {
+					conn.CloseNow()
+					return
+				}
+				pingCtx, cancel := context.WithTimeout(readCtx, s.pongTimeout)
+				err := conn.Ping(pingCtx)
+				cancel()
+				if err != nil {
+					conn.CloseNow()
+					return
+				}
+			}
+		}
+	}()
 	send := func(value any) error {
 		if !principal.valid() {
 			return context.Canceled
@@ -80,7 +104,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		return
 	}
 	for {
-		kind, data, err := conn.Read(context.Background())
+		kind, data, err := conn.Read(readCtx)
 		if err != nil {
 			return
 		}

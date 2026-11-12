@@ -13,18 +13,19 @@ import (
 )
 
 type Server struct {
-	http        *http.Server
-	url         string
-	done        chan struct{}
-	once        sync.Once
-	closeErr    error
-	sessions    *sessionStore
-	socketMu    sync.Mutex
-	sockets     map[*websocket.Conn]struct{}
-	closing     bool
-	clientReady chan struct{}
-	readyOnce   sync.Once
-	remote      *remoteManager
+	http                      *http.Server
+	url                       string
+	done                      chan struct{}
+	once                      sync.Once
+	closeErr                  error
+	sessions                  *sessionStore
+	socketMu                  sync.Mutex
+	sockets                   map[*websocket.Conn]struct{}
+	closing                   bool
+	clientReady               chan struct{}
+	readyOnce                 sync.Once
+	remote                    *remoteManager
+	pingInterval, pongTimeout time.Duration
 }
 
 func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
@@ -47,7 +48,7 @@ func startLocal(ctx context.Context, assets fs.FS, dir string) (*Server, error) 
 	if err != nil {
 		return nil, errors.New("cannot start local service")
 	}
-	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{}), clientReady: make(chan struct{})}
+	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{}), clientReady: make(chan struct{}), pingInterval: 20 * time.Second, pongTimeout: 10 * time.Second}
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	server.sessions = newSessionStore(port, time.Now)
 	server.sockets = make(map[*websocket.Conn]struct{})
