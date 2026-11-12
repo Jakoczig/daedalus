@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/coder/websocket"
 )
 
 type Server struct {
@@ -16,6 +18,10 @@ type Server struct {
 	done     chan struct{}
 	once     sync.Once
 	closeErr error
+	sessions *sessionStore
+	socketMu sync.Mutex
+	sockets  map[*websocket.Conn]struct{}
+	closing  bool
 }
 
 func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
@@ -33,7 +39,10 @@ func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
 		return nil, errors.New("cannot start local service")
 	}
 	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{})}
-	server.http = &http.Server{Handler: NewStaticHandler(assets), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	_, port, _ := net.SplitHostPort(listener.Addr().String())
+	server.sessions = newSessionStore(port, time.Now)
+	server.sockets = make(map[*websocket.Conn]struct{})
+	server.http = &http.Server{Handler: server.handler(NewStaticHandler(assets)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() { _ = server.http.Serve(listener) }()
 	go func() {
 		select {
@@ -51,6 +60,17 @@ func (s *Server) URL() string           { return s.url }
 func (s *Server) Done() <-chan struct{} { return s.done }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
+		s.sessions.clear()
+		s.socketMu.Lock()
+		s.closing = true
+		connections := make([]*websocket.Conn, 0, len(s.sockets))
+		for conn := range s.sockets {
+			connections = append(connections, conn)
+		}
+		s.socketMu.Unlock()
+		for _, conn := range connections {
+			_ = conn.CloseNow()
+		}
 		s.closeErr = s.http.Shutdown(ctx)
 		if s.closeErr != nil {
 			_ = s.http.Close()
