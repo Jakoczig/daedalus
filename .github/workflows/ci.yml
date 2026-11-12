@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, security/phase-1a-foundations]
 
 jobs:
   regression-tests:

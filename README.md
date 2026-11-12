@@ -14,6 +14,8 @@
 
 ## About DAEDALUS Terminal
 
+**Go/Wails developer preview (G1A):** an offline Windows/Linux desktop foundation is being developed separately from the working legacy application. It embeds the current React interface, but game data, integrations and remote second-screen pairing are unimplemented. See the [preview build and verification runbook](docs/testing/g1a-windows-linux-smoke.md). This is not a replacement release.
+
 _DAEDALUS Terminal is a free, immersive, context-sensitive companion app and second screen interface for [Elite Dangerous](https://www.elitedangerous.com/)._
 
 You can run DAEDALUS Terminal in a native window, on multiple windows/displays, as an overlayed window on top of the game if playing with a VR headset or on an ultra-wide display, or connect remotely in a browser from another computer/tablet/phone/other device (e.g. Chromebook, Android Phone/Tablet, Amazon Fire Tablet). The UI is specifically designed with touch screen devices in mind and adapts the layout of panels to both landscape and portrait displays, both large and small.

@@ -1,7 +1,11 @@
 /* global WebSocket, CustomEvent */
 import { createContext, useState, useContext, useEffect } from 'react'
-import Router from 'next/router'
+import Router, { useRouter } from 'next/router'
 import notification from 'lib/notification'
+import PrimaryNavigation from 'components/primary-navigation'
+import Layout from 'components/layout'
+import Panel from 'components/panel'
+import * as navigation from 'lib/navigation-items'
 
 let connecting = false
 let socket = null// Store socket connection (defaults to null)
@@ -13,6 +17,7 @@ let broadcastActivityTimeout = null
 const defaultSocketState = {
   role: null,
   needsPairing: false,
+  prototype: null,
   connected: false, // Boolean to indicate current connection status
   active: false, // Boolean to indicate if any pending requests
   ready: false // Boolean to indicate if the service is ready and loaded
@@ -96,8 +101,8 @@ async function connect (socketState, setSocketState) {
       setSocketState(previous => ({ ...previous, role: null, needsPairing: true, ready: false }))
       return
     }
-    const { role } = await response.json()
-    setSocketState(previous => ({ ...previous, role, needsPairing: false }))
+    const { role, prototype } = await response.json()
+    setSocketState(previous => ({ ...previous, role, prototype: prototype?.stage === 'G1A' && prototype?.offline === true ? prototype : null, needsPairing: false }))
   } catch {
     setTimeout(() => connect(socketState, setSocketState), 5000)
     return
@@ -362,8 +367,46 @@ function SocketProvider ({ children }) {
 
   return (
     <SocketContext.Provider value={socketState}>
-      {socketState.role ? children : socketState.needsPairing ? <PairDisplay /> : <p>Connecting to DAEDALUS…</p>}
+      {socketState.role ? socketState.prototype ? <PrototypeShell /> : children : socketState.needsPairing ? <PairDisplay /> : <p>Connecting to DAEDALUS…</p>}
     </SocketContext.Provider>
+  )
+}
+
+function PrototypeShell () {
+  const { connected, ready } = useSocket()
+  const router = useRouter()
+  const status = !connected
+    ? 'Disconnected. Waiting to reconnect to the local Go service.'
+    : !ready
+        ? 'Connected. Waiting for the local Go service to become ready.'
+        : 'Connected and ready. Game features remain unimplemented.'
+  const [, group, page = ''] = router.pathname.split('/')
+  const menus = {
+    cmdr: navigation.CmdrPanelNavItems,
+    ship: navigation.ShipPanelNavItems,
+    nav: navigation.NavPanelNavItems,
+    exploration: navigation.ExplorationPanelNavItems,
+    trade: navigation.TradePanelNavItems,
+    mining: navigation.MiningPanelNavItems,
+    missions: navigation.MissionsPanelNavItems,
+    eng: navigation.EngineeringPanelNavItems,
+    media: navigation.MediaPanelNavItems,
+    controls: navigation.ControlsPanelNavItems
+  }
+  const items = menus[group] ? menus[group](page, {}).filter(item => item.url) : []
+  return (
+    <>
+      <header><h1>DAEDALUS Terminal</h1><PrimaryNavigation /></header>
+      <p role='status'>G1A offline preview: {status}</p>
+      <Layout connected={connected} ready={ready}>
+        <Panel navigation={items}>
+          <h2>G1A — offline desktop foundation</h2>
+          <p>Game features are not implemented in this preview. No journals are read, no commander data is loaded, and no provider calls or uploads run.</p>
+          <p>Selected route: <code>{router.pathname}</code></p>
+          <p>Navigation and reload test the existing exported interface only. Remote displays and pairing are not enabled in G1A. Keep using the separate legacy application for game features.</p>
+        </Panel>
+      </Layout>
+    </>
   )
 }
 

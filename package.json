@@ -25,7 +25,10 @@
     "compress-images": "npx imagemin src/client/public/images/** --out-dir src/client/public/images/",
     "test": "npm run test:unit",
     "test:unit": "node --require ./tests/helpers/no-external-network.cjs --test --test-timeout=15000 tests/service/*.test.js",
-    "lint:security": "standard src/service/main.js src/service/lib/socket-auth.js src/service/lib/socket-server.js src/service/lib/preferences-store.js src/service/lib/event-handlers.js src/service/lib/event-handlers/integrations.js src/service/lib/events.js src/client/lib/socket.js src/client/components/settings.js tests/service/*.test.js tests/helpers/*.cjs src/service/lib/metadata-process.js src/service/lib/video-manager.js src/service/lib/event-handlers/video.js src/service/lib/event-handlers/keybinds.js src/client/lib/integration-settings.js src/client/lib/video-playback.js src/client/pages/media/music.js src/client/pages/media/video.js src/client/pages/media/galnet.js"
+    "lint:security": "standard src/service/main.js src/service/lib/socket-auth.js src/service/lib/socket-server.js src/service/lib/preferences-store.js src/service/lib/event-handlers.js src/service/lib/event-handlers/integrations.js src/service/lib/events.js src/client/lib/socket.js src/client/components/settings.js tests/service/*.test.js tests/helpers/*.cjs src/service/lib/metadata-process.js src/service/lib/video-manager.js src/service/lib/event-handlers/video.js src/service/lib/event-handlers/keybinds.js src/client/lib/integration-settings.js src/client/lib/video-playback.js src/client/pages/media/music.js src/client/pages/media/video.js src/client/pages/media/galnet.js",
+    "build:go-assets": "npm run build:client && node scripts/build/export-go-assets.cjs",
+    "test:go-assets": "node --test tests/build/*.test.cjs",
+    "lint:go-assets": "standard scripts/build/export-go-assets.cjs tests/build/*.test.cjs"
   },
   "keywords": [],
   "author": "",
