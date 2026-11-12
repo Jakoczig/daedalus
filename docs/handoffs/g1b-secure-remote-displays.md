@@ -1,5 +1,88 @@
 # G1B secure remote displays — ChatGPT/external review handoff
 
+## Six-character pairing acceptance follow-up
+
+Maintainer feedback: https://github.com/Jakoczig/daedalus/pull/5#issuecomment-6833011040.
+The maintainer reports successful real secondary-device pairing/connectivity on the
+preceding preview. This is user-reported physical acceptance, not independently
+observed device/browser coverage. The six-character entry change still needs its
+own physical usability acceptance; certificate/mobile/firewall/roaming and normal
+Linux packaging gaps below are not all closed by the connectivity report.
+
+Implementation: `e8a18952856bd5f17052fdbfbe4235f7de7e2c96`.
+
+- Codes use `0123456789ABCDEFGHJKMNPQRSTVWXYZ`, six characters / 30 bits.
+  Each character uses `crypto/rand.Int` uniform sampling; no token truncation or
+  math/rand. A random collision with the pending code is redrawn so replacement
+  cannot preserve that old code. Only its SHA-256 hash and expiry stay in memory.
+- Server input uppercases lowercase, then strictly validates six characters and
+  the alphabet. No I/L/O/U aliasing, Unicode lookalikes, spaces or separators.
+  Expected hash comparison is constant-time. Five-minute expiry, one-use and
+  global ten-attempt/minute admission remain; failures consume the same budget
+  across peers and repeated owner issuance never resets it. Codes are not logged.
+- Viewer cookies still use independent 256-bit random tokens and all existing
+  expiry/revocation/owner-viewer/TLS/Host/Origin/profile boundaries remain intact.
+  The shorter code intentionally has lower entropy than the prior 128-bit code;
+  its approved online security depends on short lifetime and the global rate cap.
+- Owner output is large, spaced, selectable and shows a five-minute deadline.
+  Viewer entry is visible, mobile-sized, max/min six, alphabet-validated and
+  uppercases on change. Anonymous G1B session bootstrap returns only a public
+  code-length hint with HTTP 401, never a role/session. This selects the short
+  form; the shared legacy form retains its original long-code entry/submission.
+  Updating the Node backend's pairing protocol is outside this G1B change.
+
+TDD evidence: new code-shape/length, lowercase admission and public-hint tests
+failed on the old server; owner prominence and viewer-entry tests failed on the
+old UI. A deterministic entropy fixture reproduced a repeated-code collision
+before its redraw guard. All pass after implementation. Added regressions cover
+exact expiry, replacement, one-use, invalid alphabets/lengths, two-peer global
+attempt exhaustion despite repeated issuance, budget recovery, hash-only pending
+state, unchanged 32-byte cookie, UI submission and legacy 32-character entry.
+Independent read-only review found no actionable issue; focused Go/JS checks pass.
+
+Local verification: **44 JS tests**, **6 build fixtures**, both security/build
+lints, **62 routes / 278 embedded assets**, fresh Go tests in all six packages
+(webapp 73.344 s), vet/module verification, Windows executable and HTTP/WS/native
+React bootstrap/shutdown smoke **PASS**. Known nonfatal WebView2 cleanup 1412
+remains. Windows local race checking is unavailable (no cgo compiler); Linux CI
+runs the mandatory fresh full race suite. No dependencies or legacy backend/
+launcher files were changed.
+
+Verified implementation run results on `e8a1895`:
+
+| Gate | Result |
+| --- | --- |
+| [Desktop CI 43286868910](https://github.com/Jakoczig/daedalus/actions/runs/43286868910) | **PASS Windows and Linux**: 44 JS tests, 6 build fixtures, both lints, 62 routes / 278 assets, six Go packages, vet/module verification, native builds and both executable/native React smoke modes |
+| Linux normal / race webapp | **PASS**: 66.203 s / 67.118 s, including fresh long-idle/reconnect and pairing regressions |
+| Windows normal webapp | **PASS**: 67.844 s, including ACL/lock/recovery regressions |
+| [Legacy/security CI 43286868891](https://github.com/Jakoczig/daedalus/actions/runs/43286868891) | **PASS all five jobs**: both OS security regressions, lint, React build and original launcher build/smoke |
+
+Updated **experimental, unsigned, offline preview** downloads from this exact
+implementation head (GitHub sign-in may be required; expire 2026-11-26):
+
+- [Windows x64](https://github.com/Jakoczig/daedalus/actions/runs/43286868910/artifacts/13976035780)
+- [Linux x64](https://github.com/Jakoczig/daedalus/actions/runs/43286868910/artifacts/13975926444)
+
+Both downloaded ZIPs were independently inspected: exactly executable, README.md
+and SHA256SUMS; executable/README hashes matched each bundled manifest, and ZIP
+hashes matched GitHub artifact digests. No keys/profiles/credentials are included.
+These supersede the earlier 32-character-code previews linked in the historical
+recovery record below. Use the new artifact's own manifest for any later run;
+new builds may differ because Go embeds commit metadata.
+
+| OS | Executable SHA-256 | ZIP SHA-256 |
+| --- | --- | --- |
+| Windows | `c05b7e3d1aca9bcaa69d96a5f0ae14a5fe1395f7a3980693769c5a73bec9d14e` | `ce963872b5a2a71668e675c7b7ed788f1a60c0900bccb720b06e80ef7e8cb6bb` |
+| Linux | `1ef0727951507316c4805a31a62b219072f1394abe0a61ccbf07ab285d322161` | `9540bf5648ddd289b4904f2b959d917e35cc3af8b875a1634ba78bee9dc4c920` |
+
+The subsequent handoff-only commit is also subject to both full workflows; final
+head/check links are recorded in the PR description to avoid a self-referential
+commit hash in this document. Runtime sources do not change in that commit.
+
+PR #5 remains draft, stacked and unmerged. Request incremental source/CI review
+before closing this milestone. No release, deployment, provider traffic, journal
+work or G2A planning/implementation is included.
+
 ## External review corrections and experimental downloads
 
 Review: https://github.com/Jakoczig/daedalus/pull/5#issuecomment-6831759803.
@@ -148,7 +231,8 @@ transport-appropriate `hostInfo`. No naming-based or arbitrary dispatch exists.
 Viewer hostInfo never returns the loopback owner URL or settings/secrets.
 
 Owner actions: enable/disable, issue code, list/refresh devices, rename and revoke.
-Codes are 128 random bits, memory-only, five-minute, one-use; making another
+Codes now contain 30 random bits as six Crockford-style Base32 characters,
+memory-only, five-minute, one-use; making another
 invalidates the previous code. Ten pairing attempts/minute globally bound guessing
 without an attacker-controlled IP map. Names are bounded/validated and escaped in
 React. Viewer cookies contain random 256-bit tokens, use a distinct `__Host-` name,
