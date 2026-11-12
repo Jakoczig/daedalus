@@ -12,3 +12,6 @@ TESTER_FEEDBACK.md
 Preferences.json
 *.log
 *.exe
+/go/internal/frontend/dist/
+/go/internal/frontend/dist.staging-*/
+/go/bin/
