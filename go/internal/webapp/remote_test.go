@@ -383,3 +383,22 @@ func TestRemoteStrictOriginsAndOwnerOnlyControl(t *testing.T) {
 		t.Fatal("anonymous owner settings accepted")
 	}
 }
+
+func TestSavedRemoteDoesNotPublishBeforeServerInitialization(t *testing.T) {
+	dir := t.TempDir()
+	if err := privatefs.Prepare(dir); err != nil {
+		t.Fatal(err)
+	}
+	state, _ := json.Marshal(remoteState{Version: 1, Enabled: true, Address: "127.0.0.1", Port: 0})
+	if err := privatefs.Write(dir, "remote.json", state); err != nil {
+		t.Fatal(err)
+	}
+	manager, err := newRemote(&Server{}, fixtureFS(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.close()
+	if manager.http != nil {
+		t.Fatal("constructor published remote listener before server initialized")
+	}
+}

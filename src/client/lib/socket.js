@@ -5,11 +5,14 @@ import notification from 'lib/notification'
 import PrimaryNavigation from 'components/primary-navigation'
 import Layout from 'components/layout'
 import Panel from 'components/panel'
+import RemoteDisplays from 'components/remote-displays'
 import * as navigation from 'lib/navigation-items'
 
 let connecting = false
 let socket = null// Store socket connection (defaults to null)
-let callbackHandlers = {} // Store callbacks waiting to be executed (pending response from server)
+let callbackHandlers = Object.create(null) // Pending responses, without inherited names
+let reconnectTimer = null
+let connectionGeneration = 0
 let deferredEventQueue = [] // Store events waiting to be sent (used when server is not ready yet or offline)
 let recentBroadcastEvents = 0
 let broadcastActivityTimeout = null
@@ -95,21 +98,29 @@ function socketDebugMessage () {
 async function connect (socketState, setSocketState) {
   if (socket !== null || connecting) return
   connecting = true
+  const generation = ++connectionGeneration
+  const controller = new AbortController()
+  const bootstrapTimer = setTimeout(() => controller.abort(), 10000)
   try {
-    const response = await window.fetch('/auth/session', { method: 'POST', credentials: 'same-origin' })
+    const response = await window.fetch('/auth/session', { method: 'POST', credentials: 'same-origin', signal: controller.signal })
+    if (generation !== connectionGeneration) return
     if (!response.ok) {
-      setSocketState(previous => ({ ...previous, role: null, needsPairing: true, ready: false }))
+      const needsPairing = response.status === 401 || response.status === 403
+      setSocketState(previous => ({ ...previous, role: needsPairing ? null : previous.role, needsPairing, connected: false, ready: false }))
+      if (!needsPairing) scheduleReconnect(socketState, setSocketState)
       return
     }
     const { role, prototype } = await response.json()
-    setSocketState(previous => ({ ...previous, role, prototype: prototype?.stage === 'G1A' && prototype?.offline === true ? prototype : null, needsPairing: false }))
+    if (generation !== connectionGeneration) return
+    if (!['owner', 'viewer'].includes(role)) throw new Error('Invalid session response')
+    setSocketState(previous => ({ ...previous, role, prototype: ['G1A', 'G1B'].includes(prototype?.stage) && prototype?.offline === true ? prototype : null, needsPairing: false }))
   } catch {
-    setTimeout(() => connect(socketState, setSocketState), 5000)
+    if (generation === connectionGeneration) scheduleReconnect(socketState, setSocketState)
     return
-  } finally { connecting = false }
+  } finally { clearTimeout(bootstrapTimer); if (generation === connectionGeneration) connecting = false }
 
   // Reset on reconnect
-  callbackHandlers = {}
+  cancelPending()
   deferredEventQueue = []
   if (broadcastActivityTimeout) {
     clearTimeout(broadcastActivityTimeout)
@@ -118,8 +129,11 @@ async function connect (socketState, setSocketState) {
   recentBroadcastEvents = 0
 
   socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host)
+  const connection = socket
+  const current = () => socket === connection && generation === connectionGeneration
   if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Connecting to service')
   socket.onmessage = (event) => {
+    if (!current()) return
     let requestId, name, message
     try {
       ({ requestId, name, message } = JSON.parse(event.data))
@@ -293,6 +307,7 @@ async function connect (socketState, setSocketState) {
     socketDebugMessage('Message received from socket server', requestId, name, message)
   }
   socket.onopen = async (e) => {
+    if (!current()) return
     if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Connection opened')
     setSocketState(prevState => ({
       ...prevState,
@@ -324,6 +339,7 @@ async function connect (socketState, setSocketState) {
     // until get a loadingProgress event that indicates the service is loaded
     try {
       const loadingStats = await sendEvent('getLoadingStatus')
+      if (!current()) return
       if (process.env.NODE_ENV === 'development') devLog(`[SOCKET] getLoadingStatus: complete=${loadingStats.loadingComplete} inProgress=${loadingStats.loadingInProgress}`)
       if (loadingStats.loadingComplete) {
         if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Ready state → true (via getLoadingStatus)')
@@ -333,11 +349,16 @@ async function connect (socketState, setSocketState) {
         }))
       }
     } catch (err) {
-      console.error('getLoadingStatus failed:', err)
+      if (current()) console.error('getLoadingStatus failed:', err)
     }
   }
   socket.onclose = (e) => {
+    if (!current()) return
     socket = null
+    connectionGeneration++
+    cancelPending()
+    if (broadcastActivityTimeout) { clearTimeout(broadcastActivityTimeout); broadcastActivityTimeout = null }
+    recentBroadcastEvents = 0
     if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Connection closed — reconnecting in 5s')
     setSocketState(prevState => ({
       ...prevState,
@@ -345,13 +366,25 @@ async function connect (socketState, setSocketState) {
       connected: false,
       ready: false
     }))
-    setTimeout(() => { connect(socketState, setSocketState) }, 5000)
+    scheduleReconnect(socketState, setSocketState)
   }
 
   socket.onerror = function (err) {
+    if (!current()) return
     socketDebugMessage('Socket error', err.message)
     socket.close()
   }
+}
+
+function scheduleReconnect (socketState, setSocketState) {
+  if (reconnectTimer) return
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(socketState, setSocketState) }, 5000)
+}
+
+function cancelPending () {
+  for (const callback of Object.values(callbackHandlers)) callback.cancel()
+  callbackHandlers = Object.create(null)
+  deferredEventQueue = []
 }
 
 const SocketContext = createContext()
@@ -373,7 +406,8 @@ function SocketProvider ({ children }) {
 }
 
 function PrototypeShell () {
-  const { connected, ready } = useSocket()
+  const { connected, ready, role, prototype } = useSocket()
+  const stage = prototype?.stage || 'G1A'
   const router = useRouter()
   const status = !connected
     ? 'Disconnected. Waiting to reconnect to the local Go service.'
@@ -397,13 +431,14 @@ function PrototypeShell () {
   return (
     <>
       <header><h1>DAEDALUS Terminal</h1><PrimaryNavigation /></header>
-      <p role='status'>G1A offline preview: {status}</p>
+      <p role='status'>{stage} offline preview: {status}</p>
+      {stage === 'G1B' && role === 'owner' && <RemoteDisplays />}
       <Layout connected={connected} ready={ready}>
         <Panel navigation={items}>
-          <h2>G1A — offline desktop foundation</h2>
+          <h2>{stage} — offline desktop foundation</h2>
           <p>Game features are not implemented in this preview. No journals are read, no commander data is loaded, and no provider calls or uploads run.</p>
           <p>Selected route: <code>{router.pathname}</code></p>
-          <p>Navigation and reload test the existing exported interface only. Remote displays and pairing are not enabled in G1A. Keep using the separate legacy application for game features.</p>
+          <p>{stage === 'G1B' ? 'Paired displays are read-only. Remote access is controlled by the local owner.' : 'Remote displays and pairing are not enabled in G1A.'} Navigation and reload test the existing exported interface only. Keep using the separate legacy application for game features.</p>
         </Panel>
       </Layout>
     </>
@@ -412,6 +447,7 @@ function PrototypeShell () {
 
 function PairDisplay () {
   const [code, setCode] = useState('')
+  const [name, setName] = useState('Browser display')
   const [error, setError] = useState('')
   const pair = async event => {
     event.preventDefault()
@@ -420,7 +456,7 @@ function PairDisplay () {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim() })
+        body: JSON.stringify({ code: code.trim(), name: name.trim() })
       })
       if (!response.ok) throw new Error('Pairing failed. Check the code and HTTPS connection, or try again in a minute.')
       window.location.reload()
@@ -429,9 +465,10 @@ function PairDisplay () {
   return (
     <main style={{ maxWidth: '36rem', margin: '4rem auto', padding: '2rem' }}>
       <h1>Pair this display</h1>
-      <p>Open DAEDALUS settings on the Windows PC to create a pairing code. Remote displays require the configured HTTPS address and a trusted certificate.</p>
+      <p>Open DAEDALUS settings on the host desktop to create a pairing code. Remote displays require the configured HTTPS address and a trusted certificate.</p>
       <form onSubmit={pair}>
         <label>Pairing code <input type='password' autoComplete='off' value={code} onChange={e => setCode(e.target.value)} /></label>
+        <label>Device name <input maxLength={80} value={name} onChange={e => setName(e.target.value)} /></label>
         <button type='submit'>Pair display</button>
       </form>
       {error && <p role='alert'>{error}</p>}
@@ -443,6 +480,7 @@ function useSocket () { return useContext(SocketContext) }
 
 function sendEvent (name, message = null, timeout = 30000) {
   return new Promise((resolve, reject) => {
+    if (Object.keys(callbackHandlers).length >= 128) { reject(new Error('Request limit reached')); return }
     const requestId = generateUuid()
     const sendStart = (process.env.NODE_ENV === 'development') ? Date.now() : 0
     if (process.env.NODE_ENV === 'development') devLog(`[SEND] → ${name}  id=${requestId.slice(0, 8)}`)
@@ -462,6 +500,7 @@ function sendEvent (name, message = null, timeout = 30000) {
         resolve(parsed.message)
       }
     }
+    callbackHandlers[requestId].cancel = () => { if (timer) clearTimeout(timer); reject(new Error('Connection interrupted; retry request')) }
     if (timeout > 0) {
       timer = setTimeout(() => {
         delete callbackHandlers[requestId]

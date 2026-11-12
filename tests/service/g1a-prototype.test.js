@@ -23,7 +23,7 @@ function loadClientModule (relativePath, dependencies, browser = {}) {
   return mod.exports(browser.window, browser.WebSocket, browser.setTimeout, browser.clearTimeout, browser.CustomEvent)
 }
 
-function harness (initialState) {
+function harness (initialState, options = {}) {
   let state = initialState
   let effect
   const timers = new Map()
@@ -31,7 +31,7 @@ function harness (initialState) {
   const browser = {
     window: {
       location: { protocol: 'http:', host: '127.0.0.1:54395' },
-      fetch: async () => ({ ok: true, json: async () => ({ role: 'owner', prototype: { stage: 'G1A', offline: true } }) }),
+      fetch: options.fetch || (async () => ({ ok: true, json: async () => ({ role: 'owner', prototype: { stage: 'G1A', offline: true } }) })),
       localStorage: { getItem: () => null },
       sessionStorage: { getItem: () => null },
       dispatchEvent: () => {}
@@ -65,6 +65,7 @@ function harness (initialState) {
     if (name === 'components/primary-navigation') return () => React.createElement('nav', null, 'Existing primary navigation')
     if (name === 'components/layout') return layout
     if (name === 'components/panel') return ({ children }) => React.createElement('div', null, children)
+    if (name === 'components/remote-displays') return () => React.createElement('section', null, 'Owner remote display settings')
     if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
     return require(name)
   }, browser)
@@ -79,7 +80,9 @@ function harness (initialState) {
       await new Promise(resolve => setImmediate(resolve))
     },
     get state () { return state },
-    sockets
+    sockets,
+    sendEvent: socket.sendEvent,
+    timers
   }
 }
 
@@ -158,4 +161,53 @@ test('G1A reports service disconnection and reconnects only after the new socket
   await reopened
   assertStatus(client, true, true, /connected and ready/i)
   assert.match(client.render(), /not implemented/)
+})
+
+test('G1B viewer stays offline and never receives owner settings', () => {
+  const viewer = harness({ role: 'viewer', prototype: { stage: 'G1B', offline: true }, connected: true, ready: true })
+  function Unported () { throw new Error('Gameplay mounted') }
+  const html = viewer.render(React.createElement(Unported))
+  assert.match(html, /G1B/)
+  assert.match(html, /read.only/i)
+  assert.doesNotMatch(html, /Owner remote display settings|not enabled in G1A/)
+  const owner = harness({ role: 'owner', prototype: { stage: 'G1B', offline: true }, connected: true, ready: true })
+  assert.match(owner.render(), /Owner remote display settings/)
+})
+
+test('G1B bootstrap survives transient service failure instead of requesting pairing', async () => {
+  let attempts = 0
+  const client = harness(undefined, { fetch: async () => ++attempts === 1 ? { ok: false, status: 503 } : { ok: true, json: async () => ({ role: 'viewer', prototype: { stage: 'G1B', offline: true } }) } })
+  client.render(); await client.start()
+  assert.equal(client.state.needsPairing, false)
+  await client.reconnect()
+  assert.equal(client.state.role, 'viewer')
+  assert.equal(client.state.prototype.stage, 'G1B')
+  assert.equal(client.sockets.length, 1)
+})
+
+test('disconnect cancels pending work and stale readiness cannot affect the new socket', async () => {
+  const client = harness(); client.render(); await client.start()
+  const first = client.sockets[0]; first.readyState = 1
+  const opened = first.onopen()
+  const pending = client.sendEvent('hostInfo')
+  const rejected = assert.rejects(pending, /interrupted/i)
+  const oldRequest = first.sent[0]
+  first.close(); await rejected; await opened
+  await client.reconnect()
+  const second = client.sockets[1]; second.readyState = 1
+  const reopened = second.onopen()
+  first.message({ ...oldRequest, message: { loadingComplete: true } })
+  assert.equal(client.state.ready, false)
+  second.message({ ...second.sent[0], message: { loadingComplete: true } }); await reopened
+  assert.equal(client.state.ready, true)
+  assert.ok([...client.timers.values()].every(timer => timer.delay !== 30000), 'pending request timers leaked')
+})
+
+test('offline RPC queue is bounded', async () => {
+  const client = harness()
+  const pending = []
+  for (let i = 0; i < 128; i++) pending.push(client.sendEvent('hostInfo').catch(() => {}))
+  await assert.rejects(client.sendEvent('hostInfo'), /limit/i)
+  client.render(); await client.start(); client.sockets[0].close()
+  await Promise.all(pending)
 })

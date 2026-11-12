@@ -47,9 +47,7 @@ func newRemote(s *Server, assets fs.FS, dir string) (*remoteManager, error) {
 		return nil, err
 	}
 	m := &remoteManager{server: s, assets: NewStaticHandler(assets), dir: dir, release: release, now: time.Now, connections: map[*websocket.Conn]string{}}
-	if err = m.load(); err == nil && m.state.Enabled {
-		err = m.enableLocked(m.state.Address, m.state.Port)
-	}
+	err = m.load()
 	if err != nil {
 		release()
 		return nil, err
@@ -184,11 +182,26 @@ func (m *remoteManager) close() error {
 }
 
 func (m *remoteManager) statusLocked() map[string]any {
+	addresses := []string{}
+	if interfaces, err := net.Interfaces(); err == nil {
+		for _, iface := range interfaces {
+			if iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			items, _ := iface.Addrs()
+			for _, item := range items {
+				ip, _, err := net.ParseCIDR(item.String())
+				if err == nil && ip.To4() != nil && ip.IsPrivate() {
+					addresses = append(addresses, ip.String())
+				}
+			}
+		}
+	}
 	devices := make([]map[string]any, 0, len(m.state.Devices))
 	for _, d := range m.state.Devices {
 		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires})
 	}
-	return map[string]any{"enabled": m.http != nil && !m.fault, "url": m.url, "address": m.state.Address, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
+	return map[string]any{"enabled": m.http != nil && !m.fault, "url": m.url, "address": m.state.Address, "addresses": addresses, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
 }
 func (s *Server) ownerRemote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" || !s.sameOrigin(r) || !s.sessions.valid(s.sessions.token(r)) || s.remote == nil {
@@ -341,6 +354,10 @@ func (m *remoteManager) serve(epoch uint64, w http.ResponseWriter, r *http.Reque
 			}
 			http.SetCookie(w, &http.Cookie{Name: viewerCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		} else {
+			if _, err := io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, 4096)); err != nil {
+				http.Error(w, "Invalid request", 400)
+				return
+			}
 			cookie, err := r.Cookie(viewerCookie)
 			if err == nil {
 				token = cookie.Value

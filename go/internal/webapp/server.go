@@ -60,6 +60,20 @@ func startLocal(ctx context.Context, assets fs.FS, dir string) (*Server, error) 
 			return nil, err
 		}
 		server.remote = manager
+		manager.mu.Lock()
+		if manager.state.Enabled {
+			if err := manager.enableLocked(manager.state.Address, manager.state.Port); err != nil {
+				manager.notice = "Remote startup failed. Check the host address, port and certificate storage, then enable again."
+				if !manager.fault {
+					manager.state.Enabled = false
+					manager.state.Active = false
+					if err = manager.saveLocked(); err != nil {
+						manager.failLocked()
+					}
+				}
+			}
+		}
+		manager.mu.Unlock()
 	}
 	go func() { _ = server.http.Serve(listener) }()
 	go func() {

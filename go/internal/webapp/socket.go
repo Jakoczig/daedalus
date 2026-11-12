@@ -10,8 +10,12 @@ import (
 	"github.com/coder/websocket"
 )
 
-func loadingStatus() map[string]any {
-	return map[string]any{"loadingComplete": true, "loadingInProgress": false, "numberOfFiles": 0, "numberOfEventsImported": 0, "numberOfLogLines": 0, "logSizeInBytes": 0, "offline": true, "stage": "G1A"}
+func (s *Server) loadingStatus() map[string]any {
+	stage := "G1A"
+	if s.remote != nil {
+		stage = "G1B"
+	}
+	return map[string]any{"loadingComplete": true, "loadingInProgress": false, "numberOfFiles": 0, "numberOfEventsImported": 0, "numberOfLogLines": 0, "logSizeInBytes": 0, "offline": true, "stage": stage}
 }
 
 func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +104,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		}
 		return conn.Write(ctx, websocket.MessageText, data)
 	}
-	if send(map[string]any{"name": "loadingProgress", "message": loadingStatus()}) != nil {
+	if send(map[string]any{"name": "loadingProgress", "message": s.loadingStatus()}) != nil {
 		return
 	}
 	for {
@@ -126,7 +130,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		response := map[string]any{"requestId": request.RequestID, "name": request.Name}
 		switch request.Name {
 		case "getLoadingStatus":
-			response["message"] = loadingStatus()
+			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
 		default:

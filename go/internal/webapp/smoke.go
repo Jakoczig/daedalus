@@ -80,7 +80,7 @@ func SmokeTest(ctx context.Context, s *Server, assets fs.FS) error {
 			return fail
 		}
 		if reply.RequestID == "smoke" {
-			if !reply.Message.Offline || reply.Message.Stage != "G1A" || reply.Message.NumberOfEventsImported != 0 {
+			if !reply.Message.Offline || (reply.Message.Stage != "G1A" && reply.Message.Stage != "G1B") || reply.Message.NumberOfEventsImported != 0 {
 				return fail
 			}
 			return nil

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -24,13 +25,28 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	flags.SetOutput(io.Discard)
 	smoke := flags.Bool("smoke-test", false, "verify offline service without a window")
 	nativeSmoke := flags.Bool("desktop-smoke-test", false, "open native window, require React authentication and RPC, then close")
+	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
 		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
 	}
 	if *smoke && *nativeSmoke {
 		return errors.New("choose one smoke mode")
 	}
-	service, err := webapp.StartLocal(ctx, assets)
+	if *smoke || *nativeSmoke {
+		temporary, err := os.MkdirTemp("", "daedalus-go-smoke-")
+		if err != nil {
+			return errors.New("cannot create isolated smoke profile")
+		}
+		defer os.RemoveAll(temporary)
+		*dataDir = temporary
+	} else if *dataDir == "" {
+		config, err := os.UserConfigDir()
+		if err != nil {
+			return errors.New("cannot locate private Go profile")
+		}
+		*dataDir = filepath.Join(config, "daedalus-go")
+	}
+	service, err := webapp.StartLocalWithStorage(ctx, assets, *dataDir)
 	if err != nil {
 		return errors.New("cannot start embedded local service")
 	}
