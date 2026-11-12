@@ -1,0 +1,4 @@
+github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9g=
+github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
+github.com/wailsapp/wails/v3 v3.0.0 h1:lBe89kFu23bVz1dc1H9v0srkHQgWsy7BAKpH4sLQuDw=
+github.com/wailsapp/wails/v3 v3.0.0/go.mod h1:U3p3/QfSer2XxXM3XWhwis9O7LvvuNKN/AcGoEFD+K8=

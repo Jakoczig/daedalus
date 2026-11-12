@@ -1,0 +1,61 @@
+package webapp
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"net"
+	"net/http"
+	"sync"
+	"time"
+)
+
+type Server struct {
+	http     *http.Server
+	url      string
+	done     chan struct{}
+	once     sync.Once
+	closeErr error
+}
+
+func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if assets == nil {
+		return nil, errors.New("frontend assets missing")
+	}
+	if _, err := fs.Stat(assets, "index.html"); err != nil {
+		return nil, errors.New("frontend assets missing")
+	}
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		return nil, errors.New("cannot start local service")
+	}
+	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{})}
+	server.http = &http.Server{Handler: NewStaticHandler(assets), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
+	go func() { _ = server.http.Serve(listener) }()
+	go func() {
+		select {
+		case <-ctx.Done():
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = server.Close(closeCtx)
+		case <-server.done:
+		}
+	}()
+	return server, nil
+}
+
+func (s *Server) URL() string           { return s.url }
+func (s *Server) Done() <-chan struct{} { return s.done }
+func (s *Server) Close(ctx context.Context) error {
+	s.once.Do(func() {
+		s.closeErr = s.http.Shutdown(ctx)
+		if s.closeErr != nil {
+			_ = s.http.Close()
+		}
+		close(s.done)
+	})
+	return s.closeErr
+}
