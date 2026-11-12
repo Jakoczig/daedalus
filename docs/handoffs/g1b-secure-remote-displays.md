@@ -10,6 +10,8 @@ own physical usability acceptance; certificate/mobile/firewall/roaming and norma
 Linux packaging gaps below are not all closed by the connectivity report.
 
 Implementation: `e8a18952856bd5f17052fdbfbe4235f7de7e2c96`.
+Final ASCII validation correction: `c47e1713a4eb14991709d52b79f369620aff6bf7`.
+Initial verification handoff: `9e1c8a117e8f208e65fa26816dfbef8bcaf2ae7b`.
 
 - Codes use `0123456789ABCDEFGHJKMNPQRSTVWXYZ`, six characters / 30 bits.
   Each character uses `crypto/rand.Int` uniform sampling; no token truncation or
@@ -39,29 +41,35 @@ exact expiry, replacement, one-use, invalid alphabets/lengths, two-peer global
 attempt exhaustion despite repeated issuance, budget recovery, hash-only pending
 state, unchanged 32-byte cookie, UI submission and legacy 32-character entry.
 Independent read-only review found no actionable issue; focused Go/JS checks pass.
+A later self-check found Unicode long-s (`ſ`) could case-fold to ASCII S. A new
+matching-hash regression first admitted that invalid alphabet (HTTP 200), then
+passed after validating exactly six ASCII alphabet bytes before normalization.
+Rejected Unicode input still consumes the shared rate budget. Full CI is rerun
+on that final correction. Independent re-review of ASCII validation and rate-counter
+ordering found no actionable issue and passed focused Go checks.
 
 Local verification: **44 JS tests**, **6 build fixtures**, both security/build
 lints, **62 routes / 278 embedded assets**, fresh Go tests in all six packages
-(webapp 73.344 s), vet/module verification, Windows executable and HTTP/WS/native
+(final corrected webapp 74.626 s), vet/module verification, Windows executable and HTTP/WS/native
 React bootstrap/shutdown smoke **PASS**. Known nonfatal WebView2 cleanup 1412
 remains. Windows local race checking is unavailable (no cgo compiler); Linux CI
 runs the mandatory fresh full race suite. No dependencies or legacy backend/
 launcher files were changed.
 
-Verified implementation run results on `e8a1895`:
+Verified final implementation run results on `c47e171`:
 
 | Gate | Result |
 | --- | --- |
-| [Desktop CI 43286868910](https://github.com/Jakoczig/daedalus/actions/runs/43286868910) | **PASS Windows and Linux**: 44 JS tests, 6 build fixtures, both lints, 62 routes / 278 assets, six Go packages, vet/module verification, native builds and both executable/native React smoke modes |
-| Linux normal / race webapp | **PASS**: 66.203 s / 67.118 s, including fresh long-idle/reconnect and pairing regressions |
-| Windows normal webapp | **PASS**: 67.844 s, including ACL/lock/recovery regressions |
-| [Legacy/security CI 43286868891](https://github.com/Jakoczig/daedalus/actions/runs/43286868891) | **PASS all five jobs**: both OS security regressions, lint, React build and original launcher build/smoke |
+| [Desktop CI 43288554692](https://github.com/Jakoczig/daedalus/actions/runs/43288554692) | **PASS Windows and Linux**: 44 JS tests, 6 build fixtures, both lints, 62 routes / 278 assets, six Go packages, vet/module verification, native builds and both executable/native React smoke modes |
+| Linux normal / race webapp | **PASS**: 65.289 s / 66.685 s, including fresh long-idle/reconnect and pairing regressions |
+| Windows normal webapp | **PASS**: 68.495 s, including ACL/lock/recovery regressions |
+| [Legacy/security CI 43288554788](https://github.com/Jakoczig/daedalus/actions/runs/43288554788) | **PASS all five jobs**: both OS security regressions, lint, React build and original launcher build/smoke |
 
 Updated **experimental, unsigned, offline preview** downloads from this exact
 implementation head (GitHub sign-in may be required; expire 2026-11-26):
 
-- [Windows x64](https://github.com/Jakoczig/daedalus/actions/runs/43286868910/artifacts/13976035780)
-- [Linux x64](https://github.com/Jakoczig/daedalus/actions/runs/43286868910/artifacts/13975926444)
+- [Windows x64](https://github.com/Jakoczig/daedalus/actions/runs/43288554692/artifacts/13976312272)
+- [Linux x64](https://github.com/Jakoczig/daedalus/actions/runs/43288554692/artifacts/13976961245)
 
 Both downloaded ZIPs were independently inspected: exactly executable, README.md
 and SHA256SUMS; executable/README hashes matched each bundled manifest, and ZIP
@@ -72,8 +80,8 @@ new builds may differ because Go embeds commit metadata.
 
 | OS | Executable SHA-256 | ZIP SHA-256 |
 | --- | --- | --- |
-| Windows | `c05b7e3d1aca9bcaa69d96a5f0ae14a5fe1395f7a3980693769c5a73bec9d14e` | `ce963872b5a2a71668e675c7b7ed788f1a60c0900bccb720b06e80ef7e8cb6bb` |
-| Linux | `1ef0727951507316c4805a31a62b219072f1394abe0a61ccbf07ab285d322161` | `9540bf5648ddd289b4904f2b959d917e35cc3af8b875a1634ba78bee9dc4c920` |
+| Windows | `f685ecbad654cd29f136c2448a12584416b5f1b102f3d4f830036c01e5aee733` | `ded6396b143094363a1c0546abac68194777aa96ca6d7d8b064c968d4256b919` |
+| Linux | `99bed51b3539ca68e3f9b725939197bd51595d88cc853badbc3fca7d2240e574` | `9ea9769c70e9c6fb59f5ce7fac796892c15987f1fc9e800bfe1fb6b864cfd1b7` |
 
 The subsequent handoff-only commit is also subject to both full workflows; final
 head/check links are recorded in the PR description to avoid a self-referential
