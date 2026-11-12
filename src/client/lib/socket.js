@@ -373,7 +373,13 @@ function SocketProvider ({ children }) {
 }
 
 function PrototypeShell () {
+  const { connected, ready } = useSocket()
   const router = useRouter()
+  const status = !connected
+    ? 'Disconnected. Waiting to reconnect to the local Go service.'
+    : !ready
+        ? 'Connected. Waiting for the local Go service to become ready.'
+        : 'Connected and ready. Game features remain unimplemented.'
   const [, group, page = ''] = router.pathname.split('/')
   const menus = {
     cmdr: navigation.CmdrPanelNavItems,
@@ -391,10 +397,10 @@ function PrototypeShell () {
   return (
     <>
       <header><h1>DAEDALUS Terminal</h1><PrimaryNavigation /></header>
-      <Layout connected ready>
+      <p role='status'>G1A offline preview: {status}</p>
+      <Layout connected={connected} ready={ready}>
         <Panel navigation={items}>
           <h2>G1A — offline desktop foundation</h2>
-          <p role='status'>The Go service, authenticated connection and embedded React navigation are running.</p>
           <p>Game features are not implemented in this preview. No journals are read, no commander data is loaded, and no provider calls or uploads run.</p>
           <p>Selected route: <code>{router.pathname}</code></p>
           <p>Navigation and reload test the existing exported interface only. Remote displays and pairing are not enabled in G1A. Keep using the separate legacy application for game features.</p>
