@@ -77,6 +77,9 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 		if send(response) != nil {
 			return
 		}
+		if request.Name == "getLoadingStatus" {
+			s.readyOnce.Do(func() { close(s.clientReady) })
+		}
 	}
 }
 

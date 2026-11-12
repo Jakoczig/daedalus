@@ -13,15 +13,17 @@ import (
 )
 
 type Server struct {
-	http     *http.Server
-	url      string
-	done     chan struct{}
-	once     sync.Once
-	closeErr error
-	sessions *sessionStore
-	socketMu sync.Mutex
-	sockets  map[*websocket.Conn]struct{}
-	closing  bool
+	http        *http.Server
+	url         string
+	done        chan struct{}
+	once        sync.Once
+	closeErr    error
+	sessions    *sessionStore
+	socketMu    sync.Mutex
+	sockets     map[*websocket.Conn]struct{}
+	closing     bool
+	clientReady chan struct{}
+	readyOnce   sync.Once
 }
 
 func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
@@ -38,7 +40,7 @@ func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
 	if err != nil {
 		return nil, errors.New("cannot start local service")
 	}
-	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{})}
+	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{}), clientReady: make(chan struct{})}
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	server.sessions = newSessionStore(port, time.Now)
 	server.sockets = make(map[*websocket.Conn]struct{})
@@ -58,6 +60,9 @@ func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
 
 func (s *Server) URL() string           { return s.url }
 func (s *Server) Done() <-chan struct{} { return s.done }
+
+// ClientReady is signaled only after an authenticated loading-status RPC.
+func (s *Server) ClientReady() <-chan struct{} { return s.clientReady }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
 		s.sessions.clear()

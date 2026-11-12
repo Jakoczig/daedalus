@@ -51,8 +51,18 @@ func TestAuthenticatedOfflineSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close(context.Background())
+	select {
+	case <-s.ClientReady():
+		t.Fatal("ready without authenticated RPC")
+	default:
+	}
 	conn, ctx := dialOwner(t, s)
 	response := callRPC(t, ctx, conn, "getLoadingStatus")
+	select {
+	case <-s.ClientReady():
+	case <-time.After(time.Second):
+		t.Fatal("authenticated bootstrap not observed")
+	}
 	var status struct {
 		LoadingComplete        bool `json:"loadingComplete"`
 		Offline                bool `json:"offline"`
