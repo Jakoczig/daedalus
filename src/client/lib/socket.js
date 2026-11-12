@@ -3,6 +3,7 @@ import { createContext, useState, useContext, useEffect } from 'react'
 import Router from 'next/router'
 import notification from 'lib/notification'
 
+let connecting = false
 let socket = null// Store socket connection (defaults to null)
 let callbackHandlers = {} // Store callbacks waiting to be executed (pending response from server)
 let deferredEventQueue = [] // Store events waiting to be sent (used when server is not ready yet or offline)
@@ -10,6 +11,8 @@ let recentBroadcastEvents = 0
 let broadcastActivityTimeout = null
 
 const defaultSocketState = {
+  role: null,
+  needsPairing: false,
   connected: false, // Boolean to indicate current connection status
   active: false, // Boolean to indicate if any pending requests
   ready: false // Boolean to indicate if the service is ready and loaded
@@ -81,11 +84,24 @@ function devLog (...args) {
 }
 
 function socketDebugMessage () {
-  devLog('[SOCKET]', ...arguments)
+  devLog('[SOCKET]', arguments[0]) // Never log credential or pairing payloads
 }
 
-function connect (socketState, setSocketState) {
-  if (socket !== null) return
+async function connect (socketState, setSocketState) {
+  if (socket !== null || connecting) return
+  connecting = true
+  try {
+    const response = await window.fetch('/auth/session', { method: 'POST', credentials: 'same-origin' })
+    if (!response.ok) {
+      setSocketState(previous => ({ ...previous, role: null, needsPairing: true, ready: false }))
+      return
+    }
+    const { role } = await response.json()
+    setSocketState(previous => ({ ...previous, role, needsPairing: false }))
+  } catch {
+    setTimeout(() => connect(socketState, setSocketState), 5000)
+    return
+  } finally { connecting = false }
 
   // Reset on reconnect
   callbackHandlers = {}
@@ -96,8 +112,8 @@ function connect (socketState, setSocketState) {
   }
   recentBroadcastEvents = 0
 
-  socket = new WebSocket('ws://' + window.location.host)
-  if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Connecting to', 'ws://' + window.location.host)
+  socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host)
+  if (process.env.NODE_ENV === 'development') devLog('[SOCKET] Connecting to service')
   socket.onmessage = (event) => {
     let requestId, name, message
     try {
@@ -346,8 +362,37 @@ function SocketProvider ({ children }) {
 
   return (
     <SocketContext.Provider value={socketState}>
-      {children}
+      {socketState.role ? children : socketState.needsPairing ? <PairDisplay /> : <p>Connecting to DAEDALUS…</p>}
     </SocketContext.Provider>
+  )
+}
+
+function PairDisplay () {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const pair = async event => {
+    event.preventDefault()
+    try {
+      const response = await window.fetch('/auth/pair', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() })
+      })
+      if (!response.ok) throw new Error('Pairing failed. Check the code and HTTPS connection, or try again in a minute.')
+      window.location.reload()
+    } catch (e) { setError(e.message) }
+  }
+  return (
+    <main style={{ maxWidth: '36rem', margin: '4rem auto', padding: '2rem' }}>
+      <h1>Pair this display</h1>
+      <p>Open DAEDALUS settings on the Windows PC to create a pairing code. Remote displays require the configured HTTPS address and a trusted certificate.</p>
+      <form onSubmit={pair}>
+        <label>Pairing code <input type='password' autoComplete='off' value={code} onChange={e => setCode(e.target.value)} /></label>
+        <button type='submit'>Pair display</button>
+      </form>
+      {error && <p role='alert'>{error}</p>}
+    </main>
   )
 }
 
@@ -357,13 +402,13 @@ function sendEvent (name, message = null, timeout = 30000) {
   return new Promise((resolve, reject) => {
     const requestId = generateUuid()
     const sendStart = (process.env.NODE_ENV === 'development') ? Date.now() : 0
-    if (process.env.NODE_ENV === 'development') devLog(`[SEND] → ${name}  id=${requestId.slice(0,8)}`)
+    if (process.env.NODE_ENV === 'development') devLog(`[SEND] → ${name}  id=${requestId.slice(0, 8)}`)
     let timer = null
     callbackHandlers[requestId] = (event, setSocketState) => {
       if (timer) clearTimeout(timer)
       const parsed = JSON.parse(event.data)
       delete callbackHandlers[requestId]
-      if (process.env.NODE_ENV === 'development') devLog(`[SEND] ← ${name}  id=${requestId.slice(0,8)}  ${Date.now() - sendStart}ms`)
+      if (process.env.NODE_ENV === 'development') devLog(`[SEND] ← ${name}  id=${requestId.slice(0, 8)}  ${Date.now() - sendStart}ms`)
       setSocketState(prevState => ({
         ...prevState,
         active: socketRequestsPending()
@@ -377,7 +422,7 @@ function sendEvent (name, message = null, timeout = 30000) {
     if (timeout > 0) {
       timer = setTimeout(() => {
         delete callbackHandlers[requestId]
-        if (process.env.NODE_ENV === 'development') devLog(`[SEND] TIMEOUT ${name}  id=${requestId.slice(0,8)}  ${timeout}ms`)
+        if (process.env.NODE_ENV === 'development') devLog(`[SEND] TIMEOUT ${name}  id=${requestId.slice(0, 8)}  ${timeout}ms`)
         reject(new Error(`sendEvent '${name}' timed out after ${timeout}ms`))
       }, timeout)
     }

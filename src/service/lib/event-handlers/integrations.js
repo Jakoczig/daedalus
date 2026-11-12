@@ -2,9 +2,7 @@
 
 const crypto = require('crypto')
 const { exec } = require('child_process')
-const os = require('os')
-const fs = require('fs').promises
-const path = require('path')
+const { preferencesStore } = require('../preferences-store')
 const _axios = require('axios')
 
 // Lazy-built axios instance — deferred so appVersion() resolves after package.json loads
@@ -15,9 +13,6 @@ function axios () {
   }
   return _axiosInstance
 }
-
-const PREFERENCES_DIR = path.join(os.homedir(), 'AppData', 'Local', 'DAEDALUS Terminal')
-const PREFERENCES_FILE = path.join(PREFERENCES_DIR, 'Preferences.json')
 
 // Frontier CAPI
 const FRONTIER_AUTH_SERVER = 'https://auth.frontierstore.net'
@@ -120,8 +115,7 @@ class Integrations {
 
   async _loadPreferences () {
     try {
-      const data = await fs.readFile(PREFERENCES_FILE, 'utf8')
-      this._prefs = JSON.parse(data)
+      this._prefs = await preferencesStore.read()
       this._syncEnabledFromPrefs()
     } catch {
       this._prefs = {}
@@ -158,16 +152,16 @@ class Integrations {
     this._updateGameState(logEvent)
 
     if (integrationStatus.edsm.enabled && EDSM_JOURNAL_EVENTS.has(eventName)) {
-      this._sendToEdsm(logEvent).catch(err => {
+      this._sendToEdsm(logEvent).catch(() => {
         integrationStatus.edsm.status = 'error'
-        integrationStatus.edsm.lastError = err.message
+        integrationStatus.edsm.lastError = 'Provider request failed'
       })
     }
 
     if (integrationStatus.eddn.enabled && EDDN_JOURNAL_EVENTS.has(eventName)) {
-      this._sendToEddn(logEvent).catch(err => {
+      this._sendToEddn(logEvent).catch(() => {
         integrationStatus.eddn.status = 'error'
-        integrationStatus.eddn.lastError = err.message
+        integrationStatus.eddn.lastError = 'Provider request failed'
       })
     }
 
@@ -354,13 +348,12 @@ class Integrations {
         integrationStatus.inara.lastSuccess = Date.now()
         integrationStatus.inara.lastError = null
       } else {
-        const msg = response.data?.header?.eventStatusText || 'Inara error'
         integrationStatus.inara.status = 'error'
-        integrationStatus.inara.lastError = msg
+        integrationStatus.inara.lastError = 'Provider request failed'
       }
     } catch (err) {
       integrationStatus.inara.status = 'error'
-      integrationStatus.inara.lastError = err.message
+      integrationStatus.inara.lastError = 'Provider request failed'
     }
   }
 
@@ -379,6 +372,7 @@ class Integrations {
   }
 
   async _getCapiAccessToken () {
+    const generation = this._capiGeneration || 0
     const prefs = this._prefs?.integrations
     if (!prefs?.capiRefreshToken) return null
 
@@ -388,7 +382,7 @@ class Integrations {
       return this._capiAccessToken
     }
 
-    const response = await axios().post(
+    const response = await (this._capiHttp || axios()).post(
       `${FRONTIER_AUTH_SERVER}/token`,
       new URLSearchParams({
         grant_type: 'refresh_token',
@@ -402,17 +396,17 @@ class Integrations {
     )
 
     const data = response.data
-    this._capiAccessToken = data.access_token
-    this._capiAccessTokenExpiry = Date.now() + (data.expires_in || 7200) * 1000
+    if (generation !== (this._capiGeneration || 0)) throw new Error('Authentication changed')
 
     if (data.refresh_token && data.refresh_token !== prefs.capiRefreshToken) {
-      const newPrefs = JSON.parse(JSON.stringify(this._prefs || {}))
-      if (!newPrefs.integrations) newPrefs.integrations = {}
-      newPrefs.integrations.capiRefreshToken = data.refresh_token
-      this._prefs = newPrefs
-      await fs.mkdir(PREFERENCES_DIR, { recursive: true })
-      await fs.writeFile(PREFERENCES_FILE, JSON.stringify(newPrefs))
+      this._prefs = await (this.preferencesStore || preferencesStore).update(raw => {
+        if (generation !== (this._capiGeneration || 0) || raw.integrations?.capiRefreshToken !== prefs.capiRefreshToken) throw new Error('Authentication changed')
+        return { ...raw, integrations: { ...raw.integrations, capiRefreshToken: data.refresh_token } }
+      })
     }
+    if (generation !== (this._capiGeneration || 0)) throw new Error('Authentication changed')
+    this._capiAccessToken = data.access_token
+    this._capiAccessTokenExpiry = Date.now() + (data.expires_in || 7200) * 1000
 
     return this._capiAccessToken
   }
@@ -422,63 +416,34 @@ class Integrations {
   handleCapiCallback (code, state, error) {
     if (!global.HANDLE_CAPI_CALLBACK) return
     const handler = global.HANDLE_CAPI_CALLBACK
-    global.HANDLE_CAPI_CALLBACK = null
     handler({ code, state, error })
   }
 
   _waitForCapiCallback () {
-    // Cancel any stale pending auth
-    if (global.HANDLE_CAPI_CALLBACK) {
-      global.HANDLE_CAPI_CALLBACK({ error: 'superseded' })
-      global.HANDLE_CAPI_CALLBACK = null
-    }
-
+    this._cancelCapiAuth?.()
+    const expectedState = this._capiState
     return new Promise((resolve, reject) => {
-      let settled = false
-
-      global.HANDLE_CAPI_CALLBACK = ({ code, state, error }) => {
-        if (settled) return
-        settled = true
-        global.HANDLE_CAPI_CALLBACK = null
-        if (error) {
-          reject(new Error(`Frontier auth error: ${error}`))
-        } else if (!code) {
-          reject(new Error('No code in OAuth callback'))
-        } else {
-          resolve({ code, state })
-        }
+      const finish = (error, result) => {
+        clearTimeout(timer)
+        if (global.HANDLE_CAPI_CALLBACK === callback) global.HANDLE_CAPI_CALLBACK = null
+        this._cancelCapiAuth = null
+        if (error) reject(new Error(error))
+        else resolve(result)
       }
-
-      // Auto-cancel after 5 minutes if the user doesn't complete auth
-      setTimeout(() => {
-        if (global.HANDLE_CAPI_CALLBACK && !settled) {
-          settled = true
-          global.HANDLE_CAPI_CALLBACK = null
-          reject(new Error('CAPI authentication timed out (5 min)'))
-        }
-      }, 5 * 60 * 1000)
+      const callback = ({ code, state, error }) => {
+        // Reject unsolicited callbacks before consuming the pending request.
+        if (!expectedState || state !== expectedState) return
+        if (error || !code) finish('Frontier authentication failed')
+        else finish(null, { code, state })
+      }
+      const timer = setTimeout(() => finish('CAPI authentication timed out (5 min)'), 5 * 60 * 1000)
+      timer.unref?.()
+      this._cancelCapiAuth = () => finish('Authentication superseded')
+      global.HANDLE_CAPI_CALLBACK = callback
     })
   }
 
-  async beginCapiAuth () {
-    this._capiVerifier = this._generateVerifier()
-    this._capiState = this._generateState()
-    const challenge = this._codeChallenge(this._capiVerifier)
-
-    const authUrl = (
-      `${FRONTIER_AUTH_SERVER}/auth` +
-      `?response_type=code` +
-      `&audience=frontier,steam,epic` +
-      `&scope=auth%20capi` +
-      `&client_id=${CAPI_CLIENT_ID}` +
-      `&code_challenge=${challenge}` +
-      `&code_challenge_method=S256` +
-      `&state=${this._capiState}` +
-      `&redirect_uri=${encodeURIComponent(CAPI_REDIRECT_URI)}`
-    )
-
-    integrationStatus.capi.status = 'pending'
-
+  _openCapiAuthUrl (authUrl) {
     const openCmd = process.platform === 'win32'
       ? `start "" "${authUrl.replace(/"/g, '\\"')}"`
       : process.platform === 'darwin'
@@ -488,6 +453,29 @@ class Integrations {
     exec(openCmd, (err) => {
       if (err) console.error('[CAPI] Failed to open browser:', err.message)
     })
+  }
+
+  async beginCapiAuth () {
+    const generation = this._capiGeneration = (this._capiGeneration || 0) + 1
+    this._capiVerifier = this._generateVerifier()
+    this._capiState = this._generateState()
+    const challenge = this._codeChallenge(this._capiVerifier)
+
+    const authUrl = (
+      `${FRONTIER_AUTH_SERVER}/auth` +
+      '?response_type=code' +
+      '&audience=frontier,steam,epic' +
+      '&scope=auth%20capi' +
+      `&client_id=${CAPI_CLIENT_ID}` +
+      `&code_challenge=${challenge}` +
+      '&code_challenge_method=S256' +
+      `&state=${this._capiState}` +
+      `&redirect_uri=${encodeURIComponent(CAPI_REDIRECT_URI)}`
+    )
+
+    integrationStatus.capi.status = 'pending'
+
+    this._openCapiAuthUrl(authUrl)
 
     const { code, state } = await this._waitForCapiCallback()
 
@@ -497,7 +485,7 @@ class Integrations {
       throw new Error('OAuth state mismatch')
     }
 
-    const tokenResponse = await axios().post(
+    const tokenResponse = await (this._capiHttp || axios()).post(
       `${FRONTIER_AUTH_SERVER}/token`,
       new URLSearchParams({
         grant_type: 'authorization_code',
@@ -513,14 +501,14 @@ class Integrations {
     )
 
     const tokenData = tokenResponse.data
+    if (generation !== this._capiGeneration) throw new Error('Authentication changed')
 
     // Persist refresh token
-    const newPrefs = JSON.parse(JSON.stringify(this._prefs || {}))
-    if (!newPrefs.integrations) newPrefs.integrations = {}
-    newPrefs.integrations.capiRefreshToken = tokenData.refresh_token
-    this._prefs = newPrefs
-    await fs.mkdir(PREFERENCES_DIR, { recursive: true })
-    await fs.writeFile(PREFERENCES_FILE, JSON.stringify(newPrefs))
+    this._prefs = await (this.preferencesStore || preferencesStore).update(raw => {
+      if (generation !== this._capiGeneration) throw new Error('Authentication changed')
+      return { ...raw, integrations: { ...raw.integrations, capiRefreshToken: tokenData.refresh_token } }
+    })
+    if (generation !== this._capiGeneration) throw new Error('Authentication changed')
     // Broadcast so other components (and getPreferences cache) know prefs changed
     const broadcastEvent = global.BROADCAST_EVENT
     if (broadcastEvent) broadcastEvent('syncMessage', { name: 'preferences' })
@@ -551,6 +539,18 @@ class Integrations {
     return response.data
   }
 
+  async disconnectCapi () {
+    this._capiGeneration = (this._capiGeneration || 0) + 1
+    this._cancelCapiAuth?.()
+    this._capiState = null
+    this._capiVerifier = null
+    this._capiAccessToken = null
+    this._capiAccessTokenExpiry = null
+    const raw = await (this.preferencesStore || preferencesStore).disconnectCapi()
+    this.notifyPreferencesChanged(raw)
+    return raw
+  }
+
   async testEdsm () {
     const prefs = this._prefs?.integrations
     if (!prefs?.edsmApiKey || !prefs?.edsmCmdrName) {
@@ -570,15 +570,14 @@ class Integrations {
         integrationStatus.edsm.lastError = null
         return { success: true, system: response.data.system || null }
       } else {
-        const msg = response.data?.msg || `EDSM error ${msgnum}`
         integrationStatus.edsm.status = 'error'
-        integrationStatus.edsm.lastError = msg
-        return { success: false, error: msg }
+        integrationStatus.edsm.lastError = 'Provider request failed'
+        return { success: false, error: 'Provider request failed' }
       }
     } catch (err) {
       integrationStatus.edsm.status = 'error'
-      integrationStatus.edsm.lastError = err.message
-      return { success: false, error: err.message }
+      integrationStatus.edsm.lastError = 'Provider request failed'
+      return { success: false, error: 'Provider request failed' }
     }
   }
 
@@ -612,15 +611,14 @@ class Integrations {
         integrationStatus.inara.lastError = null
         return { success: true }
       } else {
-        const msg = response.data?.header?.eventStatusText || `Inara error ${response.data?.header?.eventStatus ?? ''}`
         integrationStatus.inara.status = 'error'
-        integrationStatus.inara.lastError = msg
-        return { success: false, error: msg }
+        integrationStatus.inara.lastError = 'Provider request failed'
+        return { success: false, error: 'Provider request failed' }
       }
     } catch (err) {
       integrationStatus.inara.status = 'error'
-      integrationStatus.inara.lastError = err.message
-      return { success: false, error: err.message }
+      integrationStatus.inara.lastError = 'Provider request failed'
+      return { success: false, error: 'Provider request failed' }
     }
   }
 
@@ -657,8 +655,8 @@ class Integrations {
           return await this.beginCapiAuth()
         } catch (err) {
           integrationStatus.capi.status = 'error'
-          integrationStatus.capi.lastError = err.message
-          return { success: false, error: err.message }
+          integrationStatus.capi.lastError = 'Provider request failed'
+          return { success: false, error: 'Provider request failed' }
         }
       },
 
@@ -668,8 +666,8 @@ class Integrations {
           return { success: true, cmdrName: data?.commander?.name || null }
         } catch (err) {
           integrationStatus.capi.status = 'error'
-          integrationStatus.capi.lastError = err.message
-          return { success: false, error: err.message }
+          integrationStatus.capi.lastError = 'Provider request failed'
+          return { success: false, error: 'Provider request failed' }
         }
       },
 

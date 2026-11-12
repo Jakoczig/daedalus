@@ -1,10 +1,11 @@
 import { useState, useEffect, Fragment } from 'react'
-import { sendEvent, eventListener } from 'lib/socket'
+import { sendEvent, eventListener, useSocket } from 'lib/socket'
 import { SettingsNavItems } from 'lib/navigation-items'
 import packageJson from '../../../package.json'
 
 function Settings ({ visible, toggleVisible = () => {}, defaultActiveSettingsPanel = 'Theme' }) {
   const [activeSettingsPanel, setActiveSettingsPanel] = useState(defaultActiveSettingsPanel)
+  const { role } = useSocket()
 
   return (
     <>
@@ -26,9 +27,10 @@ function Settings ({ visible, toggleVisible = () => {}, defaultActiveSettingsPan
           )}
         </div>
         {activeSettingsPanel === 'Theme' && <ThemeSettings visible={visible} />}
-        {activeSettingsPanel === 'Sounds' && <SoundSettings visible={visible} />}
-        {activeSettingsPanel === 'Exploration' && <ExplorationSettings visible={visible} />}
-        {activeSettingsPanel === 'Integrations' && <IntegrationsSettings visible={visible} />}
+        {role === 'owner' && activeSettingsPanel === 'Sounds' && <SoundSettings visible={visible} />}
+        {role === 'owner' && activeSettingsPanel === 'Exploration' && <ExplorationSettings visible={visible} />}
+        {role === 'owner' && activeSettingsPanel === 'Integrations' && <IntegrationsSettings visible={visible} />}
+        {role !== 'owner' && activeSettingsPanel !== 'Theme' && <div className='modal-dialog__panel modal-dialog__panel--with-navigation'><p>Service settings are managed on the Windows PC. This paired display has read-only access.</p></div>}
         <div className='modal-dialog__footer'>
           <hr style={{ margin: '1rem 0 .5rem 0' }} />
           <button className='float-right' onClick={toggleVisible}>
@@ -37,6 +39,29 @@ function Settings ({ visible, toggleVisible = () => {}, defaultActiveSettingsPan
         </div>
       </div>
     </>
+  )
+}
+
+function PairingSettings () {
+  const [message, setMessage] = useState('')
+  const [code, setCode] = useState('')
+  return (
+    <div style={{ padding: '1rem' }}>
+      <h3>Paired displays</h3>
+      <p>Use the configured HTTPS address on the tablet. Codes expire in five minutes and work once. Displays have read-only access.</p>
+      <button onClick={async () => {
+        try { setCode((await sendEvent('createPairingCode')).code); setMessage('') } catch { setMessage('Could not create pairing code') }
+      }}
+      >Create pairing code
+      </button>
+      <button onClick={async () => {
+        try { await sendEvent('revokePairedDevices'); setCode(''); setMessage('All paired displays revoked') } catch { setMessage('Could not revoke displays') }
+      }}
+      >Revoke all displays
+      </button>
+      {code && <p style={{ overflowWrap: 'anywhere' }}><code>{code}</code></p>}
+      {message && <p role='status'>{message}</p>}
+    </div>
   )
 }
 
@@ -168,9 +193,9 @@ function SoundSettings ({ visible }) {
         if (detected?.detected) {
           setVoicepackDir(detected.dir)
           setVoicepackStatus({ valid: true, name: detected.dir.split(/[\\/]/).pop().replace(/^hcspack-/i, '') })
+        }
+        setVoicepackDetecting(false)
       }
-      setVoicepackDetecting(false)
-    }
     })()
   }, [visible])
 
@@ -197,7 +222,7 @@ function SoundSettings ({ visible }) {
     } else {
       setVoicepackStatus(null)
       const newPreferences = JSON.parse(JSON.stringify(preferences || {}))
-      delete newPreferences.voicepackDir
+      newPreferences.voicepackDir = ''
       setPreferences(await sendEvent('setPreferences', newPreferences))
     }
   }
@@ -305,8 +330,7 @@ function SoundSettings ({ visible }) {
         <p style={{ marginTop: '.5rem' }} className={voicepackStatus.valid ? 'text-secondary' : 'text-danger'}>
           {voicepackStatus.valid
             ? <>Valid Voicepack &mdash; {voicepackStatus.name}</>
-            : <>Invalid Voicepack</>
-          }
+            : <>Invalid Voicepack</>}
         </p>
       )}
     </div>
@@ -442,6 +466,16 @@ function IntegrationsSettings ({ visible }) {
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState({}) // { edsm: bool, eddn: bool, inara: bool, capi: bool }
   const [testResult, setTestResult] = useState({}) // per-service last test result msg
+  const [secretDrafts, setSecretDrafts] = useState({})
+
+  const saveSecret = async provider => {
+    try {
+      await sendEvent('setIntegrationSecret', { provider, secret: (secretDrafts[provider] || '').trim() })
+      setSecretDrafts(drafts => ({ ...drafts, [provider]: '' }))
+      setStatus(await sendEvent('getIntegrationStatus'))
+      setResult(provider, 'Credential saved', false)
+    } catch { setResult(provider, 'Could not save credential', true) }
+  }
 
   const loadAll = async () => {
     const [prefs, st] = await Promise.all([
@@ -517,11 +551,8 @@ function IntegrationsSettings ({ visible }) {
   }
 
   const disconnectCapi = async () => {
-    const newPrefs = JSON.parse(JSON.stringify(preferences || {}))
-    if (!newPrefs.integrations) newPrefs.integrations = {}
-    delete newPrefs.integrations.capiRefreshToken
-    newPrefs.integrations.capiEnabled = false
-    setPreferences(await sendEvent('setPreferences', newPrefs))
+    await sendEvent('disconnectCapi')
+    setPreferences(await sendEvent('getPreferences'))
     setStatus(await sendEvent('getIntegrationStatus'))
     setResult('capi', null)
   }
@@ -531,6 +562,7 @@ function IntegrationsSettings ({ visible }) {
   return (
     <div className='modal-dialog__panel modal-dialog__panel--with-navigation scrollable'>
       <h3 className='text-primary'>Integrations</h3>
+      <PairingSettings />
       <p>
         Connect DAEDALUS Terminal to external Elite Dangerous services to share
         your flight log, market data, and commander status automatically.
@@ -560,7 +592,7 @@ function IntegrationsSettings ({ visible }) {
               <td>
                 <input
                   type='text'
-                  value={integPrefs.edsmCmdrName || ''}
+                  value={integPrefs.edsmCmdrName ?? status?.edsm?.cmdrName ?? ''}
                   placeholder='Your EDSM commander name'
                   disabled={!preferences}
                   style={{ width: '100%', maxWidth: '22rem' }}
@@ -580,19 +612,20 @@ function IntegrationsSettings ({ visible }) {
               <td>
                 <input
                   type='password'
-                  value={integPrefs.edsmApiKey || ''}
-                  placeholder='Paste EDSM API key here'
+                  autoComplete='new-password'
+                  value={secretDrafts.edsm || ''}
+                  placeholder={status?.edsm?.configured ? 'Stored on PC — enter replacement' : 'Paste API key here'}
                   disabled={!preferences}
                   style={{ width: '100%', maxWidth: '22rem' }}
-                  onBlur={(e) => savePref('edsmApiKey', e.target.value.trim())}
-                  onKeyDown={(e) => { if (e.key === 'Enter') savePref('edsmApiKey', e.target.value.trim()) }}
-                  onChange={(e) => setPreferences(p => {
-                    const n = JSON.parse(JSON.stringify(p || {}))
-                    if (!n.integrations) n.integrations = {}
-                    n.integrations.edsmApiKey = e.target.value
-                    return n
-                  })}
+                  onChange={e => setSecretDrafts(drafts => ({ ...drafts, edsm: e.target.value }))}
                 />
+                <button disabled={!secretDrafts.edsm} onClick={() => saveSecret('edsm')}>Save key</button>
+                <button onClick={async () => {
+                  await sendEvent('setIntegrationSecret', { provider: 'edsm', secret: '' })
+                  setStatus(await sendEvent('getIntegrationStatus'))
+                }}
+                >Clear key
+                </button>
               </td>
             </tr>
           </tbody>
@@ -600,7 +633,7 @@ function IntegrationsSettings ({ visible }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <button
             onClick={testEdsm}
-            disabled={!integPrefs.edsmApiKey || !integPrefs.edsmCmdrName || busy.edsm}
+            disabled={!status?.edsm?.configured || busy.edsm}
           >
             {busy.edsm ? 'Testing…' : 'Test connection'}
           </button>
@@ -656,19 +689,20 @@ function IntegrationsSettings ({ visible }) {
               <td>
                 <input
                   type='password'
-                  value={integPrefs.inaraApiKey || ''}
-                  placeholder='Paste Inara API key here'
+                  autoComplete='new-password'
+                  value={secretDrafts.inara || ''}
+                  placeholder={status?.inara?.configured ? 'Stored on PC — enter replacement' : 'Paste API key here'}
                   disabled={!preferences}
                   style={{ width: '100%', maxWidth: '22rem' }}
-                  onBlur={(e) => savePref('inaraApiKey', e.target.value.trim())}
-                  onKeyDown={(e) => { if (e.key === 'Enter') savePref('inaraApiKey', e.target.value.trim()) }}
-                  onChange={(e) => setPreferences(p => {
-                    const n = JSON.parse(JSON.stringify(p || {}))
-                    if (!n.integrations) n.integrations = {}
-                    n.integrations.inaraApiKey = e.target.value
-                    return n
-                  })}
+                  onChange={e => setSecretDrafts(drafts => ({ ...drafts, inara: e.target.value }))}
                 />
+                <button disabled={!secretDrafts.inara} onClick={() => saveSecret('inara')}>Save key</button>
+                <button onClick={async () => {
+                  await sendEvent('setIntegrationSecret', { provider: 'inara', secret: '' })
+                  setStatus(await sendEvent('getIntegrationStatus'))
+                }}
+                >Clear key
+                </button>
               </td>
             </tr>
           </tbody>
@@ -676,7 +710,7 @@ function IntegrationsSettings ({ visible }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <button
             onClick={testInara}
-            disabled={!integPrefs.inaraApiKey || busy.inara}
+            disabled={!status?.inara?.configured || busy.inara}
           >
             {busy.inara ? 'Testing…' : 'Test connection'}
           </button>

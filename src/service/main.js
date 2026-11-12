@@ -9,7 +9,9 @@ const exec = require('child_process').exec
 const connect = require('connect')
 const serveStatic = require('serve-static')
 const http = require('http')
-const WebSocket = require('ws')
+const https = require('https')
+const { createSocketBoundary } = require('./lib/socket-server')
+const { isLoopback } = require('./lib/socket-auth')
 const yargs = require('yargs')
 const packageJson = require('../../package.json')
 
@@ -43,9 +45,9 @@ const DEVELOPMENT = commandLineArgs.dev || false // Development mode
 const WEB_DIR = (() => {
   // In pkg builds, __dirname is a virtual snapshot path — try multiple candidates
   const candidates = [
-    path.join(__dirname, '..', '..', 'build', 'client'),           // pkg snapshot (assets bundled)
-    path.join(path.dirname(process.execPath), 'build', 'client'),  // next to exe
-    path.join(process.cwd(), 'build', 'client')                    // working directory
+    path.join(__dirname, '..', '..', 'build', 'client'), // pkg snapshot (assets bundled)
+    path.join(path.dirname(process.execPath), 'build', 'client'), // next to exe
+    path.join(process.cwd(), 'build', 'client') // working directory
   ]
   return candidates.find(d => fs.existsSync(d)) || candidates[0]
 })()
@@ -236,6 +238,10 @@ function videosMiddleware (req, res, next) {
 function capiCallbackMiddleware (req, res, next) {
   if (!req.url?.startsWith('/capi-callback')) return next()
 
+  if (req.url.split('?')[0] !== '/capi-callback' || req.method !== 'GET' || !isLoopback(req.socket.remoteAddress) || req.socket.encrypted) {
+    res.writeHead(403)
+    return res.end()
+  }
   const urlParsed = new URL(req.url, `http://localhost:${PORT}`)
   const code = urlParsed.searchParams.get('code')
   const state = urlParsed.searchParams.get('state')
@@ -294,7 +300,8 @@ function systemMediaArtworkMiddleware (req, res, next) {
   next()
 }
 
-let httpServer
+const socketBoundary = createSocketBoundary({ handlers: eventHandlers })
+let requestHandler
 if (DEVELOPMENT) {
   // If DEVELOPMENT is specified then HTTP requests other than web socket
   // requests will be forwarded to a web server which is started on localhost
@@ -306,90 +313,47 @@ if (DEVELOPMENT) {
   const httpProxy = require('http-proxy')
   const proxy = httpProxy.createProxyServer({})
   proxy.on('error', (err, req, res) => {
+    if (err) console.error('Development proxy unavailable')
     if (res.writeHead) res.writeHead(502, { 'Content-Type': 'text/plain' })
     if (res.end) res.end('Waiting for Next.js dev server...')
   })
-  httpServer = http.createServer((req, res) => {
+  requestHandler = (req, res) => {
     capiCallbackMiddleware(req, res, () => voicelinesMiddleware(req, res, () => videosMiddleware(req, res, () => systemMediaArtworkMiddleware(req, res, () => proxy.web(req, res, { target: 'http://localhost:3000' })))))
-  })
+  }
 } else {
   // The default behaviour (i.e. production) is to serve static assets. When the
   // application is compiled to a native executable these assets will be bundled
   // with the executable in a virtual file system.
   const webServer = connect().use(capiCallbackMiddleware).use(voicelinesMiddleware).use(videosMiddleware).use(systemMediaArtworkMiddleware).use(serveStatic(WEB_DIR, { extensions: ['html'] }))
-  httpServer = http.createServer(webServer)
+  requestHandler = webServer
 }
 
-const webSocketServer = new WebSocket.Server({ server: httpServer })
+const httpServer = http.createServer((req, res) => socketBoundary.middleware(req, res, () => requestHandler(req, res)))
+socketBoundary.attach(httpServer)
 
-function webSocketDebugMessage () {
-  if (global.DEV_MODE) global.devLog('[WS]', ...arguments)
-}
-
-// Bind message event handler to WebSocket server before starting server
-const MAX_WS_MESSAGE_SIZE = 1024 * 1024 // 1MB
-
-webSocketServer.on('connection', socket => {
-  webSocketDebugMessage('WebSocket connection open')
-  socket.on('message', async (event) => {
-    try {
-      const raw = event.toString()
-      if (raw.length > MAX_WS_MESSAGE_SIZE) {
-        console.warn(`WebSocket message rejected: ${raw.length} bytes exceeds ${MAX_WS_MESSAGE_SIZE} limit`)
-        return
-      }
-      const { requestId, name, message } = JSON.parse(raw)
-      if (typeof name !== 'string' || !eventHandlers[name]) return
-      const reqStart = global.DEV_MODE ? Date.now() : 0
-      if (global.DEV_MODE) global.devLog(`[REQ] → ${name}  id=${requestId?.slice(0,8)}`)
-      const data = await eventHandlers[name](message || {})
-      if (global.DEV_MODE) global.devLog(`[REQ] ← ${name}  id=${requestId?.slice(0,8)}  ${Date.now() - reqStart}ms`)
-      socket.send(JSON.stringify({ requestId, name, message: data }))
-    } catch (e) {
-      console.error('WebSocket message error:', e.message)
-      try {
-        const { requestId } = JSON.parse(event.toString())
-        if (requestId) {
-          socket.send(JSON.stringify({ requestId, error: e.message }))
-        }
-      } catch (_) { /* unable to respond */ }
-    }
-  })
-})
-
-// A function for broadcasting events to all connected clients
+// The same authentication and RPC boundary applies to every listener.
 function broadcastEvent (name, message) {
-  // Use try/catch here to suppress errors caused when main window is
-  // closed and app is in process of shutting down
-  try {
-    if (!webSocketServer) return
-    const clientCount = [...webSocketServer.clients].filter(c => c !== webSocketServer && c.readyState === WebSocket.OPEN).length
-    if (global.DEV_MODE) {
-      const summary = name === 'gameStateChange'
-        ? `file=${message?._changedFile}`
-        : name === 'newLogEntry'
-          ? `event=${message?.event}`
-          : name === 'loadingProgress'
-            ? `complete=${message?.loadingComplete}`
-            : ''
-      global.devLog(`[BROADCAST] ${name} → ${clientCount} client(s)  ${summary}`)
-    }
-    webSocketServer.clients.forEach(client => {
-      if (client && client !== webSocketServer && client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ name, message }))
-      }
-    })
-    webSocketDebugMessage('WebSocket broadcast sent', name, message)
-
-    // Look for for loadingProgress events and display information about events
-    // loaded to the console when loadingProgress indicates loading is complete
-    if (name === 'loadingProgress' && message.loadingComplete === true) {
-      console.log(`Scanned ${message.numberOfFiles} files`)
-      console.log(`Imported ${message.numberOfEventsImported} events`)
-    }
-  } catch (e) {
-    console.error('ERROR_SOCKET_BROADCAST_EVENT_FAILED', name, message, e)
+  socketBoundary.broadcast(name, message)
+  if (name === 'loadingProgress' && message.loadingComplete === true) {
+    console.log(`Scanned ${message.numberOfFiles} files`)
+    console.log(`Imported ${message.numberOfEventsImported} events`)
   }
+}
+
+// Remote display access is opt-in and requires direct TLS (no proxy headers).
+// The existing Go launcher continues to use HTTP on localhost.
+const remotePort = Number(process.env.DAEDALUS_REMOTE_PORT || 0)
+if (remotePort) {
+  if (!process.env.DAEDALUS_TLS_CERT || !process.env.DAEDALUS_TLS_KEY) throw new Error('Remote access requires TLS certificate and key paths')
+  const remoteServer = https.createServer({
+    cert: fs.readFileSync(process.env.DAEDALUS_TLS_CERT),
+    key: fs.readFileSync(process.env.DAEDALUS_TLS_KEY),
+    minVersion: 'TLSv1.2'
+  }, (req, res) => socketBoundary.middleware(req, res, () => requestHandler(req, res)))
+  socketBoundary.attach(remoteServer)
+  remoteServer.on('error', () => { console.error('Remote TLS listener failed'); process.exit(1) })
+  remoteServer.listen(remotePort, process.env.DAEDALUS_REMOTE_HOST || '0.0.0.0')
+  console.log(`Paired HTTPS displays enabled on port ${remotePort}`)
 }
 
 httpServer.on('error', function (error) {
@@ -400,7 +364,7 @@ httpServer.on('error', function (error) {
 })
 
 // Start server
-httpServer.listen(PORT)
+httpServer.listen(PORT, '127.0.0.1')
 console.log(`Listening on port ${PORT}…`)
 
 // Failsafe: if the parent app dies without cleaning up, detect it and exit.
