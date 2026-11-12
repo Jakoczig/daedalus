@@ -35,35 +35,37 @@ export default function RemoteDisplays () {
     } catch (error) { setError(error.message) } finally { setPending(false) }
   }
   return (
-    <details style={{ position: 'relative', zIndex: 20, background: 'var(--color-background, #100d12)', maxHeight: '70vh', overflow: 'auto', padding: '.5rem' }}>
-      <summary>Remote display settings (local owner)</summary>
-      <p>Remote access is disabled until you enable it. Paired devices are read-only; gameplay remains offline.</p>
-      <p>Use a private IPv4 address on this host, preferably with a DHCP reservation. Allow only your private network in the host firewall. Do not forward this port to the Internet.</p>
-      {error && <p role='alert'>{error}</p>}
-      {state?.notice && <p role='alert'>{state.notice}</p>}
-      {state && !state.enabled && (
-        <form onSubmit={event => { event.preventDefault(); act('enable', { address: address.trim(), port: Number(port) }) }}>
-          <label>Host IPv4 address <input required list='remote-host-addresses' value={address} onChange={event => setAddress(event.target.value)} placeholder='192.168.1.10' /></label>
-          <datalist id='remote-host-addresses'>{(state.addresses || []).map(ip => <option key={ip} value={ip} />)}</datalist>
-          <label>HTTPS port <input required type='number' min='1024' max='65535' value={port} onChange={event => setPort(event.target.value)} /></label>
-          <button disabled={pending}>Enable HTTPS remote displays</button>
-        </form>
-      )}
-      {state?.enabled && (
-        <>
-          <p>Browser address: <a href={state.url} target='_blank' rel='noreferrer'>{state.url}</a></p>
-          <p>Transfer the public CA certificate securely to your device and verify its SHA256 fingerprint before trusting it. Import it into that device/browser trust store; never bypass a certificate warning. Private keys stay on this host.</p>
-          <p>Certificate fingerprint: <code style={{ overflowWrap: 'anywhere' }}>{state.fingerprint}</code></p>
-          <a download='daedalus-display-ca.crt' href={`data:application/x-pem-file;charset=utf-8,${encodeURIComponent(state.ca)}`}>Download public CA certificate</a>
-          <button disabled={pending} onClick={() => act('pair')}>Create pairing code</button>
-          <button disabled={pending} onClick={() => act('status')}>Refresh devices</button>
-          <button disabled={pending} onClick={() => act('disable')}>Disable remote displays and revoke all devices</button>
-          {pairing && <p>One-time pairing code: <output>{pairing.code}</output> — expires {pairing.expires}. Enter it only at the trusted HTTPS address, then refresh devices here.</p>}
-          <p>Device sessions last up to 12 hours and recover after network interruptions or a clean host restart. After expiry, revocation or an unclean host exit, pair again.</p>
-          <ul>{state.devices.map(device => <Device key={device.id} device={device} act={act} pending={pending} />)}</ul>
-        </>
-      )}
-    </details>
+    <>
+      {state?.notice && <p role='alert' style={{ position: 'relative', zIndex: 20, background: 'var(--color-background, #100d12)' }}>{state.notice}</p>}
+      <details style={{ position: 'relative', zIndex: 20, background: 'var(--color-background, #100d12)', maxHeight: '70vh', overflow: 'auto', padding: '.5rem' }}>
+        <summary>Remote display settings (local owner)</summary>
+        <p>Remote access is disabled until you enable it. Paired devices are read-only; gameplay remains offline.</p>
+        <p>Use a private IPv4 address on this host, preferably with a DHCP reservation. Allow only your private network in the host firewall. Do not forward this port to the Internet.</p>
+        {error && <p role='alert'>{error}</p>}
+        {state && !state.enabled && !state.recoveryRequired && (
+          <form onSubmit={event => { event.preventDefault(); act('enable', { address: address.trim(), port: Number(port) }) }}>
+            <label>Host IPv4 address <input required list='remote-host-addresses' value={address} onChange={event => setAddress(event.target.value)} placeholder='192.168.1.10' /></label>
+            <datalist id='remote-host-addresses'>{(state.addresses || []).map(ip => <option key={ip} value={ip} />)}</datalist>
+            <label>HTTPS port <input required type='number' min='1024' max='65535' value={port} onChange={event => setPort(event.target.value)} /></label>
+            <button disabled={pending}>Enable HTTPS remote displays</button>
+          </form>
+        )}
+        {state?.enabled && (
+          <>
+            <p>Browser address: <a href={state.url} target='_blank' rel='noreferrer'>{state.url}</a></p>
+            <p>Transfer the public CA certificate securely to your device and verify its SHA256 fingerprint before trusting it. Import it into that device/browser trust store; never bypass a certificate warning. Private keys stay on this host.</p>
+            <p>Certificate fingerprint: <code style={{ overflowWrap: 'anywhere' }}>{state.fingerprint}</code></p>
+            <a download='daedalus-display-ca.crt' href={`data:application/x-pem-file;charset=utf-8,${encodeURIComponent(state.ca)}`}>Download public CA certificate</a>
+            <button disabled={pending} onClick={() => act('pair')}>Create pairing code</button>
+            <button disabled={pending} onClick={() => act('status')}>Refresh devices</button>
+            <button disabled={pending} onClick={() => act('disable')}>Disable remote displays and revoke all devices</button>
+            {pairing && <p>One-time pairing code: <output>{pairing.code}</output> — expires {pairing.expires}. Enter it only at the trusted HTTPS address, then refresh devices here.</p>}
+            <p>Device sessions last up to 12 hours and recover after network interruptions or a clean host restart. After expiry, revocation or an unclean host exit, pair again.</p>
+            <ul>{state.devices.map(device => <Device key={device.id} device={device} act={act} pending={pending} />)}</ul>
+          </>
+        )}
+      </details>
+    </>
   )
 }
 

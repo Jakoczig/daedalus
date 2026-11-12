@@ -44,3 +44,11 @@ test('owner action uses same-origin authenticated POST and sanitized failures', 
   const denied = load({}, async () => ({ ok: false, text: async () => 'PRIVATE KEY leaked by fixture' }))
   await assert.rejects(denied.remoteAction('enable'), error => !error.message.includes('PRIVATE KEY') && /failed/i.test(error.message))
 })
+
+test('recovery warning remains visible without opening settings and prevents unsafe enable', () => {
+  const mod = load({ enabled: false, recoveryRequired: true, notice: 'Remote displays disabled. Local desktop available; back up and repair the Go profile.', devices: [] })
+  const html = renderToStaticMarkup(React.createElement(mod.default))
+  assert.match(html, /role="alert"/)
+  assert.ok(html.indexOf('back up and repair') < html.indexOf('<details'), 'recovery warning hidden in collapsed settings')
+  assert.doesNotMatch(html, /Enable HTTPS remote displays/)
+})

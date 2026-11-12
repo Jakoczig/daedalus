@@ -49,8 +49,12 @@ func newRemote(s *Server, assets fs.FS, dir string) (*remoteManager, error) {
 	m := &remoteManager{server: s, assets: NewStaticHandler(assets), dir: dir, release: release, now: time.Now, connections: map[*websocket.Conn]string{}}
 	err = m.load()
 	if err != nil {
-		release()
-		return nil, err
+		// The profile lock remains held. Optional remote corruption must not
+		// prevent a local owner from reading recovery instructions, and must
+		// never be overwritten on shutdown or trusted for viewer recovery.
+		m.fault = true
+		m.state = remoteState{Version: 1}
+		m.notice = "Remote displays disabled: configuration or TLS identity is missing, damaged or has unsafe permissions. Local desktop remains available. Close DAEDALUS, back up the dedicated Go profile, then repair its remote.json/TLS files and permissions from a trusted backup or follow the documented explicit profile-reset procedure. Restart and pair devices again after repair. Damaged files have not been replaced."
 	}
 	return m, nil
 }
@@ -201,7 +205,7 @@ func (m *remoteManager) statusLocked() map[string]any {
 	for _, d := range m.state.Devices {
 		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires})
 	}
-	return map[string]any{"enabled": m.http != nil && !m.fault, "url": m.url, "address": m.state.Address, "addresses": addresses, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
+	return map[string]any{"enabled": m.http != nil && !m.fault, "recoveryRequired": m.fault, "url": m.url, "address": m.state.Address, "addresses": addresses, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
 }
 func (s *Server) ownerRemote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" || !s.sameOrigin(r) || !s.sessions.valid(s.sessions.token(r)) || s.remote == nil {
@@ -224,7 +228,7 @@ func (s *Server) ownerRemote(w http.ResponseWriter, r *http.Request) {
 	m := s.remote
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed || m.fault {
+	if m.closed || (m.fault && request.Action != "status") {
 		http.Error(w, "Remote settings unavailable; restart and pair again", 503)
 		return
 	}

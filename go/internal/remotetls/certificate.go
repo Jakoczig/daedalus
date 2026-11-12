@@ -28,6 +28,43 @@ type Bundle struct {
 }
 type identity struct{ CA, CAKey, Leaf, LeafKey []byte }
 
+// ValidateStored checks an initialized identity without modifying any files.
+// An expired leaf may be renewed by Load after its trust identity is validated.
+func ValidateStored(dir string, now time.Time) error {
+	marker, err := privatefs.Read(dir, "tls.initialized")
+	if err != nil {
+		return err
+	}
+	if string(marker) != "1" {
+		return errors.New("invalid TLS initialization marker")
+	}
+	raw, err := privatefs.Read(dir, "tls.json")
+	if err != nil {
+		return err
+	}
+	var saved identity
+	if json.Unmarshal(raw, &saved) != nil {
+		return errors.New("invalid TLS identity")
+	}
+	ca, err := tls.X509KeyPair(saved.CA, saved.CAKey)
+	if err != nil {
+		return errors.New("invalid TLS CA key pair")
+	}
+	root, err := x509.ParseCertificate(ca.Certificate[0])
+	if err != nil || !root.IsCA || now.Before(root.NotBefore) || !now.Before(root.NotAfter) {
+		return errors.New("invalid or expired TLS CA")
+	}
+	pair, err := tls.X509KeyPair(saved.Leaf, saved.LeafKey)
+	if err != nil {
+		return errors.New("invalid TLS leaf key pair")
+	}
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil {
+		return err
+	}
+	return leaf.CheckSignatureFrom(root)
+}
+
 func key() ([]byte, *ecdsa.PrivateKey, error) {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

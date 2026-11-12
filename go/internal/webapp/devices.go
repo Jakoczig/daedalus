@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"net"
 	"time"
 	"unicode"
 
 	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/daedalus/go/internal/remotetls"
 )
 
 type device struct {
@@ -58,8 +60,10 @@ func validName(name string) bool {
 func (m *remoteManager) load() error {
 	raw, err := privatefs.Read(m.dir, "remote.json")
 	if errors.Is(err, fs.ErrNotExist) {
-		if _, e := privatefs.Read(m.dir, "tls.initialized"); !errors.Is(e, fs.ErrNotExist) {
-			return errors.New("remote settings are missing from an initialized profile")
+		for _, name := range []string{"tls.initialized", "tls.json"} {
+			if _, e := privatefs.Read(m.dir, name); !errors.Is(e, fs.ErrNotExist) {
+				return errors.New("remote settings are missing from an initialized profile")
+			}
 		}
 		m.state = remoteState{Version: 1}
 		return m.saveLocked()
@@ -76,6 +80,22 @@ func (m *remoteManager) load() error {
 			return errors.New("invalid device state")
 		}
 		seen[d.ID] = true
+	}
+	if m.state.Enabled && (!validAddress(m.state.Address) || m.state.Port < 0 || m.state.Port > 65535 || (m.state.Port < 1024 && !(m.state.Port == 0 && net.ParseIP(m.state.Address).IsLoopback()))) {
+		return errors.New("invalid saved remote endpoint")
+	}
+	// Validate initialized identity without creating keys, renewing certificates,
+	// changing the crash latch, or rewriting a damaged file.
+	required := m.state.Enabled || m.state.Address != "" || len(m.state.Devices) > 0
+	for _, name := range []string{"tls.initialized", "tls.json"} {
+		if _, e := privatefs.Read(m.dir, name); !errors.Is(e, fs.ErrNotExist) {
+			required = true
+		}
+	}
+	if required {
+		if err := remotetls.ValidateStored(m.dir, m.now()); err != nil {
+			return err
+		}
 	}
 	if m.state.Active {
 		m.state.Enabled = false
