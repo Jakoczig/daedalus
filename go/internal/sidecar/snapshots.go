@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 )
@@ -124,7 +125,7 @@ func (r *Reader) read(kind string) (Change, [32]byte) {
 	}
 	trimmed := bytes.TrimSpace(raw)
 	c.State = "invalid"
-	if len(trimmed) == 0 || trimmed[0] != '{' {
+	if len(trimmed) == 0 || trimmed[0] != '{' || !utf8.Valid(raw) {
 		return c, hash
 	}
 	var envelope struct {

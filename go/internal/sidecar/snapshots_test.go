@@ -126,3 +126,18 @@ func TestSidecarRejectHugeUnknownFile(t *testing.T) {
 		t.Fatal("canceled sidecar poll continued")
 	}
 }
+
+func TestSidecarInvalidUTF8PreservesGoodSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	writeSnapshot(t, dir, "Status", `{"event":"Status","Flags":1}`)
+	r, _ := NewReader(dir, Options{})
+	r.Poll(context.Background())
+	writeSnapshot(t, dir, "Status", "{\"event\":\"Status\",\"Note\":\""+string([]byte{0xff})+"\"}")
+	changes, _ := r.Poll(context.Background())
+	if c := findChange(changes, "Status"); c == nil || c.Valid || c.State != "invalid" {
+		t.Fatal("invalid UTF8 snapshot accepted")
+	}
+	if !strings.Contains(string(r.LastGood("Status").Raw), `"Flags":1`) {
+		t.Fatal("corrupt snapshot replaced cache")
+	}
+}
