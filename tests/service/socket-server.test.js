@@ -8,12 +8,13 @@ const { once } = require('node:events')
 const WebSocket = require('ws')
 const { createSocketBoundary } = require('../../src/service/lib/socket-server')
 
-async function fixture (t) {
+async function fixture (t, extraHandlers = {}) {
   const boundary = createSocketBoundary({
     handlers: {
       getMiningStatus: () => ({ active: true }),
       setPreferences: () => ({ saved: true }),
-      explode: () => { throw new Error('synthetic-secret-error') }
+      explode: () => { throw new Error('synthetic-secret-error') },
+      ...extraHandlers
     }
   })
   const server = http.createServer((req, res) => boundary.middleware(req, res, () => { res.end('public UI') }))
@@ -64,6 +65,31 @@ test('real HTTP/WS rejects missing auth, cross-site upgrades, inherited methods 
   assert.equal((await fetch(`${origin}/system-media-artwork/example.png`)).status, 403)
 })
 
+test('paired media and keybind RPCs work while host actions stay owner-only', async t => {
+  const reads = ['getKeybindFiles', 'getKeybinds', 'getSystemMediaSession', 'videoSearch', 'videoGetInfo', 'videoGetChannelVideos', 'videoGetCached', 'videoCheckStatus', 'galnetGetArticles']
+  const writes = ['systemMediaTransport', 'videoDownload', 'videoCancelDownload', 'galnetRefresh', 'setIntegrationSecret', 'testMessage', 'syncMessage', 'beginCapiAuth']
+  const { origin, cookie, boundary } = await fixture(t, Object.fromEntries([...reads, ...writes].map(name => [name, () => ({ name })])))
+  const owner = await connect(origin, cookie)
+  const viewerSession = boundary.auth.pair((await rpc(owner, 'createPairingCode')).message.code)
+  const viewer = await connect(origin, `daedalus_session=${viewerSession.token}`)
+  t.after(() => { owner.terminate(); viewer.terminate() })
+  for (const name of reads) assert.deepEqual((await rpc(viewer, name)).message, { name })
+  for (const name of writes) {
+    assert.equal((await rpc(viewer, name)).error, 'Forbidden')
+    assert.deepEqual((await rpc(owner, name)).message, { name })
+  }
+})
+
+test('viewers cannot force the host media observer to bypass its cache', async t => {
+  const { origin, cookie, boundary } = await fixture(t, { getSystemMediaSession: args => ({ force: args.force }) })
+  const owner = await connect(origin, cookie)
+  const session = boundary.auth.pair((await rpc(owner, 'createPairingCode')).message.code)
+  const viewer = await connect(origin, `daedalus_session=${session.token}`)
+  t.after(() => { owner.terminate(); viewer.terminate() })
+  assert.equal((await rpc(viewer, 'getSystemMediaSession', { force: true })).message.force, false)
+  assert.equal((await rpc(owner, 'getSystemMediaSession', { force: true })).message.force, true)
+})
+
 test('paired display receives journal broadcasts and read RPC; revoke blocks an already-open socket', async t => {
   const { origin, cookie, boundary } = await fixture(t)
   const owner = await connect(origin, cookie)
@@ -99,12 +125,19 @@ test('pairing endpoint refuses plaintext transport even with valid code', async 
 test('direct TLS pairing sets secure cookie, ignores requested role, and rejects reuse and brute force', async t => {
   const { boundary, origin, cookie } = await fixture(t)
   const cert = fs.readFileSync(path.join(__dirname, '../fixtures/tls/cert.pem'))
-  const tlsServer = https.createServer({ cert, key: fs.readFileSync(path.join(__dirname, '../fixtures/tls/key.pem')) }, (req, res) => boundary.middleware(req, res, () => res.end('UI')))
+  const tlsServer = https.createServer({ cert, key: fs.readFileSync(path.join(__dirname, '../fixtures/tls/key.pem')) }, (req, res) => boundary.middleware(req, res, () => res.end('fixture WAV')))
   boundary.attach(tlsServer)
   tlsServer.listen(0, '127.0.0.1')
   await once(tlsServer, 'listening')
   t.after(() => { tlsServer.closeAllConnections(); tlsServer.close() })
   const remoteOrigin = `https://127.0.0.1:${tlsServer.address().port}`
+  const getAudio = (route, cookie) => new Promise((resolve, reject) => {
+    https.get(`${remoteOrigin}${route}`, { ca: cert, headers: cookie ? { Cookie: cookie } : {} }, res => {
+      res.resume()
+      res.on('end', () => resolve(res.statusCode))
+    }).on('error', reject)
+  })
+  for (const route of ['/voicelines/confirmed.wav', '/voicelines/subdir%2fconfirmed.wav', '/voicelines/%63onfirmed.wav']) assert.equal(await getAudio(route), 403)
   const post = body => new Promise((resolve, reject) => {
     const req = https.request(`${remoteOrigin}/auth/pair`, { method: 'POST', ca: cert, headers: { Origin: remoteOrigin, 'Content-Type': 'application/json' } }, res => {
       let text = ''
@@ -120,6 +153,8 @@ test('direct TLS pairing sets secure cookie, ignores requested role, and rejects
   const paired = await post({ code, role: 'owner' })
   assert.equal(paired.status, 200)
   assert.equal(paired.body.role, 'viewer')
+  const viewerCookie = paired.headers['set-cookie'][0].split(';')[0]
+  assert.equal(await getAudio('/voicelines/confirmed.wav', viewerCookie), 200)
   assert.match(paired.headers['set-cookie'][0], /^__Host-daedalus_session=.*; HttpOnly; SameSite=Strict; Max-Age=43200; Secure$/)
   const ws = new WebSocket(remoteOrigin.replace('https', 'wss'), { ca: cert, headers: { Origin: remoteOrigin, Cookie: paired.headers['set-cookie'][0].split(';')[0] } })
   await once(ws, 'open')
@@ -129,4 +164,6 @@ test('direct TLS pairing sets secure cookie, ignores requested role, and rejects
   assert.equal((await post({ code })).status, 403)
   for (let i = 0; i < 8; i++) assert.equal((await post({ code: 'wrong' })).status, 403)
   assert.equal((await post({ code: 'wrong' })).status, 429)
+  await rpc(owner, 'revokePairedDevices')
+  assert.equal(await getAudio('/voicelines/confirmed.wav', viewerCookie), 403)
 })

@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { sendEvent, eventListener, useSocket } from 'lib/socket'
 import { SettingsNavItems } from 'lib/navigation-items'
+import { saveIntegrationPreference } from 'lib/integration-settings'
 import packageJson from '../../../package.json'
 
 function Settings ({ visible, toggleVisible = () => {}, defaultActiveSettingsPanel = 'Theme' }) {
@@ -496,10 +497,9 @@ function IntegrationsSettings ({ visible }) {
   }), [])
 
   const savePref = async (key, value) => {
-    const newPrefs = JSON.parse(JSON.stringify(preferences || {}))
-    if (!newPrefs.integrations) newPrefs.integrations = {}
-    newPrefs.integrations[key] = value
-    setPreferences(await sendEvent('setPreferences', newPrefs))
+    const saved = await saveIntegrationPreference({ sendEvent, preferences, key, value })
+    setPreferences(saved.preferences)
+    setStatus(saved.status)
   }
 
   const setBusyFor = (service, val) => setBusy(b => ({ ...b, [service]: val }))

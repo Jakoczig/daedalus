@@ -3,6 +3,7 @@ import { useSocket, sendEvent, eventListener } from 'lib/socket'
 import Layout from 'components/layout'
 import Panel from 'components/panel'
 import { MediaPanelNavItems } from 'lib/navigation-items'
+import { selectVideo } from 'lib/video-playback'
 
 // State machine: idle | searching | results | channel | downloading | playing
 const STATES = { IDLE: 'idle', SEARCHING: 'searching', RESULTS: 'results', CHANNEL: 'channel', DOWNLOADING: 'downloading', PLAYING: 'playing' }
@@ -247,26 +248,26 @@ function VideoPlayer ({ fileName, title, onBack }) {
           </span>
           <button onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'} style={muted || volume === 0 ? { opacity: 0.4 } : undefined}>
             <i className='icon daedalus-terminal-sound' />
-        </button>
-        <input
-          type='range'
-          min='0'
-          max='100'
-          value={muted ? 0 : volume * 100}
-          onChange={handleVolume}
-          className='video-panel__controls-volume'
-        />
-        <button onClick={toggleFullscreen} title='Fullscreen'>
-          <i className='icon daedalus-terminal-fullscreen' />
-        </button>
-      </div>
+          </button>
+          <input
+            type='range'
+            min='0'
+            max='100'
+            value={muted ? 0 : volume * 100}
+            onChange={handleVolume}
+            className='video-panel__controls-volume'
+          />
+          <button onClick={toggleFullscreen} title='Fullscreen'>
+            <i className='icon daedalus-terminal-fullscreen' />
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
 export default function MediaVideoPage () {
-  const { connected, active, ready } = useSocket()
+  const { connected, active, ready, role } = useSocket()
   const [state, setState] = useState(STATES.IDLE)
   const [results, setResults] = useState([])
   const [matchedChannel, setMatchedChannel] = useState(null)
@@ -276,6 +277,24 @@ export default function MediaVideoPage () {
   const [downloadProgress, setDownloadProgress] = useState(null)
   const [playingFile, setPlayingFile] = useState(null)
   const [error, setError] = useState(null)
+  const [cachedVideos, setCachedVideos] = useState([])
+
+  useEffect(() => {
+    if (ready) sendEvent('videoGetCached').then(setCachedVideos).catch(() => setError('Could not load cached videos'))
+  }, [ready])
+
+  const handleSelect = useCallback(async (video) => {
+    setSelectedVideo(video)
+    setError(null)
+    try {
+      const playback = await selectVideo({ role, video, sendEvent })
+      setPlayingFile(playback.fileName || null)
+      setState(playback.state)
+    } catch (e) {
+      setError(e.message)
+      setState(STATES.RESULTS)
+    }
+  }, [role])
 
   // Listen for download progress broadcasts
   useEffect(() => {
@@ -320,23 +339,13 @@ export default function MediaVideoPage () {
     try {
       const info = await sendEvent('videoGetInfo', { url })
       if (info) {
-        setSelectedVideo(info)
-        // Start downloading immediately for pasted URLs
-        setState(STATES.DOWNLOADING)
-        sendEvent('videoDownload', { url }, 300000).catch(() => {})
+        await handleSelect(info)
       }
     } catch (e) {
       setError(e.message || 'Failed to get video info')
       setState(STATES.IDLE)
     }
-  }, [])
-
-  const handleSelect = useCallback((video) => {
-    setSelectedVideo(video)
-    setState(STATES.DOWNLOADING)
-    setError(null)
-    sendEvent('videoDownload', { url: video.url || video.id }, 300000).catch(() => {})
-  }, [])
+  }, [handleSelect])
 
   const handleChannelClick = useCallback(async (channel) => {
     setState(STATES.SEARCHING)
@@ -378,6 +387,8 @@ export default function MediaVideoPage () {
     <Layout connected={connected} active={active} ready={ready}>
       <Panel layout='full-width' navigation={MediaPanelNavItems('Video')}>
         <div className='video-panel'>
+          {role !== 'owner' && <p>Browse YouTube and play videos already downloaded on the Windows PC. Downloads are managed on the PC.</p>}
+          {state === STATES.IDLE && cachedVideos.map(video => <button key={video.videoId} onClick={() => handleSelect({ id: video.videoId, title: video.videoId })}>Play cached: {video.videoId}</button>)}
           <SearchBar
             onSearch={handleSearch}
             onPaste={handlePaste}

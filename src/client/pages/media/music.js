@@ -469,7 +469,7 @@ function drawVisualizer (canvas, { palette, session, positionSeconds, analyser, 
 }
 
 export default function MediaMusicPage () {
-  const { connected, active, ready } = useSocket()
+  const { connected, active, ready, role } = useSocket()
   const [mediaState, setMediaState] = useState(null)
   const [mediaError, setMediaError] = useState(null)
   const [transportPending, setTransportPending] = useState(null)
@@ -567,6 +567,7 @@ export default function MediaMusicPage () {
   }, [connected, updateMediaState])
 
   const runTransport = useCallback(async (action) => {
+    if (role !== 'owner') return
     setTransportPending(action)
     try {
       const nextState = await sendEvent('systemMediaTransport', { action }, 10000)
@@ -576,7 +577,7 @@ export default function MediaMusicPage () {
     } finally {
       setTransportPending(null)
     }
-  }, [updateMediaState])
+  }, [updateMediaState, role])
 
   useEffect(() => {
     if (!ready) return
@@ -828,7 +829,7 @@ export default function MediaMusicPage () {
                   type='button'
                   className='music-panel__control-button music-panel__control-button--secondary'
                   onClick={() => runTransport('previous')}
-                  disabled={!current?.controls?.canPrevious || transportPending !== null}
+                  disabled={role !== 'owner' || !current?.controls?.canPrevious || transportPending !== null}
                   aria-label='Previous track'
                 >
                   <span className='music-panel__transport-icon music-panel__transport-icon--previous' aria-hidden='true' />
@@ -837,7 +838,7 @@ export default function MediaMusicPage () {
                   type='button'
                   className='music-panel__control-button music-panel__control-button--primary'
                   onClick={() => runTransport('playPause')}
-                  disabled={!canTogglePlayback || transportPending !== null}
+                  disabled={role !== 'owner' || !canTogglePlayback || transportPending !== null}
                   aria-label={current?.playbackStatus === 'Playing' ? 'Pause playback' : 'Play playback'}
                 >
                   <span className={`music-panel__transport-icon ${current?.playbackStatus === 'Playing' ? 'music-panel__transport-icon--pause' : 'music-panel__transport-icon--play'}`} aria-hidden='true' />
@@ -846,7 +847,7 @@ export default function MediaMusicPage () {
                   type='button'
                   className='music-panel__control-button music-panel__control-button--secondary'
                   onClick={() => runTransport('next')}
-                  disabled={!current?.controls?.canNext || transportPending !== null}
+                  disabled={role !== 'owner' || !current?.controls?.canNext || transportPending !== null}
                   aria-label='Next track'
                 >
                   <span className='music-panel__transport-icon music-panel__transport-icon--next' aria-hidden='true' />

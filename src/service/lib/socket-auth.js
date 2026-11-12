@@ -9,7 +9,9 @@ const DISPLAY_RPC = new Set([
   'getExplorationSystem', 'getExplorationBiologicals', 'getExplorationInventory',
   'getPowerplay', 'getPowerplayNearbySources', 'getMaterialSources',
   'getMaterialTraders', 'getEngineerPrerequisites', 'getEngineerUnlockStations',
-  'getMiningStatus', 'galnetGetArticles'
+  'getMiningStatus', 'galnetGetArticles', 'getKeybindFiles', 'getKeybinds',
+  'getSystemMediaSession', 'videoSearch', 'videoGetInfo', 'videoGetChannelVideos',
+  'videoGetCached', 'videoCheckStatus'
 ])
 
 function authorizeRpc ({ principal, handlerName }) {

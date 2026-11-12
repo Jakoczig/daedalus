@@ -169,7 +169,7 @@ function voicelinesMiddleware (req, res, next) {
       res.writeHead(200, {
         'Content-Type': 'audio/wav',
         'Content-Length': stat.size,
-        'Cache-Control': 'public, max-age=86400'
+        'Cache-Control': 'private, no-store'
       })
       fs.createReadStream(filePath).pipe(res)
     } else {

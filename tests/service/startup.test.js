@@ -16,7 +16,10 @@ test('actual service starts with isolated synthetic data and supports native-sty
   await fs.writeFile(journal, JSON.stringify({ timestamp: '2026-11-12T00:00:00Z', event: 'Fileheader', gameversion: '4.0', build: 'synthetic' }) + '\n')
   const prefsDir = path.join(dir, 'AppData', 'Local', 'DAEDALUS Terminal')
   await fs.mkdir(prefsDir, { recursive: true })
-  await fs.writeFile(path.join(prefsDir, 'Preferences.json'), JSON.stringify({ integrations: { inaraApiKey: 'synthetic-startup-key', capiRefreshToken: 'synthetic-startup-refresh' } }))
+  const audio = path.join(dir, 'synthetic-audio')
+  await fs.mkdir(audio)
+  await fs.writeFile(path.join(audio, 'confirmed.wav'), 'synthetic-wav-fixture')
+  await fs.writeFile(path.join(prefsDir, 'Preferences.json'), JSON.stringify({ covasDir: audio, integrations: { inaraApiKey: 'synthetic-startup-key', capiRefreshToken: 'synthetic-startup-refresh' } }))
   const probe = net.createServer()
   probe.listen(0, '127.0.0.1')
   await once(probe, 'listening')
@@ -25,7 +28,7 @@ test('actual service starts with isolated synthetic data and supports native-sty
   const child = spawn(process.execPath, ['--require', path.resolve(__dirname, '../helpers/no-external-network.cjs'), 'src/service/main.js', '--port', String(port), '--save-game-dir', logs.replace(/\\/g, '/')], {
     cwd: path.resolve(__dirname, '../..'),
     windowsHide: true,
-    env: { ...process.env, USERPROFILE: dir, HOME: dir, DAEDALUS_REMOTE_PORT: '' },
+    env: { ...process.env, USERPROFILE: dir, HOME: dir, LOCALAPPDATA: path.join(dir, 'AppData', 'Local'), DAEDALUS_REMOTE_PORT: '' },
     stdio: ['ignore', 'pipe', 'pipe']
   })
   let output = ''
@@ -45,6 +48,11 @@ test('actual service starts with isolated synthetic data and supports native-sty
   }
   assert.equal(response?.status, 200, output)
   const cookie = response.headers.get('set-cookie').split(';')[0]
+  assert.equal((await fetch(`${origin}/voicelines/confirmed.wav`)).status, 403)
+  const wav = await fetch(`${origin}/voicelines/confirmed.wav`, { headers: { Cookie: cookie } })
+  assert.equal(wav.status, 200)
+  assert.equal(wav.headers.get('cache-control'), 'private, no-store')
+  assert.equal(await wav.text(), 'synthetic-wav-fixture')
   const ws = new WebSocket(`ws://localhost:${port}`, { headers: { Origin: origin, Cookie: cookie } })
   await once(ws, 'open')
   t.after(() => ws.terminate())

@@ -17,10 +17,10 @@ test('anonymous and forged roles cannot reach RPC; viewer has explicit display a
   assert.equal(owner.role, 'owner')
   assert.equal(authorizeRpc({ principal: owner, handlerName: 'setPreferences' }), true)
   const viewer = auth.pair(auth.createPairingCode(owner).code)
-  for (const name of ['getPreferences', 'getMiningStatus', 'getNavRoute', 'getBlueprints']) {
+  for (const name of ['getPreferences', 'getMiningStatus', 'getNavRoute', 'getBlueprints', 'getKeybindFiles', 'getKeybinds', 'getSystemMediaSession', 'videoSearch', 'videoGetInfo', 'videoGetChannelVideos', 'videoGetCached', 'videoCheckStatus', 'galnetGetArticles']) {
     assert.equal(authorizeRpc({ principal: viewer, handlerName: name }), true)
   }
-  for (const name of ['setPreferences', 'beginCapiAuth', 'setIntegrationSecret', 'syncMessage', 'testMessage', 'videoDownload', 'constructor', '__proto__', 'futureHandler']) {
+  for (const name of ['setPreferences', 'beginCapiAuth', 'setIntegrationSecret', 'syncMessage', 'testMessage', 'systemMediaTransport', 'videoDownload', 'videoCancelDownload', 'galnetRefresh', 'constructor', '__proto__', 'futureHandler']) {
     assert.equal(authorizeRpc({ principal: viewer, handlerName: name }), false)
   }
 })

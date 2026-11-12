@@ -17,7 +17,7 @@ function createSocketBoundary ({ handlers, auth = createSocketAuth() }) {
     res.setHeader('X-Frame-Options', 'DENY')
     const route = req.url.split('?')[0]
     if (!route.startsWith('/auth/')) {
-      if (/^\/(videos|system-media-artwork)\//.test(route) && !auth.principal(req)) return reply(res, 403, { error: 'Forbidden' })
+      if (/^\/(videos|system-media-artwork|voicelines)\//.test(route) && !auth.principal(req)) return reply(res, 403, { error: 'Forbidden' })
       return next()
     }
     if (req.method !== 'POST' || !sameOrigin(req)) return reply(res, 403, { error: 'Forbidden' })
@@ -68,7 +68,8 @@ function createSocketBoundary ({ handlers, auth = createSocketAuth() }) {
         else if (name === 'revokePairedDevices') data = auth.revokeViewers(socket.principal)
         else {
           if (!Object.hasOwn(handlers, name) || typeof handlers[name] !== 'function') throw new Error('Forbidden')
-          data = await handlers[name](input.message || {})
+          const message = socket.principal.role === 'viewer' && name === 'getSystemMediaSession' ? { force: false } : input.message || {}
+          data = await handlers[name](message)
         }
         if (auth.valid(socket.principal) && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ requestId, name, message: data }))
       } catch (e) {
