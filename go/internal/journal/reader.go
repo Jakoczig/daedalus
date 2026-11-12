@@ -206,7 +206,7 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 		}
 		return nil
 	}
-	f, err := os.Open(path)
+	f, err := OpenReadOnly(path)
 	if err != nil {
 		r.sourceError(err)
 		return nil

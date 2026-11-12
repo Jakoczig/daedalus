@@ -192,3 +192,31 @@ func TestReaderCancellationStopsPolling(t *testing.T) {
 		t.Fatal("cancel did not stop reader")
 	}
 }
+
+func TestReaderAllowsRotationWhileReadHandleIsOpen(t *testing.T) {
+	dir := t.TempDir()
+	path := journalPath(dir)
+	os.WriteFile(path, []byte("{\"event\":\"Fileheader\"}\n"), 0600)
+	r, _ := NewReader(dir, ReaderOptions{PollInterval: time.Millisecond})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	rotated := false
+	sawNew := false
+	err := r.Run(ctx, func(e Event, _ Phase) error {
+		if !rotated {
+			rotated = true
+			if err := os.Rename(path, path+".retired"); err != nil {
+				return err
+			}
+			return os.WriteFile(path, []byte("{\"event\":\"Location\",\"StarSystem\":\"Fixture After Rotation\"}\n"), 0600)
+		}
+		if e.SystemName == "Fixture After Rotation" {
+			sawNew = true
+			cancel()
+		}
+		return nil
+	})
+	if err != nil || !sawNew {
+		t.Fatal("reader blocked game file rotation", err)
+	}
+}
