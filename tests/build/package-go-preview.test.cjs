@@ -1,0 +1,41 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs/promises')
+const os = require('node:os')
+const path = require('node:path')
+const crypto = require('node:crypto')
+const { packagePreview } = require('../../scripts/build/package-go-preview.cjs')
+
+test('preview contains only executable, prerequisites and matching SHA256 hashes', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'daedalus-preview-test-'))
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const binary = path.join(root, 'daedalus.exe')
+  await fs.writeFile(binary, 'synthetic executable fixture')
+  await fs.writeFile(path.join(root, 'tls.json'), 'PRIVATE KEY MUST NEVER SHIP')
+  await fs.writeFile(path.join(root, 'remote.json'), 'viewer token MUST NEVER SHIP')
+  const readme = path.join(root, 'instructions.md')
+  await fs.writeFile(readme, 'EXPERIMENTAL, UNSIGNED, OFFLINE PREVIEW\nWindows requires WebView2; Linux requires GTK4/WebKitGTK.\n')
+  const directory = await packagePreview({ binaryPath: binary, readmePath: readme, outputParent: root, platform: 'Windows' })
+  assert.deepEqual((await fs.readdir(directory)).sort(), ['README.md', 'SHA256SUMS', 'daedalus.exe'])
+  const hashes = await fs.readFile(path.join(directory, 'SHA256SUMS'), 'utf8')
+  for (const name of ['daedalus.exe', 'README.md']) {
+    const bytes = await fs.readFile(path.join(directory, name))
+    assert.ok(hashes.includes(`${crypto.createHash('sha256').update(bytes).digest('hex')}  ${name}\n`))
+  }
+  const second = await packagePreview({ binaryPath: binary, readmePath: readme, outputParent: root, platform: 'Windows' })
+  assert.notEqual(second, directory, 'existing artifact directory was reused')
+})
+
+test('preview refuses missing or linked inputs rather than packaging adjacent files', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'daedalus-preview-invalid-'))
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const binary = path.join(root, 'daedalus')
+  const readme = path.join(root, 'readme.md')
+  await fs.writeFile(readme, 'instructions')
+  await assert.rejects(packagePreview({ binaryPath: binary, readmePath: readme, outputParent: root, platform: 'Linux' }))
+  await fs.writeFile(binary, 'synthetic ELF fixture')
+  await assert.rejects(packagePreview({ binaryPath: root, readmePath: readme, outputParent: root, platform: 'Linux' }))
+  const link = path.join(root, 'linked-executable')
+  try { await fs.symlink(binary, link, 'file') } catch (error) { if (error.code === 'EPERM') return; throw error }
+  await assert.rejects(packagePreview({ binaryPath: link, readmePath: readme, outputParent: root, platform: 'Linux' }))
+})

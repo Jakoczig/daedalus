@@ -23,13 +23,15 @@ func TestSingleLoopbackLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Close(context.Background())
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 3 * time.Second}
+	defer client.CloseIdleConnections()
 	if !strings.HasPrefix(server.URL(), "http://127.0.0.1:") || strings.HasSuffix(server.URL(), ":3300") {
 		t.Fatal("unsafe/fixed listener", server.URL())
 	}
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
-			response, err := http.Get(server.URL() + "/exploration/system")
+			response, err := client.Get(server.URL() + "/exploration/system")
 			if err != nil {
 				t.Error(err)
 				return
@@ -42,13 +44,16 @@ func TestSingleLoopbackLifecycle(t *testing.T) {
 		})
 	}
 	wg.Wait()
+	// Retire this fixture's idle/speculative dials before timing graceful shutdown.
+	// net/http can otherwise give unused StateNew sockets a five-second grace.
+	client.CloseIdleConnections()
 	cancel()
 	select {
 	case <-server.Done():
 	case <-time.After(3 * time.Second):
 		t.Fatal("cancel did not close server")
 	}
-	if _, err := http.Get(server.URL()); err == nil {
+	if _, err := client.Get(server.URL()); err == nil {
 		t.Fatal("listener survived shutdown")
 	}
 	if err := server.Close(context.Background()); err != nil {
