@@ -83,7 +83,7 @@ func TestHumanPairingLowercaseOneUseAndViewerSecret(t *testing.T) {
 }
 
 func TestHumanPairingRejectsInvalidAlphabetAndLength(t *testing.T) {
-	for _, code := range []string{"", "7K4M9", "7K4M9PP", "7I4M9P", "7L4M9P", "7O4M9P", "7U4M9P", "7K4M P", "7K4M-P", "７K4M9P"} {
+	for _, code := range []string{"", "7K4M9", "7K4M9PP", "7I4M9P", "7L4M9P", "7O4M9P", "7U4M9P", "7K4M P", "7K4M-P", "７K4M9P", "7ſ4m9p"} {
 		t.Run(code, func(t *testing.T) {
 			s, _, client, remoteURL, _ := remoteFixture(t)
 			// Even a matching hash must not bypass canonical alphabet/length validation.

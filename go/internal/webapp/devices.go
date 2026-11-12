@@ -163,8 +163,12 @@ func (m *remoteManager) pairLocked(code, name string) (string, error) {
 	if m.attempts > 10 {
 		return "", errors.New("pairing temporarily limited")
 	}
+	// Check the ASCII alphabet before Unicode case folding (e.g. long-s -> S).
+	if len(code) != 6 || strings.Trim(code, pairingAlphabet+strings.ToLower(pairingAlphabet)) != "" {
+		return "", errors.New("invalid or expired pairing code")
+	}
 	code = strings.ToUpper(code)
-	if !m.state.Enabled || m.fault || m.pairing == nil || !now.Before(m.pairing.Expires) || len(code) != 6 || strings.Trim(code, pairingAlphabet) != "" || subtle.ConstantTimeCompare([]byte(tokenHash(code)), []byte(m.pairing.Hash)) != 1 || !validName(name) {
+	if !m.state.Enabled || m.fault || m.pairing == nil || !now.Before(m.pairing.Expires) || subtle.ConstantTimeCompare([]byte(tokenHash(code)), []byte(m.pairing.Hash)) != 1 || !validName(name) {
 		return "", errors.New("invalid or expired pairing code")
 	}
 	m.pruneLocked()
