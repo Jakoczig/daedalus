@@ -56,8 +56,9 @@ export default function RemoteDisplays () {
           <p>Certificate fingerprint: <code style={{ overflowWrap: 'anywhere' }}>{state.fingerprint}</code></p>
           <a download='daedalus-display-ca.crt' href={`data:application/x-pem-file;charset=utf-8,${encodeURIComponent(state.ca)}`}>Download public CA certificate</a>
           <button disabled={pending} onClick={() => act('pair')}>Create pairing code</button>
+          <button disabled={pending} onClick={() => act('status')}>Refresh devices</button>
           <button disabled={pending} onClick={() => act('disable')}>Disable remote displays and revoke all devices</button>
-          {pairing && <p>One-time pairing code: <output>{pairing.code}</output> — expires {pairing.expires}. Enter it only at the trusted HTTPS address.</p>}
+          {pairing && <p>One-time pairing code: <output>{pairing.code}</output> — expires {pairing.expires}. Enter it only at the trusted HTTPS address, then refresh devices here.</p>}
           <p>Device sessions last up to 12 hours and recover after network interruptions or a clean host restart. After expiry, revocation or an unclean host exit, pair again.</p>
           <ul>{state.devices.map(device => <Device key={device.id} device={device} act={act} pending={pending} />)}</ul>
         </>

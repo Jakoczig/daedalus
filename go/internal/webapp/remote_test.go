@@ -9,15 +9,51 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
 )
+
+type gatedBody struct {
+	entered, release chan struct{}
+	once             sync.Once
+	io.Reader
+}
+
+func (b *gatedBody) Read(data []byte) (int, error) {
+	b.once.Do(func() { close(b.entered); <-b.release })
+	return b.Reader.Read(data)
+}
+func (b *gatedBody) Close() error { return nil }
+
+func TestSlowRemoteBodyCannotBlockOwnerControl(t *testing.T) {
+	s, owner, _, remoteURL, _ := remoteFixture(t)
+	body := &gatedBody{entered: make(chan struct{}), release: make(chan struct{}), Reader: strings.NewReader(`{"code":"wrong"}`)}
+	defer close(body.release)
+	req := httptest.NewRequest("POST", remoteURL+"/auth/pair", body)
+	req.TLS = &tls.ConnectionState{}
+	req.Header.Set("Origin", remoteURL)
+	response := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() { s.remote.serve(s.remote.epoch, response, req); close(done) }()
+	<-body.entered
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	request, _ := http.NewRequestWithContext(ctx, "POST", s.URL()+"/owner/remote", strings.NewReader(`{"action":"status"}`))
+	request.Header.Set("Origin", s.URL())
+	result, err := owner.Do(request)
+	if err != nil {
+		t.Fatal("slow unauthenticated body blocked local owner", err)
+	}
+	result.Body.Close()
+}
 
 func ownerAction(t *testing.T, s *Server, client *http.Client, value any) map[string]json.RawMessage {
 	t.Helper()

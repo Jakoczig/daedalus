@@ -25,6 +25,7 @@ test('owner remote settings explain TLS trust and expose only safe device contro
   assert.match(html, /Create pairing code/)
   assert.match(html, /Rename/)
   assert.match(html, /Revoke/)
+  assert.match(html, /Refresh devices/)
   assert.match(html, /certificate/i)
   assert.match(html, /fixture-fingerprint/)
   assert.match(html, /&lt;tablet&gt;/)

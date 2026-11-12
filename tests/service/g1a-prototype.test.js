@@ -211,3 +211,18 @@ test('offline RPC queue is bounded', async () => {
   client.render(); await client.start(); client.sockets[0].close()
   await Promise.all(pending)
 })
+
+test('timed-out offline work is removed and is never replayed on connect', async () => {
+  const client = harness()
+  client.render(); await client.start()
+  for (let round = 0; round < 3; round++) {
+    const pending = client.sendEvent('staleAction')
+    const rejected = assert.rejects(pending, /timed out/i)
+    const timer = [...client.timers.entries()].find(([, value]) => value.delay === 30000)
+    client.timers.delete(timer[0]); timer[1].callback(); await rejected
+  }
+  const connection = client.sockets[0]; connection.readyState = 1
+  const opened = connection.onopen()
+  assert.ok(connection.sent.every(request => request.name === 'getLoadingStatus'), 'timed-out action was replayed')
+  connection.message({ ...connection.sent[0], message: { loadingComplete: true } }); await opened
+})

@@ -480,7 +480,7 @@ function useSocket () { return useContext(SocketContext) }
 
 function sendEvent (name, message = null, timeout = 30000) {
   return new Promise((resolve, reject) => {
-    if (Object.keys(callbackHandlers).length >= 128) { reject(new Error('Request limit reached')); return }
+    if (Object.keys(callbackHandlers).length >= 128 || deferredEventQueue.length >= 128) { reject(new Error('Request limit reached')); return }
     const requestId = generateUuid()
     const sendStart = (process.env.NODE_ENV === 'development') ? Date.now() : 0
     if (process.env.NODE_ENV === 'development') devLog(`[SEND] → ${name}  id=${requestId.slice(0, 8)}`)
@@ -504,6 +504,7 @@ function sendEvent (name, message = null, timeout = 30000) {
     if (timeout > 0) {
       timer = setTimeout(() => {
         delete callbackHandlers[requestId]
+        deferredEventQueue = deferredEventQueue.filter(request => request.requestId !== requestId)
         if (process.env.NODE_ENV === 'development') devLog(`[SEND] TIMEOUT ${name}  id=${requestId.slice(0, 8)}  ${timeout}ms`)
         reject(new Error(`sendEvent '${name}' timed out after ${timeout}ms`))
       }, timeout)

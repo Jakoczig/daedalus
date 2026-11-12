@@ -329,43 +329,50 @@ func (m *remoteManager) serve(epoch uint64, w http.ResponseWriter, r *http.Reque
 			http.Error(w, "Forbidden", 403)
 			return
 		}
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		if m.closed || m.fault || m.epoch != epoch || m.http == nil {
-			http.Error(w, "Forbidden", 403)
-			return
-		}
-		var token string
+		// Unauthenticated network reads must never hold the authorization lock.
+		var request struct{ Code, Name, Role string }
 		if r.URL.Path == "/auth/pair" {
-			var request struct{ Code, Name, Role string }
 			decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
 			if decoder.Decode(&request) != nil || decoder.Decode(&struct{}{}) != io.EOF {
 				http.Error(w, "Invalid request", 400)
 				return
 			}
+		} else if _, err := io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, 4096)); err != nil {
+			http.Error(w, "Invalid request", 400)
+			return
+		}
+		m.mu.Lock()
+		if m.closed || m.fault || m.epoch != epoch || m.http == nil {
+			m.mu.Unlock()
+			http.Error(w, "Forbidden", 403)
+			return
+		}
+		var token string
+		if r.URL.Path == "/auth/pair" {
 			if request.Name == "" {
 				request.Name = "Browser display"
 			}
 			var err error
 			token, err = m.pairLocked(request.Code, request.Name)
 			if err != nil {
+				m.mu.Unlock()
 				http.Error(w, "Invalid, expired or rate-limited pairing", 403)
 				return
 			}
-			http.SetCookie(w, &http.Cookie{Name: viewerCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		} else {
-			if _, err := io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, 4096)); err != nil {
-				http.Error(w, "Invalid request", 400)
-				return
-			}
 			cookie, err := r.Cookie(viewerCookie)
 			if err == nil {
 				token = cookie.Value
 			}
 			if _, ok := m.findLocked(token); !ok {
+				m.mu.Unlock()
 				http.Error(w, "Pair this display", 401)
 				return
 			}
+		}
+		m.mu.Unlock()
+		if r.URL.Path == "/auth/pair" {
+			http.SetCookie(w, &http.Cookie{Name: viewerCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		}
 		writeJSON(w, map[string]any{"role": "viewer", "prototype": map[string]any{"stage": "G1B", "offline": true}})
 		return

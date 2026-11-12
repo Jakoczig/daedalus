@@ -65,7 +65,8 @@ This never reads/migrates the old app's preferences or credentials.
    name in the trusted remote form. Codes expire after five minutes; making a new
    one invalidates the previous code. Pairing has a shared ten-attempt/minute
    budget, so wait one minute after excessive attempts.
-9. Confirm the remote shell says **G1B offline** and **read-only**. No gameplay
+9. Click **Refresh devices** on the owner to list the newly paired device. Confirm
+   the remote shell says **G1B offline** and **read-only**. No gameplay
    parity is claimed. Owner controls and secrets must not appear remotely.
 
 ## Client trust references
