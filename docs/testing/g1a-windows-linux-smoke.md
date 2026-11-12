@@ -41,6 +41,15 @@ Linux race checks: `go test -race ./...`. Headless native window:
 `xvfb-run -a dbus-run-session -- ./bin/daedalus --desktop-smoke-test`.
 No `server` build tag: it would select a different Wails runtime.
 
+Ubuntu 24.04 restricts unprofiled user namespaces. If WebKit fails with
+`bwrap: setting up uid map: Permission denied`, it needs an administrator-reviewed
+AppArmor profile granting `userns,` to the exact built executable, as described
+in the [Ubuntu release notes](https://documentation.ubuntu.com/release-notes/24.04/#unprivileged-user-namespace-restrictions).
+The desktop CI installs that narrowly attached profile in its disposable runner.
+The executable never installs a profile or changes system settings itself.
+Do not disable WebKit's sandbox or turn off system-wide namespace restrictions.
+Release packaging must resolve this prerequisite for a fixed installed path.
+
 ## What the two smoke modes prove
 
 `--smoke-test` starts the same kernel-selected `127.0.0.1:0` listener used by

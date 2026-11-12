@@ -55,6 +55,19 @@ jobs:
         run: cd go && go test -race ./...
       - name: Build native desktop
         run: cd go && go build -o bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/daedalus
+      - name: Allow this preview to create WebKit sandbox namespaces
+        if: runner.os == 'Linux'
+        run: |
+          # Ubuntu 24.04 restricts unprofiled user namespaces. Grant only this
+          # executable userns permission; keep WebKit's sandbox and global policy.
+          sudo tee /etc/apparmor.d/daedalus-g1a-ci > /dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          "$GITHUB_WORKSPACE/go/bin/daedalus" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/daedalus-g1a-ci
       - name: Executable offline smoke
         run: go/bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} --smoke-test
       - name: Native React smoke
