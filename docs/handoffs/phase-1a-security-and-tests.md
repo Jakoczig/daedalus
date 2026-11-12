@@ -1,11 +1,13 @@
 # Phase 1A: security and regression tests
 
-**Branch:** `security/phase-1a-foundations`  
-**Draft PR:** https://github.com/Jakoczig/daedalus/pull/2  
-**Base:** `06a69635623c5bfacff51785a33fbb5f09948c9d` (fork main)  
+**Branch:** `security/phase-1a-foundations`
+**Draft PR:** https://github.com/Jakoczig/daedalus/pull/2
+**Base:** `06a69635623c5bfacff51785a33fbb5f09948c9d` (fork main)
 **Implementation commits:**
+
 - `c5908d5151d511de326e290fd0c3c44cfec28ac5` — authenticated service/clients, credential isolation, tests.
 - `90732724ec43711ca4982726db4bd834f67d0d1f` — npm commands and blocking CI jobs.
+- `b822fc3fc51f7a72e5535c7e5e48a7be1d733065` — initial handoff, setup instructions and Inara scope.
 
 Documentation commits follow those implementation commits; use the PR's commit
 list for their hashes (this document cannot contain its own commit hash).
@@ -63,7 +65,17 @@ Local host: Windows, Node v24.22.1. npm was missing from PATH, so a disposable
 untracked npm 11.6.2 wrapper under ignored temp/tools supplied the normal npm
 commands. No global tool installation or dependency upgrades were made.
 Go is unavailable locally; Windows compile/WebView2 smoke verification is delegated
-to the existing CI build-app job. CI results are recorded below when available.
+to the existing CI build-app job, whose successful result is recorded below.
+
+CI evidence: [run 43169663025](https://github.com/Jakoczig/daedalus/actions/runs/43169663025)
+at `b822fc3`: Linux and Windows regression tests (15 passed, 0 failed/skipped on
+each OS) and changed-file lint passed; client build
+passed. Windows `cd src/app && go build -ldflags="-H windowsgui -s -w" -o
+../../build/test-app.exe` passed, followed by `.\build\test-app.exe --smoke-test`
+with `OK: WebView2 initialized successfully`. All five jobs completed successfully.
+This final documentation-only update leaves that tested application/CI code unchanged.
+The legacy lint job's success
+is advisory and does not mean global lint is clean.
 
 Tests cover real HTTP/HTTPS/WS connections, cross-origin and DNS-rebinding-style
 bootstrap rejection, anonymous denial, forged roles/inherited methods, pairing
