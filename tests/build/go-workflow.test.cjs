@@ -21,4 +21,7 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.ok(job.steps.some(step => step.name === 'Linux native libraries' && step.run.includes('libgtk-4-dev') && step.run.includes('libwebkitgtk-6.0-dev')))
   const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
   assert.ok(legacy.on.pull_request.branches.includes('security/phase-1a-foundations'))
+  assert.ok(legacy.on.pull_request.branches.includes('go/g1a-desktop-foundation'), 'legacy CI must check the G1B stacked target')
+  assert.ok(workflow.on.pull_request.branches.includes('go/g1a-desktop-foundation'), 'desktop CI must check the G1B stacked target')
+  assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
 })

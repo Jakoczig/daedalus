@@ -2,9 +2,9 @@ name: Go desktop foundation
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation]
   push:
-    branches: [go/g1a-desktop-foundation]
+    branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays]
 
 permissions:
   contents: read
@@ -47,12 +47,12 @@ jobs:
       - name: Verify pinned Go modules
         run: cd go && go mod download && go mod verify && git diff --exit-code -- go.mod go.sum
       - name: Go tests
-        run: cd go && go test ./...
+        run: cd go && go test -count=1 -timeout=4m ./...
       - name: Go vet
         run: cd go && go vet ./...
       - name: Race detector
         if: runner.os == 'Linux'
-        run: cd go && go test -race ./...
+        run: cd go && go test -race -count=1 -timeout=4m ./...
       - name: Build native desktop
         run: cd go && go build -o bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/daedalus
       - name: Allow this preview to create WebKit sandbox namespaces
