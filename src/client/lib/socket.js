@@ -106,7 +106,12 @@ async function connect (socketState, setSocketState) {
     if (generation !== connectionGeneration) return
     if (!response.ok) {
       const needsPairing = response.status === 401 || response.status === 403
-      setSocketState(previous => ({ ...previous, role: needsPairing ? null : previous.role, needsPairing, connected: false, ready: false }))
+      let pairingCodeLength = 32 // Preserve the legacy backend's pairing format.
+      if (needsPairing) {
+        try { if ((await response.json()).pairingCodeLength === 6) pairingCodeLength = 6 } catch {}
+      }
+      if (generation !== connectionGeneration) return
+      setSocketState(previous => ({ ...previous, role: needsPairing ? null : previous.role, pairingCodeLength, needsPairing, connected: false, ready: false }))
       if (!needsPairing) scheduleReconnect(socketState, setSocketState)
       return
     }
@@ -400,7 +405,7 @@ function SocketProvider ({ children }) {
 
   return (
     <SocketContext.Provider value={socketState}>
-      {socketState.role ? socketState.prototype ? <PrototypeShell /> : children : socketState.needsPairing ? <PairDisplay /> : <p>Connecting to DAEDALUS…</p>}
+      {socketState.role ? socketState.prototype ? <PrototypeShell /> : children : socketState.needsPairing ? <PairDisplay shortCode={socketState.pairingCodeLength === 6} /> : <p>Connecting to DAEDALUS…</p>}
     </SocketContext.Provider>
   )
 }
@@ -445,7 +450,7 @@ function PrototypeShell () {
   )
 }
 
-function PairDisplay () {
+function PairDisplay ({ shortCode }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState('Browser display')
   const [error, setError] = useState('')
@@ -467,7 +472,8 @@ function PairDisplay () {
       <h1>Pair this display</h1>
       <p>Open DAEDALUS settings on the host desktop to create a pairing code. Remote displays require the configured HTTPS address and a trusted certificate.</p>
       <form onSubmit={pair}>
-        <label>Pairing code <input type='password' autoComplete='off' value={code} onChange={e => setCode(e.target.value)} /></label>
+        <label>Pairing code <input type={shortCode ? 'text' : 'password'} required minLength={shortCode ? 6 : undefined} maxLength={shortCode ? 6 : undefined} pattern={shortCode ? '[0-9A-HJKMNP-TV-Z]{6}' : undefined} inputMode='text' autoCapitalize={shortCode ? 'characters' : 'none'} autoCorrect='off' spellCheck={false} autoComplete='off' placeholder={shortCode ? '7K4M9P' : undefined} style={shortCode ? { fontSize: '2rem', letterSpacing: '.2em', width: '9em', maxWidth: '100%', boxSizing: 'border-box' } : undefined} value={code} onChange={e => setCode(shortCode ? e.target.value.toUpperCase() : e.target.value)} /></label>
+        {shortCode && <p>Enter the six-character code from the owner. It expires after 5 minutes and can be used once. Letters I, L, O and U are not used.</p>}
         <label>Device name <input maxLength={80} value={name} onChange={e => setName(e.target.value)} /></label>
         <button type='submit'>Pair display</button>
       </form>

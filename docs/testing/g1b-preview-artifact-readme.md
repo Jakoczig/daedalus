@@ -76,8 +76,13 @@ profile. Remote access is disabled on a fresh profile. Do not upload that profil
 5. Open the exact **HTTPS** address/port shown by the owner. A secondary laptop
    needs only its browser. Never bypass a certificate warning or disable TLS
    verification; stop and fix trust/address/time if the certificate is rejected.
-6. Create a short-lived pairing code on the host, enter it and a device name in
-   the secondary browser, then click **Refresh devices** on the owner.
+6. Create a pairing code on the host. Enter its six characters (e.g. `7K4M9P`)
+   and a device name in the secondary browser, then **Refresh devices** on the owner.
+   The visible field uppercases letters automatically; lowercase also works. I, L,
+   O and U are excluded; use exactly six characters, no spaces or dashes. The code
+   works once and expires after five minutes, at the deadline shown by the owner.
+   A new code replaces the previous one but never resets the shared ten-attempt/
+   minute budget. After too many failed attempts, wait a minute.
 7. Confirm read-only/offline status. Test browser reload, network loss/recovery,
    two devices, rename and revoke an open viewer. Viewers cannot run host actions.
 

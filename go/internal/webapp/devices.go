@@ -3,11 +3,14 @@ package webapp
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"math/big"
 	"net"
+	"strings"
 	"time"
 	"unicode"
 
@@ -32,6 +35,21 @@ type remoteState struct {
 type pairingCode struct {
 	Hash    string
 	Expires time.Time
+}
+
+const pairingAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+func newPairingCode() (string, error) {
+	var code [6]byte
+	for i := range code {
+		// rand.Int uses rejection sampling, with no modulo bias.
+		n, err := rand.Int(rand.Reader, big.NewInt(32))
+		if err != nil {
+			return "", err
+		}
+		code[i] = pairingAlphabet[n.Int64()]
+	}
+	return string(code[:]), nil
 }
 
 func randomToken(size int) (string, error) {
@@ -145,7 +163,8 @@ func (m *remoteManager) pairLocked(code, name string) (string, error) {
 	if m.attempts > 10 {
 		return "", errors.New("pairing temporarily limited")
 	}
-	if !m.state.Enabled || m.fault || m.pairing == nil || !now.Before(m.pairing.Expires) || len(code) != 32 || tokenHash(code) != m.pairing.Hash || !validName(name) {
+	code = strings.ToUpper(code)
+	if !m.state.Enabled || m.fault || m.pairing == nil || !now.Before(m.pairing.Expires) || len(code) != 6 || strings.Trim(code, pairingAlphabet) != "" || subtle.ConstantTimeCompare([]byte(tokenHash(code)), []byte(m.pairing.Hash)) != 1 || !validName(name) {
 		return "", errors.New("invalid or expired pairing code")
 	}
 	m.pruneLocked()

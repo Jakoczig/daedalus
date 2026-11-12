@@ -7,13 +7,13 @@ const React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 const { transformSync } = require('next/dist/compiled/babel/core')
 
-function load (snapshot, fetch) {
+function load (snapshot, fetch, pairing = null) {
   const filename = path.resolve(__dirname, '../../src/client/components/remote-displays.js')
   const code = transformSync(fs.readFileSync(filename, 'utf8'), { babelrc: false, configFile: false, presets: [[require('next/dist/compiled/babel/preset-react'), { runtime: 'automatic' }]], plugins: [require('next/dist/compiled/babel/plugin-transform-modules-commonjs')] }).code
   const mod = new Module(filename, module)
   mod.filename = filename; mod.paths = module.paths
   let call = 0
-  mod.require = name => name === 'react' ? { ...React, useState: initial => [call++ === 0 ? snapshot : initial, () => {}], useEffect: () => {} } : require(name)
+  mod.require = name => name === 'react' ? { ...React, useState: initial => { const index = call++; return [index === 0 ? snapshot : index === 2 ? pairing : initial, () => {}] }, useEffect: () => {} } : require(name)
   mod._compile(`module.exports = function (window) { const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
   return mod.exports({ fetch })
 }
@@ -51,4 +51,13 @@ test('recovery warning remains visible without opening settings and prevents uns
   assert.match(html, /role="alert"/)
   assert.ok(html.indexOf('back up and repair') < html.indexOf('<details'), 'recovery warning hidden in collapsed settings')
   assert.doesNotMatch(html, /Enable HTTPS remote displays/)
+})
+
+test('owner shows a prominent six-character code with a clear five-minute deadline', () => {
+  const mod = load({ enabled: true, devices: [], ca: '', fingerprint: '', url: 'https://192.168.1.10:3443' }, null, { code: '7K4M9P', expires: '2026-11-12T19:05:00Z' })
+  const html = renderToStaticMarkup(React.createElement(mod.default))
+  assert.match(html, /<output[^>]*aria-label="One-time pairing code"[^>]*>7K4M9P<\/output>/)
+  assert.match(html, /font-size:2rem/)
+  assert.match(html, /5 minutes/)
+  assert.match(html, /2026-11-12T19:05:00Z/)
 })

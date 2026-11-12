@@ -262,7 +262,11 @@ func (s *Server) ownerRemote(w http.ResponseWriter, r *http.Request) {
 			err = errors.New("enable remote displays first")
 			break
 		}
-		code, e := randomToken(16)
+		code, e := newPairingCode()
+		// Even a random collision must not make the replaced code valid again.
+		for e == nil && m.pairing != nil && tokenHash(code) == m.pairing.Hash {
+			code, e = newPairingCode()
+		}
 		err = e
 		if err == nil {
 			expires := m.now().Add(5 * time.Minute)
@@ -380,7 +384,10 @@ func (m *remoteManager) serve(epoch uint64, w http.ResponseWriter, r *http.Reque
 			}
 			if _, ok := m.findLocked(token); !ok {
 				m.mu.Unlock()
-				http.Error(w, "Pair this display", 401)
+				// Public UI hint only; it confers no session or authority.
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				writeJSON(w, map[string]any{"pairingCodeLength": 6})
 				return
 			}
 		}

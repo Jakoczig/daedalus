@@ -7,7 +7,7 @@ const React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 const { transformSync } = require('next/dist/compiled/babel/core')
 
-function loadClientModule (relativePath, dependencies, browser = {}) {
+function loadClientModule (relativePath, dependencies, browser = {}, testExports = '') {
   const filename = path.resolve(__dirname, '../../src/client', relativePath)
   const code = transformSync(fs.readFileSync(filename, 'utf8'), {
     babelrc: false,
@@ -19,7 +19,7 @@ function loadClientModule (relativePath, dependencies, browser = {}) {
   mod.filename = filename
   mod.paths = module.paths
   mod.require = dependencies
-  mod._compile(`module.exports = function (window, WebSocket, setTimeout, clearTimeout, CustomEvent) { const module = { exports: {} }; const exports = module.exports; ${code}\nreturn module.exports }`, filename)
+  mod._compile(`module.exports = function (window, WebSocket, setTimeout, clearTimeout, CustomEvent) { const module = { exports: {} }; const exports = module.exports; ${code}\n${testExports}\nreturn module.exports }`, filename)
   return mod.exports(browser.window, browser.WebSocket, browser.setTimeout, browser.clearTimeout, browser.CustomEvent)
 }
 
@@ -89,6 +89,68 @@ function harness (initialState, options = {}) {
 function render (prototype, child, connection = { connected: true, ready: true }) {
   return harness({ role: 'owner', prototype, ...connection }).render(child)
 }
+
+test('viewer manual pairing accepts six visible uppercase characters and submits without owner authority', async () => {
+  const values = []
+  let cursor = 0
+  let submitted
+  let reloaded = false
+  const browser = { window: { fetch: async (url, options) => { submitted = { url, options }; return { ok: true } }, location: { reload: () => { reloaded = true } } } }
+  const mod = loadClientModule('lib/socket.js', name => {
+    if (name === 'react') return { ...React, useState: initial => { const index = cursor++; values[index] ??= initial; return [values[index], value => { values[index] = value }] } }
+    if (name === 'next/router') return { __esModule: true, default: {} }
+    if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
+    if (name.startsWith('components/') || name === 'lib/notification') return () => null
+    return require(name)
+  }, browser, 'module.exports.PairDisplay = PairDisplay')
+  const draw = (shortCode = true) => { cursor = 0; return mod.PairDisplay({ shortCode }) }
+  let tree = draw()
+  const children = React.Children.toArray(tree.props.children)
+  let form = children.find(child => child.type === 'form')
+  let inputs = React.Children.toArray(form.props.children).filter(child => child.type === 'label').map(label => React.Children.toArray(label.props.children).find(child => child.type === 'input'))
+  assert.equal(inputs[0].props.type, 'text')
+  assert.equal(inputs[0].props.maxLength, 6)
+  assert.equal(inputs[0].props.minLength, 6)
+  assert.equal(inputs[0].props.autoCapitalize, 'characters')
+  assert.equal(inputs[0].props.spellCheck, false)
+  assert.equal(inputs[0].props.inputMode, 'text')
+  assert.equal(inputs[0].props.required, true)
+  const pattern = new RegExp(`^(?:${inputs[0].props.pattern})$`)
+  assert.ok(pattern.test('7K4M9P'))
+  assert.ok(!pattern.test('7I4M9P') && !pattern.test('7K4M9PP'))
+  inputs[0].props.onChange({ target: { value: '7k4m9p' } })
+  tree = draw()
+  form = React.Children.toArray(tree.props.children).find(child => child.type === 'form')
+  inputs = React.Children.toArray(form.props.children).filter(child => child.type === 'label').map(label => React.Children.toArray(label.props.children).find(child => child.type === 'input'))
+  assert.equal(inputs[0].props.value, '7K4M9P')
+  await form.props.onSubmit({ preventDefault () {} })
+  assert.equal(submitted.url, '/auth/pair')
+  assert.equal(submitted.options.credentials, 'same-origin')
+  assert.deepEqual(JSON.parse(submitted.options.body), { code: '7K4M9P', name: 'Browser display' })
+  assert.ok(reloaded)
+  values[0] = ''
+  tree = draw(false)
+  form = React.Children.toArray(tree.props.children).find(child => child.type === 'form')
+  inputs = React.Children.toArray(form.props.children).filter(child => child.type === 'label').map(label => React.Children.toArray(label.props.children).find(child => child.type === 'input'))
+  assert.notEqual(inputs[0].props.maxLength, 6, 'legacy long pairing code was truncated')
+  inputs[0].props.onChange({ target: { value: 'abcdef0123456789abcdef0123456789' } })
+  tree = draw(false)
+  form = React.Children.toArray(tree.props.children).find(child => child.type === 'form')
+  await form.props.onSubmit({ preventDefault () {} })
+  assert.equal(JSON.parse(submitted.options.body).code, 'abcdef0123456789abcdef0123456789')
+})
+
+test('unauthenticated G1B hint selects short entry without granting a role; legacy keeps long entry', async () => {
+  for (const hint of [6, undefined]) {
+    const client = harness(undefined, { fetch: async () => ({ ok: false, status: 401, json: async () => ({ pairingCodeLength: hint }) }) })
+    client.render()
+    await client.start()
+    assert.equal(client.state.pairingCodeLength, hint === 6 ? 6 : 32)
+    assert.equal(client.state.role, null)
+    assert.equal(client.state.needsPairing, true)
+    assert.equal(client.sockets.length, 0)
+  }
+})
 
 test('G1A uses the React navigation shell without mounting an unported page', () => {
   function Unported () { throw new Error('Unported game page mounted') }

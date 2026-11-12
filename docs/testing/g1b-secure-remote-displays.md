@@ -67,10 +67,16 @@ This never reads/migrates the old app's preferences or credentials.
    If you cannot install the CA under device policy, remote mode is unavailable.
 7. Open the **exact HTTPS URL shown by the owner**, including port. Once trusted,
    the browser should show the pairing form without a certificate warning.
-8. Click **Create pairing code** on the owner. Enter its one-use code and a device
-   name in the trusted remote form. Codes expire after five minutes; making a new
-   one invalidates the previous code. Pairing has a shared ten-attempt/minute
-   budget, so wait one minute after excessive attempts.
+8. Click **Create pairing code** on the owner. Enter the six-character code
+   (for example `7K4M9P`) and a device name in the trusted remote form. The large
+   owner display shows its five-minute deadline. Entry is visible and automatically
+   uppercases letters; lowercase is also accepted by the server. The alphabet is
+   `0123456789ABCDEFGHJKMNPQRSTVWXYZ`: I, L, O and U are never used; do not
+   substitute them for digits. Use exactly six characters, with no spaces/dashes.
+   Codes expire after five minutes, work once, and a new code invalidates the old
+   one. Pairing has a shared ten-attempt/minute budget across devices and invalid
+   entries; creating another code does not reset it. Wait a minute after excessive
+   attempts. Keep the code private and enter it only at the trusted HTTPS URL.
 9. Click **Refresh devices** on the owner to list the newly paired device. Confirm
    the remote shell says **G1B offline** and **read-only**. No gameplay
    parity is claimed. Owner controls and secrets must not appear remotely.

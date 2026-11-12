@@ -59,7 +59,7 @@ export default function RemoteDisplays () {
             <button disabled={pending} onClick={() => act('pair')}>Create pairing code</button>
             <button disabled={pending} onClick={() => act('status')}>Refresh devices</button>
             <button disabled={pending} onClick={() => act('disable')}>Disable remote displays and revoke all devices</button>
-            {pairing && <p>One-time pairing code: <output>{pairing.code}</output> — expires {pairing.expires}. Enter it only at the trusted HTTPS address, then refresh devices here.</p>}
+            {pairing && <p>One-time pairing code: <output aria-label='One-time pairing code' style={{ display: 'block', fontFamily: 'monospace', fontSize: '2rem', letterSpacing: '.25em', userSelect: 'all' }}>{pairing.code}</output>Valid for 5 minutes, until <time dateTime={pairing.expires}>{pairing.expires}</time>. Creating a new code replaces this one. Enter it only at the trusted HTTPS address, then refresh devices here.</p>}
             <p>Device sessions last up to 12 hours and recover after network interruptions or a clean host restart. After expiry, revocation or an unclean host exit, pair again.</p>
             <ul>{state.devices.map(device => <Device key={device.id} device={device} act={act} pending={pending} />)}</ul>
           </>
