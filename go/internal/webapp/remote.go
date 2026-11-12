@@ -72,6 +72,12 @@ func (m *remoteManager) enableLocked(address string, port int) error {
 	if m.http != nil {
 		return errors.New("disable remote displays before changing the address")
 	}
+	if m.state.Address != "" || len(m.bundle.CAPEM) > 0 {
+		if err := remotetls.ValidateStored(m.dir, m.now()); err != nil {
+			m.failLocked()
+			return errors.New("trusted display identity requires offline repair")
+		}
+	}
 	bundle, err := remotetls.Load(m.dir, net.ParseIP(address), m.now())
 	if err != nil {
 		return errors.New("cannot load private display certificate")
@@ -102,6 +108,10 @@ func (m *remoteManager) enableLocked(address string, port int) error {
 			return nil, errors.New("remote service unavailable")
 		}
 		if m.now().Add(7 * 24 * time.Hour).After(m.bundle.Expires) {
+			if err := remotetls.ValidateStored(m.dir, m.now()); err != nil {
+				m.failLocked()
+				return nil, errors.New("trusted display identity requires offline repair")
+			}
 			renewed, err := remotetls.Load(m.dir, net.ParseIP(address), m.now())
 			if err != nil {
 				return nil, errors.New("display certificate renewal failed")

@@ -158,3 +158,39 @@ func TestUnusableProfileRootStillFailsStartup(t *testing.T) {
 		t.Fatal("invalid profile root changed")
 	}
 }
+
+func TestRunningProfileNeverRegeneratesMissingTrustedIdentity(t *testing.T) {
+	for _, operation := range []string{"re-enable", "renew"} {
+		t.Run(operation, func(t *testing.T) {
+			server, owner, _, _, _ := remoteFixture(t)
+			if operation == "re-enable" {
+				ownerAction(t, server, owner, map[string]any{"action": "disable"})
+			}
+			for _, name := range []string{"tls.json", "tls.initialized"} {
+				if err := os.Remove(filepath.Join(server.remote.dir, name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if operation == "re-enable" {
+				status, _, _ := remotePost(t, owner, server.URL()+"/owner/remote", server.URL(), map[string]any{"action": "enable", "address": "127.0.0.1", "port": 0})
+				if status == 200 {
+					t.Fatal("lost trusted CA silently regenerated during enable")
+				}
+			} else {
+				server.remote.mu.Lock()
+				future := time.Now().Add(85 * 24 * time.Hour)
+				server.remote.now = func() time.Time { return future }
+				config := server.remote.http.TLSConfig
+				server.remote.mu.Unlock()
+				if _, err := config.GetCertificate(nil); err == nil {
+					t.Fatal("lost trusted CA silently regenerated during renewal")
+				}
+			}
+			for _, name := range []string{"tls.json", "tls.initialized"} {
+				if _, err := os.Stat(filepath.Join(server.remote.dir, name)); !os.IsNotExist(err) {
+					t.Fatal("missing identity file was recreated", name)
+				}
+			}
+		})
+	}
+}
