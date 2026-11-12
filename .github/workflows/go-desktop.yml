@@ -1,0 +1,68 @@
+name: Go desktop foundation
+
+on:
+  pull_request:
+    branches: [main, security/phase-1a-foundations]
+  push:
+    branches: [go/g1a-desktop-foundation]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache-dependency-path: go/go.sum
+      - name: Linux native libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev xvfb dbus-x11
+      - run: npm ci --loglevel=error
+      - name: Security regression tests
+        run: npm test
+      - name: Security lint
+        run: npm run lint:security && npm run lint:go-assets
+      - name: Asset fixture tests
+        run: npm run test:go-assets
+      - name: Build embedded React assets
+        run: npm run build:go-assets
+      - name: Verify pinned Go modules
+        run: cd go && go mod download && go mod verify && git diff --exit-code -- go.mod go.sum
+      - name: Go tests
+        run: cd go && go test ./...
+      - name: Go vet
+        run: cd go && go vet ./...
+      - name: Race detector
+        if: runner.os == 'Linux'
+        run: cd go && go test -race ./...
+      - name: Build native desktop
+        run: cd go && go build -o bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/daedalus
+      - name: Executable offline smoke
+        run: go/bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} --smoke-test
+      - name: Native React smoke
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- go/bin/daedalus --desktop-smoke-test
+          else
+            go/bin/daedalus.exe --desktop-smoke-test
+          fi
