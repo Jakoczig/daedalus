@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -20,6 +21,33 @@ type DiscoveryResult struct {
 	Found      bool
 	Source     string
 	Candidates []string
+}
+
+var journalName = regexp.MustCompile(`^Journal\.[^.]+\.[0-9]+\.log$`)
+
+func hasSources(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	entries, err := f.ReadDir(4097)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false
+	}
+	if len(entries) > 4096 {
+		return false
+	}
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			continue
+		}
+		name := entry.Name()
+		if journalName.MatchString(name) || name == "Status.json" || name == "Cargo.json" || name == "Materials.json" || name == "NavRoute.json" {
+			return true
+		}
+	}
+	return false
 }
 
 func ValidateDir(path string) error {
@@ -57,7 +85,11 @@ func Discover(ctx context.Context, opts DiscoveryOptions) (DiscoveryResult, erro
 	}
 	try := func(path, source string) bool {
 		result.Candidates = append(result.Candidates, path)
-		if ValidateDir(path) == nil {
+		if result.Directory == "" {
+			result.Directory = path
+			result.Source = source
+		}
+		if ValidateDir(path) == nil && hasSources(path) {
 			result.Directory = path
 			result.Source = source
 			result.Found = true
@@ -72,7 +104,15 @@ func Discover(ctx context.Context, opts DiscoveryOptions) (DiscoveryResult, erro
 		return result, errors.New("too many Steam roots")
 	}
 	seen := map[string]bool{}
-	roots := append([]string(nil), opts.Roots...)
+	queued := map[string]bool{}
+	var roots []string
+	for _, root := range opts.Roots {
+		root = filepath.Clean(root)
+		if !queued[root] {
+			queued[root] = true
+			roots = append(roots, root)
+		}
+	}
 	for i := 0; i < len(roots); i++ {
 		if err := ctx.Err(); err != nil {
 			return result, err
@@ -88,11 +128,12 @@ func Discover(ctx context.Context, opts DiscoveryOptions) (DiscoveryResult, erro
 				return result, err
 			}
 			for _, p := range libraries {
-				if !seen[p] {
+				if !queued[p] {
 					if len(roots) >= 32 {
 						return result, errors.New("Steam library discovery limit exceeded")
 					}
 					roots = append(roots, p)
+					queued[p] = true
 				}
 			}
 		}

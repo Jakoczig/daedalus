@@ -2,6 +2,7 @@ package journal
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ func gameDir(root string) string {
 func TestDiscoverWindowsMovedSavedGames(t *testing.T) {
 	saved := filepath.Join(t.TempDir(), "Moved Saved Games")
 	want := makeDir(t, gameDir(saved))
+	os.WriteFile(filepath.Join(want, "Status.json"), []byte(`{}`), 0600)
 	got, err := Discover(context.Background(), DiscoveryOptions{SavedGames: saved})
 	if err != nil || !got.Found || got.Directory != want || got.Source != "saved_games" {
 		t.Fatalf("moved Saved Games not discovered: %+v %v", got, err)
@@ -51,6 +53,7 @@ func TestDiscoverLinuxSteamFlatpakExtraLibraryAndWineOverride(t *testing.T) {
 				}
 			}
 			want := makeDir(t, gameDir(filepath.Join(library, "steamapps", "compatdata", "359320", "pfx", "drive_c", "users", "different-player", "Saved Games")))
+			os.WriteFile(filepath.Join(want, "Status.json"), []byte(`{}`), 0600)
 			opts := DiscoveryOptions{Roots: []string{root}}
 			if kind == "wine override" {
 				want = makeDir(t, filepath.Join(base, "CustomWine", "journals"))
@@ -72,6 +75,7 @@ func TestDiscoverAbsentAndNewlyCreated(t *testing.T) {
 		t.Fatalf("missing optional source: %+v %v", got, err)
 	}
 	want := makeDir(t, gameDir(saved))
+	os.WriteFile(filepath.Join(want, "Status.json"), []byte(`{}`), 0600)
 	got, err = Discover(context.Background(), opts)
 	if err != nil || !got.Found || got.Directory != want {
 		t.Fatal("late creation not found")
@@ -125,5 +129,42 @@ func TestProtectedJournalOverride(t *testing.T) {
 	}
 	if got, _ := LoadOverride(profile); got != "" {
 		t.Fatal("override not cleared")
+	}
+}
+
+func TestDiscoverSkipsEmptyAutomaticCandidate(t *testing.T) {
+	root := t.TempDir()
+	saved := makeDir(t, filepath.Join(root, "MovedSaved"))
+	makeDir(t, gameDir(saved))
+	want := makeDir(t, gameDir(filepath.Join(root, "steamapps", "compatdata", "359320", "pfx", "drive_c", "users", "fixture", "Saved Games")))
+	os.WriteFile(filepath.Join(want, "Status.json"), []byte(`{}`), 0600)
+	got, err := Discover(context.Background(), DiscoveryOptions{SavedGames: saved, Roots: []string{root}})
+	if err != nil || got.Directory != want || !got.Found {
+		t.Fatalf("empty default masked real source: %+v %v", got, err)
+	}
+}
+
+func TestDiscoverDeduplicatesQueuedLibraries(t *testing.T) {
+	base := t.TempDir()
+	root := makeDir(t, filepath.Join(base, "Steam"))
+	var vdf strings.Builder
+	vdf.WriteString(`"libraryfolders" {`)
+	var want string
+	for i := range 16 {
+		library := filepath.Join(base, fmt.Sprintf("Library%d", i))
+		fmt.Fprintf(&vdf, ` "%d" { "path" "%s" }`, i, strings.ReplaceAll(library, `\`, `\\`))
+		if i == 15 {
+			want = makeDir(t, gameDir(filepath.Join(library, "steamapps", "compatdata", "359320", "pfx", "drive_c", "users", "fixture", "Saved Games")))
+			os.WriteFile(filepath.Join(want, "Status.json"), []byte(`{}`), 0600)
+		}
+	}
+	vdf.WriteString(`}`)
+	for _, folder := range []string{"steamapps", "config"} {
+		makeDir(t, filepath.Join(root, folder))
+		os.WriteFile(filepath.Join(root, folder, "libraryfolders.vdf"), []byte(vdf.String()), 0600)
+	}
+	got, err := Discover(context.Background(), DiscoveryOptions{Roots: []string{root, root}})
+	if err != nil || !got.Found || got.Directory != want {
+		t.Fatalf("duplicate queue masked valid library: %+v %v", got, err)
 	}
 }
