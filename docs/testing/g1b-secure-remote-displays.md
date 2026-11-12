@@ -4,6 +4,12 @@ This is an offline Go/Wails preview. It shares one Go service among the native
 desktop and paired browsers; it reads no journals and calls no game/provider APIs.
 The old application is separate and untouched. Remote access starts disabled.
 
+Experimental unsigned executables can be downloaded from successful desktop
+GitHub Actions runs on [PR #5](https://github.com/Jakoczig/daedalus/pull/5), without
+compiling locally. Each OS artifact includes SHA256SUMS and the
+[standalone Windows/Linux test instructions](g1b-preview-artifact-readme.md).
+These are expiring CI test artifacts, never a Release or installer.
+
 ## Build and start
 
 Use the [G1A prerequisites](g1a-windows-linux-smoke.md): Go 1.26.10, Node 24.22.1
@@ -119,6 +125,15 @@ No private CA is downloaded automatically from an untrusted remote endpoint.
 - Private CA lasts ten years; server leaf lasts 90 days and renews near expiry on
   startup/enable and during TLS handshakes. A failed renewal rejects admission.
   Corrupt/missing initialized CA state never silently changes the trust identity.
+  Damaged optional remote settings now quarantine the remote module while keeping
+  the local owner desktop/RPC and recovery warning available. No remote listener
+  starts, saved viewers are discarded in memory, and damaged files are not changed
+  on startup or shutdown. Remote mutations remain blocked until offline repair.
+  A second process holding the profile lock, an unsafe profile root or a profile
+  that cannot be securely locked still prevents a competing local owner.
+  Close the app and back up the dedicated Go profile first; restore a consistent
+  trusted backup and correct its permissions, or deliberately reset the entire Go
+  profile as below. Do not delete isolated TLS files to force regeneration.
   To reset deliberately: stop the app, revoke/remove the old CA from clients,
   back up/remove the dedicated Go profile yourself, restart and pair/import the
   new verified CA. This resets every device; never delete the legacy profile.

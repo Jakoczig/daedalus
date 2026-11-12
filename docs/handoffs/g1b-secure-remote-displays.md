@@ -1,5 +1,108 @@
 # G1B secure remote displays — ChatGPT/external review handoff
 
+## External review corrections and experimental downloads
+
+Review: https://github.com/Jakoczig/daedalus/pull/5#issuecomment-6831759803.
+The startup finding was independently reproduced before implementation: malformed
+or missing initialized remote settings aborted StartLocalWithStorage and prevented
+the native desktop from launching. Missing TLS files also exposed paths that could
+recreate a CA when both identity files were absent. The regressions failed first.
+
+Correction commits:
+
+- `966ac730be4ac6837be4b3eb9a767e163760b357` — quarantine optional remote corruption
+  after securing the exclusive profile lock; preserve local owner HTTP/WS, display
+  recovery instructions, and retain damaged files without startup/shutdown writes.
+- `b077c2d0da7d59111ea55d7521f002c10e36b1de` — gated Windows/Linux experimental
+  artifact ZIPs with executable, standalone prerequisite/setup README and hashes.
+- `185159494ea5b40599d58c84f14f5a6325dfb46d` — never regenerate a lost initialized
+  CA during running-profile re-enable or certificate renewal.
+- `1d373c6fccb8565e446f0dc8f30a8d0b06c87990` — isolate/retire the shutdown
+  fixture HTTP connections; retain the original three-second assertion.
+
+Recovery clears remote/device state in memory and blocks every remote mutation.
+Only authenticated local-owner status remains available for diagnosis. No HTTPS
+listener starts for invalid remote state. Initialized identity is validated without
+creating/renewing keys or overwriting configuration. Invalid permissions on optional
+files enter the same local-only mode; an unprotectable/unlockable profile root or
+an already locked profile remains fatal to prevent another competing owner.
+The actionable warning is outside collapsed settings. Repair/reset is manual,
+with a backup and explicit trust/device re-pairing; no automatic reset was added.
+
+Server regressions cover malformed remote.json, missing remote.json in an initialized
+profile, missing TLS key/certificate file, missing initialization marker, both TLS
+files missing, malformed TLS identity, unsafe file permissions, byte-for-byte file
+preservation, blocked old viewer tokens, no listener, working local assets/RPC,
+exclusive lock retention, unusable root, and running-profile trust loss. A React
+regression verifies the warning stays visible and unsafe enable controls are absent.
+An independent read-only review of recovery/packaging found no actionable defect
+and freshly passed its targeted Go and Node checks. The later running-profile
+guards were additionally verified by failing-then-passing tests.
+
+Local verification on the correction tree: **41 Node tests**, **6 build tests**,
+both security/build lints, **62-route / 278-asset React export**, six fresh Go package
+tests (webapp ~71 s including 65-second idle/reconnect), Go vet/module verification,
+Windows executable build, headless HTTP/WS smoke and actual WebView2 native React
+bootstrap/shutdown all **PASS**. An initial local export/Go overlap caused a Windows
+file-sharing failure; sequential re-export and fresh verification passed. No check
+was suppressed. Existing nonfatal WebView2 cleanup warning 1412 remains.
+
+A Linux race run on `1851594` failed the existing shutdown fixture deadline
+(`TestSingleLoopbackLifecycle`, no data race reported). Concurrent global-client
+requests could leave speculative idle sockets; Go gives unused StateNew sockets
+a five-second graceful-shutdown grace. The fixture now owns its HTTP transport
+and closes idle connections before cancellation, without changing runtime code
+or extending its assertion deadline. Thirty repeated targeted runs passed locally.
+The mandatory complete race suite is rerun on the corrected head below.
+
+Artifact packaging reads only two explicit inputs (compiled executable and authored
+README), creates a fresh directory and adds SHA256SUMS for those files. Tests prove
+adjacent private keys/profiles are excluded and hashes match; directories/symlinks
+are refused as inputs. Upload follows mandatory tests/build/native smoke using a
+pinned upload-artifact commit, with 14-day retention and missing-files-as-error.
+ZIPs are **EXPERIMENTAL, UNSIGNED, OFFLINE PREVIEW**, never a Release or installer.
+Each includes [simple Windows/Linux and secondary-laptop HTTPS instructions](../testing/g1b-preview-artifact-readme.md).
+Linux users restore the executable bit after extracting (`chmod +x daedalus`).
+
+Verified implementation head: `1d373c6fccb8565e446f0dc8f30a8d0b06c87990`.
+Documentation-only commits after this head do not change these executable bytes;
+PR checks are rerun on the final documentation head as well.
+
+| Verification | Result |
+| --- | --- |
+| [Desktop Windows/Linux run 43280351914](https://github.com/Jakoczig/daedalus/actions/runs/43280351914) | **PASS both OSes**: 41 JS tests, 6 build fixtures, both lints, 62 routes / 278 embedded assets, module verification, six Go packages, vet, native builds, executable HTTP/WS smoke and native React bootstrap/shutdown |
+| Linux normal / race webapp package | **PASS**: 65.239 s / 66.387 s, fresh full suites including long idle/reconnect |
+| Windows normal webapp package | **PASS**: 66.667 s; Windows ACL/lock/recovery regressions included |
+| [Legacy/security run 43280351917](https://github.com/Jakoczig/daedalus/actions/runs/43280351917) | **PASS all five jobs**: both OS security regressions, lint, React build, original Windows launcher build/smoke |
+| Local final fixture-head verification | **PASS**: fresh 41 + 6 Node tests, both lints, six Go packages (webapp 70.053 s), vet, Windows rebuild and both smoke modes |
+
+Download **EXPERIMENTAL, UNSIGNED, OFFLINE PREVIEW** executables from the verified
+implementation run (GitHub sign-in may be required; retention expires 2026-11-26):
+
+- [Windows x64 ZIP](https://github.com/Jakoczig/daedalus/actions/runs/43280351914/artifacts/13973730841)
+- [Linux x64 ZIP](https://github.com/Jakoczig/daedalus/actions/runs/43280351914/artifacts/13971424763)
+
+Both actual downloadable ZIPs were inspected: exactly the executable, README.md
+and SHA256SUMS; both inner hashes matched, with no profile/key/credential files.
+README bytes differ only by checkout line endings across OSes; each local hash
+matches its included manifest. Verified SHA-256 values:
+
+| OS | Executable SHA-256 | ZIP SHA-256 |
+| --- | --- | --- |
+| Windows | `5e05dbe42d1368813aeae3d96ccbb8f57d1bbf19e3b0db9274252b463cf35cbf` | `cda82558eee964c9e734ac469b3ba74763463b4d03dce37182723d24803252b2` |
+| Linux | `57ed0266cf42cc9943b085ab56b2a31309efb16ca1fc67282389cb78346ced7a` | `58b045ccca8079eb2bf90eaddf0f8500a6208bee3a50aecd6d4369c027ec4ccd` |
+
+No confirmed finding is disputed. Review suggestions about the 12-hour session
+lifetime and trust-installation burden remain documented usability/security
+tradeoffs; this correction does not change either protocol decision.
+
+Physical trust import, firewall permissions, second-laptop/mobile browser behavior,
+sleep/roaming, Wayland/AppArmor packaging, multi-window and power-loss acceptance
+remain manual. The original application/security boundary is preserved; no release,
+merge, deployment, provider traffic or G2 work is included.
+
+## Original G1B implementation record
+
 Draft PR: https://github.com/Jakoczig/daedalus/pull/5.
 Branch: `go/g1b-secure-remote-displays`.
 Stacked base: `go/g1a-desktop-foundation` at accepted
