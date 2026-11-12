@@ -60,6 +60,15 @@ falling back to plaintext remote access.
    Settings/authentication, host media controls/downloads, debug injection and
    arbitrary sync relay must be denied to paired displays. Theme remains local.
    Remote control of those host functions is intentionally outside this role.
+   Also check the restored read views: list/select keybinding presets (including
+   spaces/version suffixes), observe music/artwork with PC transport disabled,
+   read GalNet with forced refresh disabled, and browse YouTube/search channels
+   (including Unicode handles). Play an already cached video locally on the
+   tablet; selecting an uncached one must explain that downloading requires the
+   PC, without issuing a download RPC or leaving a permanent progress screen.
+   Confirm the owner still controls playback and initiates downloads normally.
+   Test configured WAV filenames before pairing (403), after pairing (200 with
+   private/no-store cache headers) and after revocation (403).
 4. Reuse the code and try an expired code: both must fail. A client-supplied
    `role: owner` must not grant privileges. Plain HTTP pairing must fail.
 5. Revoke all displays on the PC. Existing remote sockets must lose access;

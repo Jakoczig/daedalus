@@ -1,5 +1,87 @@
 # Phase 1A: security and regression tests
 
+## External-review corrections (2026-11-12)
+
+Review: [comment 6817010247](https://github.com/Jakoczig/daedalus/pull/2#issuecomment-6817010247),
+independently checked against `756600b`. Implementation commit:
+`b65553679fca4a47fa8e3b1cee35358aa2e5b667` — safe paired-display queries,
+authenticated voice assets, deterministic commander settings, regression tests.
+This section supersedes the initial verification counts below.
+
+- **Finding 1 confirmed:** viewer authorization blocked existing keybinding,
+  music and video read queries. Restored explicit read permissions; native owner
+  permissions are unchanged. Music is observation only; viewer `force` is ignored
+  server-side. Playback controls, downloads/cancellation, forced GalNet refresh,
+  credential mutation, authentication, debug injection and arbitrary relay stay
+  owner-only. Their tablet controls are disabled or give an actionable message.
+  GalNet reading uses its ordinary cached endpoint. Video offers cached playback
+  and YouTube browsing, never initiates a host download for a viewer.
+- Enabling reads required validating their inputs: keybinding presets cannot
+  escape the bindings directory; video metadata accepts canonical YouTube targets
+  only (including short links, HTTP-to-HTTPS normalization and Unicode handles).
+  Queries launch the fixed bundled metadata executable with configuration
+  ignored, simulation/no-cache mode, normal TLS verification, a 20-second timeout,
+  two-process concurrency limit and 8 MiB output limit. Owner download behavior
+  remains separate. The existing music observer may initialize its fixed helper
+  and scratch artwork cache; this is service housekeeping, not permission to
+  execute caller commands or control host playback.
+- **Finding 2 confirmed:** unauthenticated `/voicelines/` requests could retrieve
+  configured WAV files over TLS. The full prefix now requires a valid session,
+  including encoded filename/suffix forms. Authorized owner/viewer playback is
+  retained. WAV responses use `private, no-store`; revoked sessions get 403.
+- **Finding 3 qualified:** saves do persist the name, but their sanitized response
+  omits it. The existing preferences broadcast can reload integration status, so
+  permanent staleness was not established. The client now explicitly awaits fresh
+  owner-only integration status after saving and updates both states. Save/reopen
+  regression coverage verifies the new name while ordinary preference responses
+  still omit commander fields, API keys and OAuth tokens.
+
+Additional files: `src/service/lib/metadata-process.js`, video manager/handlers,
+keybind handler, media page JSX, `src/client/lib/{integration-settings,video-playback}.js`,
+five new test files (`display-inputs`, `display-render`, `integration-settings`,
+`metadata-process`, `video-playback`) and existing authorization/TLS/startup tests.
+The security lint command now includes every newly touched JavaScript file.
+No dependency, lockfile, provider payload or Inara delivery changes were made.
+
+Verification on the correction tree:
+
+| Command | Result |
+| --- | --- |
+| `npm test` (`npm run test:unit`) | 27 passed, 0 failed/skipped; external network blocked. |
+| `npm run lint:security` | Passed, including restored display pages and new helpers. |
+| `npm run build:client` | Passed, 62 pages exported; existing Browserslist warning only. |
+| `git diff --check` | Passed. |
+
+Tests exercise real owner/viewer WebSocket dispatch, HTTPS anonymous/paired/revoked
+WAV requests, actual child-service WAV delivery/cache headers, preset confinement,
+safe metadata targets/resource limits, cached viewer playback, owner downloads,
+commander save/reopen, and actual media-page JSX rendered with synthetic snapshots
+and stubbed app chrome/transport. They do not execute the real yt-dlp binary or
+Windows media helpers or replace physical tablet/Windows interaction checks.
+
+A fresh boundary investigation and a separate candidate review were performed.
+The latter found an ASCII-only channel-handle regression; Unicode and encoded
+Unicode fixtures failed first, then passed after the constrained path parser fix.
+No concrete surviving authorization/audio bypass was reported. The only disputed
+part of the external report is persistent commander-name staleness, as described
+above; its deterministic-refresh correction is included regardless.
+
+CI evidence: [run 43193199177](https://github.com/Jakoczig/daedalus/actions/runs/43193199177)
+at `b655536`: all five jobs passed. Linux and Windows each passed 27 tests with
+zero failures/skips and the expanded security lint gate. Client build passed.
+Windows Go compilation and `test-app.exe --smoke-test` passed, reporting
+`OK: WebView2 initialized successfully`. The legacy lint job remains advisory;
+its green status does not certify the global legacy lint backlog. This subsequent
+handoff/manual-check update changes documentation only.
+Remaining manual checks: native multi-window UX, physical tablet certificate and
+pairing/playback flow, real Elite sessions, Windows media helpers, installed
+yt-dlp/YouTube compatibility and authenticated provider integrations. Existing
+OS-vault/dependency/updater/release-asset/licensing limitations below remain.
+PR #2 stays draft; main, upstream and PR #1 are unchanged. No merge, release,
+deployment, real game-data upload or Phase 1B work was performed.
+
+## Initial Phase 1A record
+
 **Branch:** `security/phase-1a-foundations`
 **Draft PR:** https://github.com/Jakoczig/daedalus/pull/2
 **Base:** `06a69635623c5bfacff51785a33fbb5f09948c9d` (fork main)
