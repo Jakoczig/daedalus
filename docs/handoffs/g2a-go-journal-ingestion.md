@@ -21,6 +21,7 @@ Approved architecture/spec/seven-task plan were read from documentation branch
 | `6346fa922fc608d944b7967485655491878fd620` | One shared per-commander service, narrow authenticated RPC/events, protected owner selection, G2A runtime |
 | `a7d3d7de0ed613ca248143ae5e4600efdd1ddcb3` | Minimal React journal card, real connection/source states, owner-only setup and async recovery guards |
 | `20fddfa87ae0fd6a4557ca7aa2558c38e2c78d36` | Cross-platform CI gates, four smoke modes, replay benchmark, synthetic fixture helper and experimental artifacts/runbook |
+| `8feb0ee7f8d987676b4422dea037bcabb2e155bd` | Independent whole-branch review notes; clean source used for the local Windows preview |
 
 CI/smoke/handoff commits and final checked head are recorded in the PR description
 after publication. Publishing uses GitHub connector trees/commits because local
@@ -118,10 +119,47 @@ No idle CPU/RSS, end-to-end latency or legacy-versus-Go savings claim is made.
 
 ## Windows/Linux CI and experimental artifacts
 
-Verification is in progress. This section will be replaced with actual current-
-head run/job links, benchmark outputs, downloadable artifacts and SHA-256 values
-after both platforms and independent final review pass. A compile alone is not
-claimed as native Linux gameplay support.
+**BLOCKED — GitHub Actions is disabled repository-wide.** On 2026-11-13 the
+[repository Actions page](https://github.com/Jakoczig/daedalus/actions) displayed
+"GitHub Actions is currently disabled for this repository" and directed the owner
+to GitHub Support. The public API and connector returned zero run/check records
+for the G2A heads, although both workflow definitions are active and the stacked
+PR is mergeable. Reopening only draft PR #6 and a contents-API documentation push
+did not create runs. No repo security/settings bypass or Support communication
+was attempted. The owner has been asked to resolve this external restriction.
+
+Consequently **no G2A Windows/Linux CI, Linux race/native result, CI benchmark or
+CI artifact URL exists yet**. The earlier G1B checks are baseline evidence only,
+not G2A validation. Required follow-up once Actions is restored:
+
+1. Trigger/reopen/synchronize PR #6 to run the
+   [desktop workflow](https://github.com/Jakoczig/daedalus/actions/workflows/go-desktop.yml)
+   and [legacy/security workflow](https://github.com/Jakoczig/daedalus/actions/workflows/ci.yml).
+2. Require Windows + Ubuntu Go/JS/security/build/native gates, Linux full race,
+   synthetic executable/native journal smoke, and replay benchmark to pass. Fix
+   any failure with a reproducing regression; do not treat workflow wiring as a pass.
+3. Inspect both successful-run artifact ZIPs and their SHA256SUMS, record immutable
+   run/artifact links and measured OS benchmark values here, then request review.
+
+Local fallback: the actual clean `8feb0ee` Windows executable was rebuilt and all
+four smoke modes passed again. A local experimental ZIP was produced under the
+ignored workspace-relative path
+`temp/g2a-windows-x64-experimental-unsigned-local-journal-no-uploads.zip`.
+It is delivered as a local file in the chat, not a GitHub Release or CI artifact.
+Its README explicitly states CI is blocked. The ZIP was opened and independently
+checked: exactly executable, README and SHA256SUMS, both internal hashes match.
+
+| Local Windows file | SHA-256 |
+| --- | --- |
+| daedalus.exe | `fbf9a51a0eb8a8d3226193740a09a95b98534e7ee31e7559eddf3981901897c5` |
+| README.md | `2418636af00f1ea81655d3184b958cfedbf38f235bfe1c3944c408695e17e884` |
+| ZIP archive | `b6cb0531fbb36976fbe6fc5b5ff4eadcb20fcf2120fe57bc248601f15b23d32f` |
+
+There is no installed local WSL distribution or Docker runtime; no substitute
+Linux result or binary is claimed, and no OS distribution was installed. Local
+Windows race execution still lacks a cgo compiler. G2A implementation is reviewable,
+but its required cross-platform verification and CI artifact publication are
+**unfinished pending the external Actions restriction**.
 
 Artifacts are **experimental, unsigned, local journal preview (no provider uploads)**,
 not Releases/installers. Packaging reads only the executable and authored runbook,
