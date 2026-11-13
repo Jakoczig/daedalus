@@ -216,3 +216,16 @@ func TestRouteReplayEvidenceAndSessionReset(t *testing.T) {
 		t.Fatal("same commander stale session reused", v)
 	}
 }
+
+func TestRouteRejectsNullCoordinatesAndCombinedStarClass(t *testing.T) {
+	for i, raw := range []string{strings.Replace(routeFixture, "[3,4,0]", "[null,4,0]", 1), strings.Replace(routeFixture, `"StarClass":"G"`, `"StarClass":"O|B"`, 1)} {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			m := verified(t)
+			m.ApplySidecar(file(raw))
+			v := m.View("A")
+			if len(v.Hops) != 0 || v.DestinationSystem != "" || v.RouteState != "stale" {
+				t.Fatalf("malformed rewrite fabricated valid route: %+v", v)
+			}
+		})
+	}
+}

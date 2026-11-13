@@ -318,7 +318,12 @@ func exactID(n json.Number) (string, error) {
 	return strconv.FormatUint(x, 10), nil
 }
 func starClass(s string) bool {
-	return strings.Contains("|O|B|A|F|G|K|M|L|T|Y|TTS|AeBe|W|WN|WNC|WC|WO|CS|C|CN|CJ|CH|CHd|MS|S|D|DA|DAB|DAO|DAZ|DAV|DB|DBZ|DBV|DO|DOV|DQ|DC|DCV|DX|N|H|X|", "|"+s+"|") && s != ""
+	for _, known := range strings.Split("O B A F G K M L T Y TTS AeBe W WN WNC WC WO CS C CN CJ CH CHd MS S D DA DAB DAO DAZ DAV DB DBZ DBV DO DOV DQ DC DCV DX N H X", " ") {
+		if s == known {
+			return true
+		}
+	}
+	return false
 }
 func parseRoute(c sidecar.Change) (*route, bool, error) {
 	bad := errors.New("invalid bounded route")
@@ -348,7 +353,7 @@ func parseRoute(c sidecar.Change) (*route, bool, error) {
 		var h struct {
 			StarSystem, StarClass string
 			SystemAddress         json.Number
-			StarPos               []float64
+			StarPos               []json.Number
 		}
 		if d.Decode(&h) != nil || !safeText(h.StarSystem) || !starClass(h.StarClass) || len(h.StarPos) != 3 {
 			return nil, false, bad
@@ -358,7 +363,11 @@ func parseRoute(c sidecar.Change) (*route, bool, error) {
 			return nil, false, bad
 		}
 		v := routeHop{name: h.StarSystem, class: h.StarClass, address: address}
-		for i, x := range h.StarPos {
+		for i, number := range h.StarPos {
+			x, err := number.Float64()
+			if err != nil {
+				return nil, false, bad
+			}
 			if math.IsNaN(x) || math.IsInf(x, 0) || math.Abs(x) > 1e6 {
 				return nil, false, bad
 			}
