@@ -177,19 +177,157 @@ func TestViewerReconnectDoesNotStartSecondReader(t *testing.T) {
 		t.Fatal("browser started another source reader")
 	}
 }
+
+// readGameSystem is a stream barrier: the notification actually reached this
+// socket, rather than merely being ingested by the shared service.
+func readGameSystem(t *testing.T, ctx context.Context, conn *websocket.Conn, system string) {
+	t.Helper()
+	for {
+		_, raw, err := conn.Read(ctx)
+		if err != nil {
+			t.Fatal("game notification barrier", err)
+		}
+		var frame struct {
+			Name    string
+			Message json.RawMessage
+		}
+		if err := json.Unmarshal(raw, &frame); err != nil {
+			t.Fatal(err)
+		}
+		if frame.Name == "journalSummaryChanged" {
+			assertSafeSummary(t, frame.Message)
+			var summary struct{ CurrentSystem string }
+			if err := json.Unmarshal(frame.Message, &summary); err != nil {
+				t.Fatal(err)
+			}
+			if summary.CurrentSystem == system {
+				return
+			}
+		}
+	}
+}
+
 func TestRevocationStopsGameFeed(t *testing.T) {
-	s, owner, viewer, url, dir := gameFixture(t)
-	conn := pairedSocket(t, viewer, url)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	callRPC(t, ctx, conn, "getJournalSummary")
-	listed := ownerAction(t, s, owner, map[string]any{"action": "status"})
-	var devices []struct{ ID string }
-	json.Unmarshal(listed["devices"], &devices)
-	ownerAction(t, s, owner, map[string]any{"action": "revoke", "deviceId": devices[0].ID})
-	writeGameEvent(t, dir, `{"event":"FSDJump","StarSystem":"Fixture After Revoke"}`)
-	if _, _, err := conn.Read(ctx); err == nil {
-		t.Fatal("revoked subscription remained active")
+	for _, delayedClose := range []bool{false, true} {
+		name := "registered_socket"
+		if delayedClose {
+			name = "per_message_authorization_without_socket_drop"
+		}
+		t.Run(name, func(t *testing.T) {
+			s, owner, viewer, remoteURL, dir := gameFixture(t)
+			conn := pairedSocket(t, viewer, remoteURL)
+			ownerConn, _ := dialOwner(t, s)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			callRPC(t, ctx, conn, "getJournalSummary")
+			// Buffer a real, authorized frame before revocation. This forces the
+			// old "any readable frame is a leak" assertion to fail deterministically.
+			type received struct {
+				raw []byte
+				err error
+			}
+			frames := make(chan received, 32)
+			queued, done := make(chan struct{}), make(chan struct{})
+			go func() {
+				defer close(done)
+				var once sync.Once
+				for {
+					_, raw, err := conn.Read(ctx)
+					select {
+					case frames <- received{raw, err}:
+					case <-ctx.Done():
+						return
+					}
+					if strings.Contains(string(raw), "Fixture Before Revoke") {
+						once.Do(func() { close(queued) })
+					}
+					if err != nil {
+						return
+					}
+				}
+			}()
+			defer func() { cancel(); conn.CloseNow(); <-done }()
+			writeGameEvent(t, dir, `{"event":"FSDJump","StarSystem":"Fixture Before Revoke"}`)
+			select {
+			case <-queued:
+			case <-ctx.Done():
+				t.Fatal("pre-revocation notification was not queued")
+			}
+			before := s.game.Snapshot().EventsRead
+			listed := ownerAction(t, s, owner, map[string]any{"action": "status"})
+			var devices []struct{ ID string }
+			if err := json.Unmarshal(listed["devices"], &devices); err != nil || len(devices) != 1 {
+				t.Fatal("expected one paired device", err)
+			}
+			if delayedClose {
+				// Test-only fault injection: remove this socket from the close
+				// registry. Revocation must still reject every subsequent send.
+				// This prevents transport closure from masking a broken auth check.
+				s.remote.mu.Lock()
+				removed := 0
+				for c, id := range s.remote.connections {
+					if id == devices[0].ID {
+						delete(s.remote.connections, c)
+						removed++
+					}
+				}
+				s.remote.mu.Unlock()
+				if removed != 1 {
+					t.Fatal("socket registration barrier failed", removed)
+				}
+			}
+			ownerAction(t, s, owner, map[string]any{"action": "revoke", "deviceId": devices[0].ID})
+			// Only now create unique new data. The owner must actually receive it,
+			// proving that a silent/stopped producer cannot satisfy this test.
+			writeGameEvent(t, dir, `{"event":"FSDJump","StarSystem":"Fixture After Revoke"}`)
+			readGameSystem(t, ctx, ownerConn, "Fixture After Revoke")
+			for {
+				select {
+				case frame := <-frames:
+					if frame.err != nil {
+						if ctx.Err() != nil {
+							t.Fatal("revoked socket did not close before deadline", frame.err)
+						}
+						goto closed
+					}
+					var notification struct {
+						Name    string
+						Message json.RawMessage
+					}
+					if err := json.Unmarshal(frame.raw, &notification); err != nil {
+						t.Fatal(err)
+					}
+					if notification.Name != "journalSummaryChanged" {
+						t.Fatalf("unexpected queued frame: %s", frame.raw)
+					}
+					assertSafeSummary(t, notification.Message)
+					var summary struct {
+						CurrentSystem string
+						EventsRead    uint64
+					}
+					if err := json.Unmarshal(notification.Message, &summary); err != nil {
+						t.Fatal(err)
+					}
+					if summary.EventsRead > before || (summary.CurrentSystem != "Fixture System" && summary.CurrentSystem != "Fixture Before Revoke") {
+						t.Fatalf("revoked viewer received newly authorized data: %s", frame.raw)
+					}
+				case <-ctx.Done():
+					t.Fatal("revoked subscription remained active")
+				}
+			}
+		closed:
+			status, _, _ := remotePost(t, viewer, remoteURL+"/auth/session", remoteURL, nil)
+			if status != http.StatusUnauthorized {
+				t.Fatal("revoked session recovered", status)
+			}
+			reconnected, response, err := websocket.Dial(ctx, "wss"+strings.TrimPrefix(remoteURL, "https"), &websocket.DialOptions{HTTPClient: viewer, HTTPHeader: http.Header{"Origin": {remoteURL}}})
+			if reconnected != nil {
+				reconnected.CloseNow()
+			}
+			if err == nil || response == nil || response.StatusCode != http.StatusForbidden {
+				t.Fatal("revoked device reconnected", err, response)
+			}
+		})
 	}
 }
 func TestBadJournalOverrideAndShutdownKeepOwnerSafe(t *testing.T) {

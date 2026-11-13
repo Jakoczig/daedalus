@@ -119,42 +119,55 @@ No idle CPU/RSS, end-to-end latency or legacy-versus-Go savings claim is made.
 
 ## Windows/Linux CI and experimental artifacts
 
-**BLOCKED — GitHub Actions still refuses to schedule runs.** On 2026-11-13,
-after the maintainer reported disabling/re-enabling Actions in repository
-settings, an authorized empty retry commit
-[`11403bb541aaa6304a185ddb631cdd9a2e20185c`](https://github.com/Jakoczig/daedalus/commit/11403bb541aaa6304a185ddb631cdd9a2e20185c)
-was pushed to `go/g2a-journal-ingestion`. Its tree is identical to `4818ba0`;
-no runtime, workflow or security settings changed.
+**Actions restored; correction verification in progress.** The maintainer
+completed the fork-specific Enable workflows confirmation. The original retry
+`1b47d96bac7882d17cdd26815441d959532a7bdc` ran both workflows:
+[legacy/security PASS (five jobs)](https://github.com/Jakoczig/daedalus/actions/runs/43459886156),
+[desktop PR: Windows PASS, Ubuntu Go-test FAIL](https://github.com/Jakoczig/daedalus/actions/runs/43459886159),
+[desktop push: both Go-test FAIL](https://github.com/Jakoczig/daedalus/actions/runs/43459866594).
+These are diagnostic baseline results, not acceptance of the corrected head.
+Current-head passing CI and artifact verification must be recorded after the
+focused corrections below run in both desktop triggers and legacy/security CI.
 
-A fresh [repository Actions page](https://github.com/Jakoczig/daedalus/actions)
-now displays this exact message:
+### CI failure investigation and deterministic regression corrections
 
-> Workflows are not currently being run on this fork due to the scale of GitHub Actions usage. A repository maintainer can choose to re-enable these.
+The [external investigation](https://github.com/Jakoczig/daedalus/pull/6#issuecomment-6859071834)
+was independently verified against failed Windows/Ubuntu logs and current code.
+Both reported failures came from incorrect test ordering assumptions; no runtime
+reader, authorization or revocation behavior was changed.
 
-Both connector and public REST head-filtered run queries returned **zero runs**;
-the REST check-runs endpoint also returned **zero checks** for `11403bb`.
-Neither workflow started, so there are no job failures/logs or artifact checksums
-to assess. This is a scheduling restriction, not a reported test failure.
-Previously the page said Actions was disabled and directed the owner to GitHub
-Support; the newer fork/usage message above is the current observed restriction.
-The maintainer must resolve the remaining Actions restriction (or contact GitHub
-Support if re-enabling does not clear it), then request another fresh trigger.
-No repository security/settings bypass or Support communication was attempted.
+- **Late discovery:** constructor SourceState=waiting does not mean the reader
+  has polled. A test-only first-poll gate reproduces the old failure on demand:
+  the file is created while Run is blocked, then its first record is correctly
+  Replay, violating the test's incorrect Live expectation. The corrected late
+  test waits for waiting **and ImportInProgress=false**, published under the
+  stats mutex after the first completed poll. A separate gated test creates the
+  source before that first poll and requires Replay. Live and Replay assertions
+  remain strict, with no longer timeout or sleep-based startup barrier.
+- **Revocation:** the initial Subscribe snapshot (or another valid notification)
+  can be queued before revoke and read afterward. A real pre-revocation FSDJump
+  notification is deliberately buffered by a test receiver; the old any-readable-
+  frame assertion deterministically fails. The corrected test establishes this
+  stream barrier, synchronously revokes via the owner endpoint, then creates a
+  unique new FSDJump. The owner must actually receive that new notification.
+  The revoked stream may drain only old allowlisted summaries at or below the
+  pre-revocation event count; any new event count/system fails. It must close
+  before the original three-second deadline (timeout is failure), session
+  recovery must return 401, and a new WebSocket handshake must return 403.
+- **Independent authorization defense:** a second revocation subtest removes the
+  socket from the close registry under its mutex, simulating delayed transport
+  closure. Per-message authorization must still prevent all newly authorized
+  notifications and close the socket. Temporarily deleting send's principal.valid
+  guard produced deterministic RED with the unique post-revoke system delivered;
+  restoring the unchanged production guard produced GREEN. Pre-authorized bytes
+  cannot be recalled from TCP/client buffers; they are not new authorizations.
+- Both OS jobs now repeat all three tests 25 times; Linux additionally repeats
+  them 25 times under -race after the full race suite. All existing gates stay
+  mandatory and timeouts are unchanged. Local targeted count10 and count25 passed;
+  independent read-only review also ran count10 and found no actionable issue.
 
-Consequently **no G2A Windows/Linux CI, Linux race/native result, CI benchmark or
-CI artifact URL exists yet**. The earlier G1B checks are baseline evidence only,
-not G2A validation. Required follow-up once Actions is restored:
-
-1. Trigger/reopen/synchronize PR #6 to run the
-   [desktop workflow](https://github.com/Jakoczig/daedalus/actions/workflows/go-desktop.yml)
-   and [legacy/security workflow](https://github.com/Jakoczig/daedalus/actions/workflows/ci.yml).
-2. Require Windows + Ubuntu Go/JS/security/build/native gates, Linux full race,
-   synthetic executable/native journal smoke, and replay benchmark to pass. Fix
-   any failure with a reproducing regression; do not treat workflow wiring as a pass.
-3. Inspect both successful-run artifact ZIPs and their SHA256SUMS, record immutable
-   run/artifact links and measured OS benchmark values here, then request review.
-
-Local fallback: the actual clean `8feb0ee` Windows executable was rebuilt and all
+Historical local fallback (before Actions restoration):
+the actual clean `8feb0ee` Windows executable was rebuilt and all
 four smoke modes passed again. A local experimental ZIP was produced under the
 ignored workspace-relative path
 `temp/g2a-windows-x64-experimental-unsigned-local-journal-no-uploads.zip`.
@@ -172,7 +185,7 @@ There is no installed local WSL distribution or Docker runtime; no substitute
 Linux result or binary is claimed, and no OS distribution was installed. Local
 Windows race execution still lacks a cgo compiler. G2A implementation is reviewable,
 but its required cross-platform verification and CI artifact publication are
-**unfinished pending the external Actions restriction**.
+**pending verification of the corrected Windows/Linux workflows and artifacts**.
 
 Artifacts are **experimental, unsigned, local journal preview (no provider uploads)**,
 not Releases/installers. Packaging reads only the executable and authored runbook,

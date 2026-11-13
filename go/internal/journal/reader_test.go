@@ -16,6 +16,12 @@ type observed struct {
 
 func startReader(t *testing.T, dir string) (*Reader, chan observed, context.CancelFunc, chan error) {
 	t.Helper()
+	return startReaderWhen(t, dir, nil)
+}
+
+// A gate lets startup tests control the first poll without scheduler assumptions.
+func startReaderWhen(t *testing.T, dir string, gate <-chan struct{}) (*Reader, chan observed, context.CancelFunc, chan error) {
+	t.Helper()
 	r, err := NewReader(dir, ReaderOptions{PollInterval: 5 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
@@ -24,6 +30,14 @@ func startReader(t *testing.T, dir string) (*Reader, chan observed, context.Canc
 	events := make(chan observed, 200)
 	done := make(chan error, 1)
 	go func() {
+		if gate != nil {
+			select {
+			case <-gate:
+			case <-ctx.Done():
+				done <- nil
+				return
+			}
+		}
 		done <- r.Run(ctx, func(e Event, p Phase) error {
 			select {
 			case events <- observed{e, p}:
@@ -79,12 +93,35 @@ func appendJournal(t *testing.T, path, text string) {
 
 func TestReaderStartsBeforeGameDirectoryExists(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "later")
-	r, events, _, _ := startReader(t, dir)
-	waitReader(t, func() bool { return r.Stats().SourceState == "waiting" })
+	gate := make(chan struct{})
+	r, events, _, _ := startReaderWhen(t, dir, gate)
+	close(gate)
+	// The constructor also says waiting. ImportInProgress becomes false only
+	// after Run has completed its first poll and established the replay boundary.
+	waitReader(t, func() bool {
+		s := r.Stats()
+		return s.SourceState == "waiting" && !s.ImportInProgress
+	})
 	makeDir(t, dir)
 	os.WriteFile(journalPath(dir), []byte("{\"event\":\"Fileheader\"}\n"), 0600)
 	if e := nextEvent(t, events); e.Event.Type != "Fileheader" || e.Phase != Live {
 		t.Fatal("late source did not become live")
+	}
+}
+func TestReaderDirectoryAppearsBeforeFirstPollReplays(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "before-first-poll")
+	gate := make(chan struct{})
+	r, events, _, _ := startReaderWhen(t, dir, gate)
+	if !r.Stats().ImportInProgress {
+		t.Fatal("reader claims first poll completed before Run")
+	}
+	makeDir(t, dir)
+	if err := os.WriteFile(journalPath(dir), []byte("{\"event\":\"Fileheader\"}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	close(gate)
+	if e := nextEvent(t, events); e.Event.Type != "Fileheader" || e.Phase != Replay {
+		t.Fatalf("source present at first poll must replay: %+v", e)
 	}
 }
 func TestReaderWaitsForNewline(t *testing.T) {

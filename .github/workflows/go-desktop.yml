@@ -50,9 +50,14 @@ jobs:
         run: cd go && go test -count=1 -timeout=4m ./...
       - name: Go vet
         run: cd go && go vet ./...
+      - name: Journal startup and revocation stress
+        run: cd go && go test -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
       - name: Race detector
         if: runner.os == 'Linux'
-        run: cd go && go test -race -count=1 -timeout=4m ./...
+        run: |
+          cd go
+          go test -race -count=1 -timeout=4m ./...
+          go test -race -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
       - name: Build native desktop
         run: cd go && go build -o bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/daedalus
       - name: Allow this preview to create WebKit sandbox namespaces
