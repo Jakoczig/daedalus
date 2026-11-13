@@ -395,7 +395,7 @@ func (m *remoteManager) serve(epoch uint64, w http.ResponseWriter, r *http.Reque
 		if r.URL.Path == "/auth/pair" {
 			http.SetCookie(w, &http.Cookie{Name: viewerCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 		}
-		writeJSON(w, map[string]any{"role": "viewer", "prototype": map[string]any{"stage": "G1B", "offline": true}})
+		writeJSON(w, map[string]any{"role": "viewer", "prototype": m.server.prototype()})
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/auth/") {

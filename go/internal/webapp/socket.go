@@ -5,17 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 )
 
 func (s *Server) loadingStatus() map[string]any {
-	stage := "G1A"
-	if s.remote != nil {
-		stage = "G1B"
-	}
-	return map[string]any{"loadingComplete": true, "loadingInProgress": false, "numberOfFiles": 0, "numberOfEventsImported": 0, "numberOfLogLines": 0, "logSizeInBytes": 0, "offline": true, "stage": stage}
+	marker := s.prototype()
+	return map[string]any{"loadingComplete": true, "loadingInProgress": false, "numberOfFiles": 0, "numberOfEventsImported": 0, "numberOfLogLines": 0, "logSizeInBytes": 0, "offline": marker["offline"], "stage": marker["stage"]}
 }
 
 func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +90,10 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			}
 		}
 	}()
+	var writeMu sync.Mutex
 	send := func(value any) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
 		if !principal.valid() {
 			return context.Canceled
 		}
@@ -106,6 +107,26 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	}
 	if send(map[string]any{"name": "loadingProgress", "message": s.loadingStatus()}) != nil {
 		return
+	}
+	if s.game != nil {
+		changes, unsubscribe := s.game.Subscribe(readCtx)
+		defer unsubscribe()
+		go func() {
+			for {
+				select {
+				case <-readCtx.Done():
+					return
+				case summary, ok := <-changes:
+					if !ok {
+						return
+					}
+					if send(map[string]any{"name": "journalSummaryChanged", "message": summary}) != nil {
+						conn.CloseNow()
+						return
+					}
+				}
+			}
+		}()
 	}
 	for {
 		kind, data, err := conn.Read(readCtx)
@@ -133,6 +154,12 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getJournalSummary":
+			if s.game == nil {
+				response["error"] = "Journal ingestion disabled"
+			} else {
+				response["message"] = s.game.Snapshot()
+			}
 		default:
 			response["error"] = "Not implemented in this offline preview"
 		}
@@ -158,7 +185,11 @@ func (s *Server) handler(assets http.Handler) http.Handler {
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/owner/") {
-			s.ownerRemote(w, r)
+			if r.URL.Path == "/owner/journal" {
+				s.ownerJournal(w, r)
+			} else {
+				s.ownerRemote(w, r)
+			}
 			return
 		}
 		if r.Header.Get("Upgrade") != "" {

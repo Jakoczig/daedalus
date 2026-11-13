@@ -37,7 +37,7 @@ func TestSmokeAndStartupFailure(t *testing.T) {
 		response.Body.Close()
 		return errors.New("native startup failed")
 	}
-	if err := run(context.Background(), []string{"--data-dir", t.TempDir()}, assets, launch, &output); err == nil {
+	if err := run(context.Background(), []string{"--data-dir", t.TempDir(), "--journal-dir", t.TempDir()}, assets, launch, &output); err == nil {
 		t.Fatal("startup failure hidden")
 	}
 	if response, err := http.Get(localURL); err == nil {
@@ -58,12 +58,23 @@ func TestNormalRuntimeProvidesOwnerRemoteSettings(t *testing.T) {
 		}
 		defer res.Body.Close()
 		body, _ := io.ReadAll(res.Body)
-		if !strings.Contains(string(body), `"stage":"G1B"`) {
-			t.Fatal("normal runtime has no G1B owner settings", string(body))
+		if !strings.Contains(string(body), `"stage":"G2A"`) {
+			t.Fatal("normal runtime has no G2A journal status", string(body))
 		}
 		return nil
 	}
-	if err := run(context.Background(), []string{"--data-dir", t.TempDir()}, assets, launch, &output); err != nil {
+	if err := run(context.Background(), []string{"--data-dir", t.TempDir(), "--journal-dir", t.TempDir()}, assets, launch, &output); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSmokeUsesNoPersonalJournals(t *testing.T) {
+	assets := fstest.MapFS{"index.html": {Data: []byte("index")}, "exploration/system.html": {Data: []byte("system")}}
+	var output bytes.Buffer
+	if err := run(context.Background(), []string{"--smoke-test", "--journal-dir", t.TempDir()}, assets, func(context.Context, string, func()) error { t.Fatal("smoke launched desktop"); return nil }, &output); err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != "G1A offline smoke passed\n" {
+		t.Fatal("smoke ceased to be isolated/offline")
 	}
 }

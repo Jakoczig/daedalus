@@ -26,6 +26,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	smoke := flags.Bool("smoke-test", false, "verify offline service without a window")
 	nativeSmoke := flags.Bool("desktop-smoke-test", false, "open native window, require React authentication and RPC, then close")
 	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
+	journalDir := flags.String("journal-dir", "", "local owner journal directory override")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
 		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
 	}
@@ -46,7 +47,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		}
 		*dataDir = filepath.Join(config, "daedalus-go")
 	}
-	service, err := webapp.StartLocalWithStorage(ctx, assets, *dataDir)
+	service, err := webapp.StartLocalWithOptions(ctx, assets, webapp.Options{StorageDir: *dataDir, EnableJournal: !*smoke && !*nativeSmoke, JournalDir: *journalDir})
 	if err != nil {
 		return errors.New("cannot start embedded local service")
 	}
