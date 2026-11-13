@@ -3,6 +3,7 @@ package navstate
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
@@ -42,10 +43,12 @@ type routeHop struct {
 	pos                  [3]float64
 }
 type route struct {
-	stamp time.Time
-	hops  []routeHop
-	owner string
-	epoch uint64
+	stamp       time.Time
+	fingerprint [sha256.Size]byte
+	ambiguous   bool
+	hops        []routeHop
+	owner       string
+	epoch       uint64
 }
 type sessionState struct {
 	verified                                               bool
@@ -64,13 +67,14 @@ type sessionState struct {
 
 // Model is owned by the enclosing service's mutex. Returned views own all memory.
 type Model struct {
-	sessions    map[string]*sessionState
-	order       []string
-	active      string
-	candidate   *route
-	sourceValid bool
-	overflow    bool
-	serial      uint64
+	sessions       map[string]*sessionState
+	order          []string
+	active         string
+	candidate      *route
+	sourceValid    bool
+	overflow       bool
+	serial         uint64
+	claimedThrough time.Time
 }
 
 func NewModel() *Model { m := &Model{}; m.ResetSource(); return m }
@@ -81,6 +85,7 @@ func (m *Model) ResetSource() {
 	m.candidate = nil
 	m.sourceValid = false
 	m.overflow = false
+	m.claimedThrough = time.Time{}
 }
 func (m *Model) state(key string) *sessionState {
 	if s := m.sessions[key]; s != nil {
@@ -203,7 +208,7 @@ func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase
 // Both file-before-marker and marker-before-file are supported without guessing.
 func (m *Model) correlate(key string, s *sessionState) {
 	c := m.candidate
-	if !s.verified || s.clearUnknown || !m.sourceValid || c == nil || !c.stamp.Equal(s.marker) || !c.stamp.After(s.reset) || !c.stamp.After(s.barrier) {
+	if !s.verified || s.clearUnknown || !m.sourceValid || c == nil || c.ambiguous || !c.stamp.Equal(s.marker) || !c.stamp.After(s.reset) || !c.stamp.After(s.barrier) {
 		return
 	}
 	if c.owner != "" && (c.owner != key || c.epoch != s.epoch) {
@@ -211,6 +216,9 @@ func (m *Model) correlate(key string, s *sessionState) {
 	}
 	c.owner = key
 	c.epoch = s.epoch
+	if c.stamp.After(m.claimedThrough) {
+		m.claimedThrough = c.stamp
+	}
 	s.route = c
 	s.state = "verified"
 }
@@ -223,15 +231,26 @@ func (m *Model) ApplySidecar(c sidecar.Change) {
 		return
 	}
 	r, overflow, err := parseRoute(c)
+	continuous := m.sourceValid
 	m.sourceValid = err == nil
 	m.overflow = overflow
 	if err != nil {
 		return
 	}
-	// Keep an existing claim when a byte-identical/equal-time file is polled again.
-	if m.candidate != nil && m.candidate.stamp.Equal(r.stamp) {
-		r.owner = m.candidate.owner
-		r.epoch = m.candidate.epoch
+	r.fingerprint = sha256.Sum256(c.Raw)
+	// Only an uninterrupted observation of the exact bytes retains its claim.
+	// A journal timestamp carries no content hash or within-second ordering.
+	// Once claimed (or ambiguous), that timestamp cannot attest replacement
+	// content, even after a bad write, an identical repair or a duplicate marker.
+	if previous := m.candidate; previous != nil {
+		if continuous && previous.fingerprint == r.fingerprint {
+			r = previous
+		} else if previous.stamp.Equal(r.stamp) {
+			r.ambiguous = true
+		}
+	}
+	if r != m.candidate && !r.stamp.After(m.claimedThrough) {
+		r.ambiguous = true
 	}
 	m.candidate = r
 	if s := m.sessions[m.active]; s != nil {
@@ -261,13 +280,17 @@ func (m *Model) View(key string) NavigationView {
 	if s.state == "cleared" || s.state == "waiting_game" {
 		return v
 	}
+	if m.sourceValid && m.candidate != nil && m.candidate.ambiguous {
+		v.RouteState = "unverified"
+		return v
+	}
 	if s.route == nil {
 		if m.candidate != nil {
 			v.RouteState = "unverified"
 		}
 		return v
 	}
-	if !m.sourceValid || m.candidate == nil || !s.route.stamp.Equal(m.candidate.stamp) {
+	if !m.sourceValid || s.route != m.candidate {
 		v.RouteState = "stale"
 		return v
 	}

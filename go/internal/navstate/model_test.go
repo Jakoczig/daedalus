@@ -144,6 +144,101 @@ func verified(t *testing.T) *Model {
 	m.ApplySidecar(file(routeFixture))
 	return m
 }
+
+func assertUnverifiedRoute(t *testing.T, m *Model) {
+	t.Helper()
+	v := m.View("A")
+	if v.RouteState != "unverified" || len(v.Hops) != 0 || v.DestinationSystem != "" || v.RemainingJumps != nil || v.TargetEvidence == "verified_route_next" {
+		t.Fatalf("ambiguous route actionable: %+v", v)
+	}
+}
+
+func TestRouteSameTimestampChangedContentCannotReuseOldMarker(t *testing.T) {
+	for _, change := range []struct{ name, from, to string }{
+		{"destination", "Fixture Beta", "Fixture Gamma"},
+		{"identity", "9007199254740994", "9007199254740995"},
+		{"coordinates", "[3,4,0]", "[6,8,0]"},
+		{"bytes", `"event":"NavRoute"`, `"event": "NavRoute"`},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			m := verified(t)
+			m.ApplySidecar(file(strings.Replace(routeFixture, change.from, change.to, 1)))
+			assertUnverifiedRoute(t, m)
+			// A repeated file or indistinguishable same-second journal marker is
+			// not independent evidence of which content that marker described.
+			marker(t, m, "A")
+			m.ApplySidecar(file(strings.Replace(routeFixture, change.from, change.to, 1)))
+			assertUnverifiedRoute(t, m)
+			m.ApplySidecar(file(routeFixture))
+			assertUnverifiedRoute(t, m)
+		})
+	}
+}
+
+func TestRouteSameTimestampInvalidThenRepairedNeedsNewEvidence(t *testing.T) {
+	for _, repair := range []string{routeFixture, strings.Replace(routeFixture, "Fixture Beta", "Fixture Gamma", 1)} {
+		for _, invalid := range []sidecar.Change{{Kind: "NavRoute", State: "invalid"}, file(`{"broken":true}`)} {
+			m := verified(t)
+			m.ApplySidecar(invalid)
+			if v := m.View("A"); v.RouteState != "stale" || len(v.Hops) != 0 {
+				t.Fatalf("invalid route not withheld: %+v", v)
+			}
+			m.ApplySidecar(file(repair))
+			assertUnverifiedRoute(t, m)
+			marker(t, m, "A")
+			assertUnverifiedRoute(t, m)
+		}
+	}
+}
+
+func TestRouteSameTimestampProvenanceRecoversWithNewerEvidence(t *testing.T) {
+	for _, fileFirst := range []bool{true, false} {
+		t.Run(fmt.Sprint(fileFirst), func(t *testing.T) {
+			m := verified(t)
+			m.ApplySidecar(file(strings.Replace(routeFixture, "Fixture Beta", "Fixture Gamma", 1)))
+			assertUnverifiedRoute(t, m)
+			newFile := file(strings.ReplaceAll(strings.Replace(routeFixture, "Fixture Beta", "Fixture Delta", 1), "00:00:02Z", "00:00:03Z"))
+			newFile.Timestamp = newFile.Timestamp.Add(time.Second)
+			newMarker := event(t, `{"timestamp":"2026-01-01T00:00:03Z","event":"NavRoute"}`)
+			if fileFirst {
+				m.ApplySidecar(newFile)
+				m.ApplyEvent("A", newMarker)
+			} else {
+				m.ApplyEvent("A", newMarker)
+				m.ApplySidecar(newFile)
+			}
+			v := m.View("A")
+			if v.RouteState != "verified" || v.DestinationSystem != "Fixture Delta" || len(v.Hops) != 2 {
+				t.Fatalf("new independent evidence did not recover: %+v", v)
+			}
+			// Identical continuous re-observation retains the same claim.
+			m.ApplySidecar(newFile)
+			if m.View("A").RouteState != "verified" {
+				t.Fatal("identical poll lost provenance")
+			}
+		})
+	}
+}
+
+func TestRouteSameTimestampOldClaimCannotReturnAfterAnotherCandidate(t *testing.T) {
+	m := verified(t)
+	next := file(strings.ReplaceAll(routeFixture, "00:00:02Z", "00:00:03Z"))
+	next.Timestamp = next.Timestamp.Add(time.Second)
+	m.ApplySidecar(next)
+	// Returning to the old timestamp must not erase the consumed claim, even
+	// though the immediately previous file had a different timestamp.
+	m.ApplySidecar(file(strings.Replace(routeFixture, "Fixture Beta", "Fixture Gamma", 1)))
+	assertUnverifiedRoute(t, m)
+}
+
+func TestRouteSameTimestampChangedBeforeMarkerIsAmbiguous(t *testing.T) {
+	m := NewModel()
+	session(t, m, "A")
+	m.ApplySidecar(file(routeFixture))
+	m.ApplySidecar(file(strings.Replace(routeFixture, "Fixture Beta", "Fixture Gamma", 1)))
+	marker(t, m, "A")
+	assertUnverifiedRoute(t, m)
+}
 func arrive(t *testing.T, m *Model, name, address string) {
 	t.Helper()
 	m.ApplyEvent("A", event(t, `{"event":"FSDJump","timestamp":"2026-01-01T00:00:04Z","StarSystem":"`+name+`","SystemAddress":`+address+`}`))
