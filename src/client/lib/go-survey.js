@@ -1,4 +1,12 @@
 // Pure, bounded adapters over typed Go DTOs. IDs stay strings throughout.
+export function legacyStarSubtype (kind = '') {
+  if (kind === 'H' || kind === 'SupermassiveBlackHole') return kind === 'H' ? 'Black Hole' : 'Supermassive Black Hole'
+  if (kind === 'N') return 'Neutron Star'
+  if (kind.startsWith('D')) return `${kind} White Dwarf`
+  return `${kind} Star`
+}
+const biologicalEvidence = b => b.bioSignals > 0 || b.genuses?.length > 0 || b.organisms?.length > 0
+
 const order = (a, b) => a.bodyId.length - b.bodyId.length || a.bodyId.localeCompare(b.bodyId)
 export function layoutBodies (bodies = []) {
   const nodes = new Map(bodies.map(body => [body.bodyId, { body, depth: 0, parent: null, unresolved: false, state: 0 }]))
@@ -39,8 +47,8 @@ export function selectBodies (bodies = [], query = '', filter = 'all') {
   return bodies.filter(body => (!needle || `${body.name} ${body.kind} ${body.bodyId} ${body.genuses?.join(' ')} ${body.organisms?.map(o => `${o.genus} ${o.species}`).join(' ')}`.toLocaleLowerCase().includes(needle)) &&
     (filter !== 'landable' || body.landable === true) &&
     (filter !== 'unmapped' || body.dssMapped !== true) &&
-    (filter !== 'biology' || body.bioSignals > 0 || body.genuses?.length > 0 || body.organisms?.length > 0))
+    (filter !== 'biology' || biologicalEvidence(body)))
 }
 export function surveySummary (bodies = []) {
-  return bodies.reduce((s, b) => ({ mapped: s.mapped + (b.dssMapped ? 1 : 0), landable: s.landable + (b.landable ? 1 : 0), biologicalBodies: s.biologicalBodies + (b.bioSignals > 0 || b.organisms?.length > 0 ? 1 : 0), analysed: s.analysed + (b.organisms || []).filter(o => o.complete).length }), { mapped: 0, landable: 0, biologicalBodies: 0, analysed: 0 })
+  return bodies.reduce((s, b) => ({ mapped: s.mapped + (b.dssMapped ? 1 : 0), landable: s.landable + (b.landable ? 1 : 0), biologicalBodies: s.biologicalBodies + (biologicalEvidence(b) ? 1 : 0), analysed: s.analysed + (b.organisms || []).filter(o => o.complete).length }), { mapped: 0, landable: 0, biologicalBodies: 0, analysed: 0 })
 }

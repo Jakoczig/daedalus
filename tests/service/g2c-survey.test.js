@@ -28,3 +28,8 @@ test('G2C survey filters distinguish witnessed mapping and confirmed biology', (
   assert.deepEqual(selectBodies(bodies, 'beta', 'biology').map(b => b.bodyId), ['2'])
   assert.equal(surveySummary(bodies).analysed, 1); assert.equal(surveySummary(bodies).mapped, 1)
 })
+
+test('G2C genus-only observations agree between worklist and summary', () => {
+  const { selectBodies, surveySummary } = survey(); const bodies = [{ bodyId: '1', genuses: ['Bacterium'] }]
+  assert.equal(selectBodies(bodies, '', 'biology').length, 1); assert.equal(surveySummary(bodies).biologicalBodies, 1)
+})

@@ -19,3 +19,13 @@ test('G2C enhanced navigation pages long routes without a polling loop or host a
   const h = harness('go-navigation', { ...navigation, hops: Array.from({ length: 200 }, (_, i) => ({ name: `Waypoint ${i}`, starClass: 'G', isNext: i === 100 })) }); h.props.enhanced = true; h.html(); const html = await h.flush()
   assert.equal(h.elements('li').length, 80); assert.match(html, /Waypoint 100/); assert.match(html, /fuel-scoop class/); assert.deepEqual(h.calls, ['getGoNavigation'])
 })
+
+test('G2C renderer translates journal star codes into the existing CSS classes', async () => {
+  for (const [kind, subtype] of [['M', 'M Star'], ['N', 'Neutron Star'], ['H', 'Black Hole'], ['DA', 'DA White Dwarf']]) {
+    const h = harness('go-survey-explorer', { ...survey, bodies: [{ ...survey.bodies[0], kind, details: { isStar: true } }] }); h.html(); const html = await h.flush(); assert.ok(html.includes(`data-system-object-sub-type="${subtype}"`), `missing legacy subtype ${subtype}`)
+  }
+})
+test('G2C filtering does not discard known parent provenance', async () => {
+  const bodies = [{ bodyId: '0', name: 'Fixture Star', details: { isStar: true } }, { ...survey.bodies[0], bodyId: '1', landable: true, details: { parents: [{ kind: 'Star', bodyId: '0' }] } }]
+  const h = harness('go-survey-explorer', { ...survey, bodies }); h.html(); await h.flush(); h.elements('select')[0].props.onChange({ target: { value: 'landable' } }); const html = h.html(); assert.doesNotMatch(html, /Parent unobserved \/ ambiguous|, parent unknown/)
+})

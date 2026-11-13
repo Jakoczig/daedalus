@@ -1,3 +1,4 @@
+import { legacyStarSubtype } from '../lib/go-survey'
 import SystemMapObject from './panels/nav/system-map/system-map-object'
 // Reuses the original SVG textures, rings, landability and body selection renderer.
 // Layout uses witnessed Parents only; this is a schematic, not a live orrery.
@@ -9,7 +10,7 @@ export default function GoSystemMap ({ nodes, selected, onSelect }) {
       <svg role='group' aria-label='Selectable journal system map' viewBox={`0 0 ${width} ${Math.max(1800, rows.length * 1800)}`} width={Math.max(850, width / 16)} height={Math.max(120, rows.length * 112)}>
         {rows.map((node, index) => {
           const body = node.body; const x = 1200 + node.depth * 2500; const y = index * 1800 + 900
-          const object = { id: `go-${body.bodyId}`, name: body.name || `Body ${body.bodyId}`, label: body.name || `Body ${body.bodyId}`, type: body.details?.isStar ? 'Star' : 'Planet', subType: body.kind, atmosphereType: body.atmosphere, isLandable: body.landable === true, distanceToArrival: body.distanceLS ?? 0, orbitsStar: false, rings: body.details?.rings?.length > 0, _x: x, _y: y, _r: body.details?.isStar ? 550 : 330 }
+          const object = { id: `go-${body.bodyId}`, name: body.name || `Body ${body.bodyId}`, label: body.name || `Body ${body.bodyId}`, type: body.details?.isStar ? 'Star' : 'Planet', subType: body.details?.isStar ? legacyStarSubtype(body.kind) : body.kind, atmosphereType: body.atmosphere, isLandable: body.landable === true, distanceToArrival: body.distanceLS ?? 0, orbitsStar: false, rings: body.details?.rings?.length > 0, _x: x, _y: y, _r: body.details?.isStar ? 550 : 330 }
           const choose = () => onSelect(body.bodyId)
           return (
             <g key={body.bodyId} role='button' aria-label={`Inspect ${object.name}${node.unresolved ? ', parent unknown' : ''}`} aria-pressed={selected === body.bodyId} tabIndex={0} onClick={choose} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose() } }}>

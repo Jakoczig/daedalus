@@ -35,7 +35,8 @@ export default function GoSurveyExplorer (props) {
   const [query, setQuery] = useState(''); const [filter, setFilter] = useState('all'); const [page, setPage] = useState(0); const [selection, setSelection] = useState(null)
   const bodies = value?.bodies || []
   const filtered = useMemo(() => selectBodies(bodies, query, props.biology ? 'biology' : filter), [bodies, query, filter, props.biology])
-  const nodes = useMemo(() => layoutBodies(filtered), [filtered])
+  const hierarchy = useMemo(() => layoutBodies(bodies), [bodies])
+  const nodes = useMemo(() => { const ids = new Set(filtered.map(b => b.bodyId)); return hierarchy.filter(n => ids.has(n.body.bodyId)) }, [hierarchy, filtered])
   const summary = useMemo(() => surveySummary(bodies), [bodies])
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 25) - 1))
   // Only the ID is retained; all displayed facts come from the current DTO.
