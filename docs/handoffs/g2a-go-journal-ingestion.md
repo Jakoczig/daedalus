@@ -1,4 +1,4 @@
-# G2A native Go journal ingestion — external review handoff
+# G2A native Go journal ingestion â€” external review handoff
 
 Date: 2026-11-13. Draft stacked PR: https://github.com/Jakoczig/daedalus/pull/6.
 Branch `go/g2a-journal-ingestion`, based on accepted G1B
@@ -22,6 +22,7 @@ Approved architecture/spec/seven-task plan were read from documentation branch
 | `a7d3d7de0ed613ca248143ae5e4600efdd1ddcb3` | Minimal React journal card, real connection/source states, owner-only setup and async recovery guards |
 | `20fddfa87ae0fd6a4557ca7aa2558c38e2c78d36` | Cross-platform CI gates, four smoke modes, replay benchmark, synthetic fixture helper and experimental artifacts/runbook |
 | `8feb0ee7f8d987676b4422dea037bcabb2e155bd` | Independent whole-branch review notes; clean source used for the local Windows preview |
+| `385f472bc9900d812d046fd93ec4aadd8908a469` | Deterministic startup/revocation synchronization regressions, authorization mutation proof, repeated cross-platform and Linux race gates |
 
 CI/smoke/handoff commits and final checked head are recorded in the PR description
 after publication. Publishing uses GitHub connector trees/commits because local
@@ -100,7 +101,7 @@ as fixtures. All committed fixture records, IDs and systems are fabricated.
 
 - **PASS 52 JavaScript tests**, **7 build fixtures**, security and build-script lints.
 - **PASS React export: 62 routes / 278 embedded assets**.
-- **PASS all nine Go packages**, uncached full suite with webapp 70.812 s, including
+- **PASS all nine Go packages**, uncached full suite with webapp 71.437 s at correction head, including
   the existing real 65-second two-viewer idle/reconnect acceptance; vet and module
   verification pass. A final added native-isolation test also passes separately.
 - **PASS Windows executable build and all four actual executable modes**: isolated
@@ -119,15 +120,30 @@ No idle CPU/RSS, end-to-end latency or legacy-versus-Go savings claim is made.
 
 ## Windows/Linux CI and experimental artifacts
 
-**Actions restored; correction verification in progress.** The maintainer
-completed the fork-specific Enable workflows confirmation. The original retry
-`1b47d96bac7882d17cdd26815441d959532a7bdc` ran both workflows:
-[legacy/security PASS (five jobs)](https://github.com/Jakoczig/daedalus/actions/runs/43459886156),
-[desktop PR: Windows PASS, Ubuntu Go-test FAIL](https://github.com/Jakoczig/daedalus/actions/runs/43459886159),
-[desktop push: both Go-test FAIL](https://github.com/Jakoczig/daedalus/actions/runs/43459866594).
-These are diagnostic baseline results, not acceptance of the corrected head.
-Current-head passing CI and artifact verification must be recorded after the
-focused corrections below run in both desktop triggers and legacy/security CI.
+**PASS — corrected implementation `385f472bc9900d812d046fd93ec4aadd8908a469`.**
+Actions was restored through the maintainer's fork-specific Enable workflows
+confirmation. All three fresh runs completed successfully, with every job green:
+
+| Exact run | Result |
+| --- | --- |
+| [Go desktop PR 43467126427](https://github.com/Jakoczig/daedalus/actions/runs/43467126427) | Windows + Ubuntu 24.04 PASS; both native builds and all four smoke modes, JS/security/assets/Go/vet, 25 startup/revocation repetitions per OS; full Linux race + 25 race repetitions; both preview uploads |
+| [Go desktop push 43467112207](https://github.com/Jakoczig/daedalus/actions/runs/43467112207) | Same Windows/Linux gates PASS on the exact branch commit |
+| [Legacy/security 43467126367](https://github.com/Jakoczig/daedalus/actions/runs/43467126367) | All five jobs PASS: Windows/Linux regressions + security lint, legacy Go launcher build, React build, existing broad style job |
+
+The PR job checks GitHub's test merge `cd20722b51569dc654972f32acd419323d2eebec`
+against unchanged G1B `2a79991`; the push run builds exact `385f472`.
+Logs confirm Go 1.26.10 / Wails 3.0.0, vcs.modified=false, real native React and
+journal bootstrap/shutdown on both OSes. Linux uses Xvfb/DBus, software rendering
+and the existing executable-specific AppArmor userns permission; WebKit sandbox
+and global policy remain enabled. The full race webapp suite passed in 67.094 s
+(PR) / 67.096 s (push), including the real 65-second idle/reconnect test.
+
+Original failed runs at `1b47d96` remain diagnostic history:
+[desktop PR](https://github.com/Jakoczig/daedalus/actions/runs/43459886159),
+[desktop push](https://github.com/Jakoczig/daedalus/actions/runs/43459866594).
+They are superseded by the passing correction runs above. The handoff-only
+publication following `385f472` changes no runtime, tests, workflow or bundled
+runbook; its fresh run status is recorded in PR #6's description after verification.
 
 ### CI failure investigation and deterministic regression corrections
 
@@ -166,26 +182,43 @@ reader, authorization or revocation behavior was changed.
   mandatory and timeouts are unchanged. Local targeted count10 and count25 passed;
   independent read-only review also ran count10 and found no actionable issue.
 
-Historical local fallback (before Actions restoration):
-the actual clean `8feb0ee` Windows executable was rebuilt and all
-four smoke modes passed again. A local experimental ZIP was produced under the
-ignored workspace-relative path
-`temp/g2a-windows-x64-experimental-unsigned-local-journal-no-uploads.zip`.
-It is delivered as a local file in the chat, not a GitHub Release or CI artifact.
-Its README explicitly states CI is blocked. The ZIP was opened and independently
-checked: exactly executable, README and SHA256SUMS, both internal hashes match.
+### Independently downloaded preview artifacts
 
-| Local Windows file | SHA-256 |
+From passing PR run 43467126427 (same accepted G1B base):
+
+- [Windows x64 artifact 14058093528](https://github.com/Jakoczig/daedalus/actions/runs/43467126427/artifacts/14058093528)
+- [Linux x64 artifact 14058773720](https://github.com/Jakoczig/daedalus/actions/runs/43467126427/artifacts/14058773720)
+
+Both ZIPs were downloaded and independently opened locally. Each contains exactly
+its platform executable, README.md and SHA256SUMS. Both manifest entries match
+SHA-256 computed from the actual uncompressed bytes. Executable magic is PE/ELF
+as expected, README identifies the experimental/unsigned/no-uploads scope and
+Windows/Linux prerequisites, and each entire ZIP hash matches GitHub's artifact
+digest. No generated profile, CA/private key, credentials, journals or adjacent
+build files are present. README hashes differ because Windows/Linux checkout line
+endings differ; each matches its own manifest.
+
+| Verified file | SHA-256 |
 | --- | --- |
-| daedalus.exe | `fbf9a51a0eb8a8d3226193740a09a95b98534e7ee31e7559eddf3981901897c5` |
-| README.md | `2418636af00f1ea81655d3184b958cfedbf38f235bfe1c3944c408695e17e884` |
-| ZIP archive | `b6cb0531fbb36976fbe6fc5b5ff4eadcb20fcf2120fe57bc248601f15b23d32f` |
+| Windows daedalus.exe | `f072bfc826656fff535925f3a0060503b5ece89f0f7f1fe0a4c0414a33765d27` |
+| Windows README.md | `c738ded5f900a4f806aa6a04f3dd875a3d35bf0bc986dc9930ce56b9fb71750b` |
+| Windows ZIP | `addfbe2dfec6fe9706f310fd6b05a072e756c4c5f24d80c2e66cb91603314458` |
+| Linux daedalus | `229b7f83e5f0dcc7d871f5a939d269d67e70d1daf889136848d9dbbc5022f60c` |
+| Linux README.md | `938835a5f3237c429636123e7d182175990b519e8d329e5a5e493ada35e2b1d3` |
+| Linux ZIP | `a58b17d4ca08601eee758347d3e93e05941f8b99ae9d3f79f23bda9bef7bc851` |
 
-There is no installed local WSL distribution or Docker runtime; no substitute
-Linux result or binary is claimed, and no OS distribution was installed. Local
-Windows race execution still lacks a cgo compiler. G2A implementation is reviewable,
-but its required cross-platform verification and CI artifact publication are
-**pending verification of the corrected Windows/Linux workflows and artifacts**.
+PR CI replay measurements, 50,000 fabricated records, three iterations (not RSS or
+end-to-end UI measurements):
+
+| Runner | ns/op | MB/s | events/s | allocated B/op | allocs/op |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Windows amd64 | 155375933 | 28.96 | 321801 | 94555008 | 1300128 |
+| Ubuntu amd64 | 142853115 | 31.50 | 350011 | 94477485 | 1300039 |
+
+No Windows local race result is claimed (no local cgo compiler); Linux full and
+repeated race suites are now verified in CI. Real gameplay/physical-device and
+distro coverage remains manual as listed below. The old local fallback archive
+is historical evidence only; use these CI artifacts and their own manifests.
 
 Artifacts are **experimental, unsigned, local journal preview (no provider uploads)**,
 not Releases/installers. Packaging reads only the executable and authored runbook,
