@@ -57,6 +57,9 @@ type sessionState struct {
 	arrival                                                time.Time
 	reported                                               *int
 	markerLive, targetLive                                 bool
+	sourceFile                                             string
+	sequence                                               uint64
+	clearUnknown                                           bool
 }
 
 // Model is owned by the enclosing service's mutex. Returned views own all memory.
@@ -98,6 +101,22 @@ func (m *Model) ApplyEvent(key string, e journal.Event) { m.ApplyEventPhase(key,
 func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase) {
 	m.active = key
 	s := m.state(key)
+	// Completed records rejected by the reader still consume a sequence number.
+	// Their category/identity is unknowable: do not bridge that source gap.
+	if e.Position.Sequence != 0 {
+		if s.sequence != 0 && (e.Position.FileID != s.sourceFile || e.Position.Sequence != s.sequence+1) {
+			s.verified = false
+			s.route = nil
+			s.marker = time.Time{}
+			s.currentName = ""
+			s.currentAddress = ""
+			s.targetName = ""
+			s.targetAddress = ""
+			s.reported = nil
+			s.state = "unverified"
+		}
+		defer func() { s.sequence = e.Position.Sequence; s.sourceFile = e.Position.FileID }()
+	}
 	switch e.Type {
 	case "Shutdown":
 		s.verified = false
@@ -110,6 +129,7 @@ func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase
 		m.serial++
 		*s = sessionState{epoch: m.serial, reset: e.Timestamp, state: "unverified", verified: e.Type == "LoadGame" && key != "" && e.FID != "" && !e.Timestamp.IsZero()}
 	case "NavRouteClear":
+		s.clearUnknown = e.Timestamp.IsZero()
 		s.targetName = ""
 		s.targetAddress = ""
 		s.reported = nil
@@ -120,7 +140,7 @@ func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase
 			s.barrier = e.Timestamp
 		}
 	case "NavRoute":
-		if !s.verified || e.Timestamp.IsZero() || !e.Timestamp.After(s.reset) || !e.Timestamp.After(s.barrier) {
+		if !s.verified || s.clearUnknown || e.Timestamp.IsZero() || !e.Timestamp.After(s.reset) || !e.Timestamp.After(s.barrier) {
 			return
 		}
 		s.marker = e.Timestamp
@@ -129,6 +149,9 @@ func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase
 		s.route = nil
 		m.correlate(key, s)
 	case "Location", "FSDJump", "CarrierJump":
+		s.targetName = ""
+		s.targetAddress = ""
+		s.reported = nil
 		if !safeText(e.SystemName) || e.SystemAddress == "" {
 			s.currentName = ""
 			s.currentAddress = ""
@@ -180,7 +203,7 @@ func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase
 // Both file-before-marker and marker-before-file are supported without guessing.
 func (m *Model) correlate(key string, s *sessionState) {
 	c := m.candidate
-	if !s.verified || !m.sourceValid || c == nil || !c.stamp.Equal(s.marker) || !c.stamp.After(s.reset) || !c.stamp.After(s.barrier) {
+	if !s.verified || s.clearUnknown || !m.sourceValid || c == nil || !c.stamp.Equal(s.marker) || !c.stamp.After(s.reset) || !c.stamp.After(s.barrier) {
 		return
 	}
 	if c.owner != "" && (c.owner != key || c.epoch != s.epoch) {
@@ -364,7 +387,7 @@ func parseRoute(c sidecar.Change) (*route, bool, error) {
 		var h struct {
 			StarSystem, StarClass string
 			SystemAddress         json.Number
-			StarPos               []json.Number
+			StarPos               []any
 		}
 		if d.Decode(&h) != nil || !safeText(h.StarSystem) || !starClass(h.StarClass) || len(h.StarPos) != 3 {
 			return nil, false, bad
@@ -374,7 +397,11 @@ func parseRoute(c sidecar.Change) (*route, bool, error) {
 			return nil, false, bad
 		}
 		v := routeHop{name: h.StarSystem, class: h.StarClass, address: address}
-		for i, number := range h.StarPos {
+		for i, coordinate := range h.StarPos {
+			number, ok := coordinate.(json.Number)
+			if !ok {
+				return nil, false, bad
+			}
 			x, err := number.Float64()
 			if err != nil {
 				return nil, false, bad

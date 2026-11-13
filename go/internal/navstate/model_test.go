@@ -243,3 +243,38 @@ func TestRoutePublicPayloadHasByteBudget(t *testing.T) {
 		t.Fatal("unbounded/fake partial route", len(data), len(v.Hops), v.Truncated)
 	}
 }
+
+func TestRouteUntimestampedClearCannotResurrectOldEvidence(t *testing.T) {
+	m := verified(t)
+	m.ApplyEvent("A", event(t, `{"event":"NavRouteClear"}`))
+	m.ApplySidecar(file(routeFixture))
+	marker(t, m, "A")
+	if v := m.View("A"); v.RouteState != "cleared" || len(v.Hops) != 0 || v.DestinationSystem != "" {
+		t.Fatal("untimed clear resurrected old route", v)
+	}
+	// An explicit dated clear re-establishes a provable barrier for a newer plot.
+	m.ApplyEvent("A", event(t, `{"event":"NavRouteClear","timestamp":"2026-01-01T00:00:04Z"}`))
+	m.ApplyEvent("A", event(t, `{"event":"NavRoute","timestamp":"2026-01-01T00:00:05Z"}`))
+	newer := file(strings.Replace(routeFixture, "00:00:02Z", "00:00:05Z", 1))
+	newer.Timestamp, _ = time.Parse(time.RFC3339Nano, "2026-01-01T00:00:05Z")
+	m.ApplySidecar(newer)
+	if v := m.View("A"); len(v.Hops) != 2 || v.RouteState != "verified" {
+		t.Fatal("dated recovery did not restore new route", v)
+	}
+}
+func TestRouteCoordinatesRequireActualJSONNumbers(t *testing.T) {
+	m := verified(t)
+	m.ApplySidecar(file(strings.Replace(routeFixture, "[3,4,0]", `["3",4,0]`, 1)))
+	if v := m.View("A"); len(v.Hops) != 0 || v.RouteState != "stale" {
+		t.Fatal("string coordinate presented as measured geometry", v)
+	}
+}
+func TestRouteIncompleteArrivalClearsPreviousTarget(t *testing.T) {
+	m := verified(t)
+	arrive(t, m, "Fixture Alpha", "9007199254740993")
+	m.ApplyEvent("A", event(t, `{"event":"FSDTarget","timestamp":"2026-01-01T00:00:05Z","Name":"Fixture Beta","SystemAddress":9007199254740994,"RemainingJumpsInRoute":1}`))
+	m.ApplyEvent("A", event(t, `{"event":"FSDJump","timestamp":"2026-01-01T00:00:06Z","StarSystem":"Fixture Beta"}`))
+	if v := m.View("A"); v.TargetSystem != "" || v.ReportedRemainingJumps != nil || v.TargetEvidence != "unknown" {
+		t.Fatal("arrival retained pre-arrival target", v)
+	}
+}

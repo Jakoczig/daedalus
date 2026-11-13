@@ -75,6 +75,9 @@ journal reader or game install is required on the laptop.
    appear in a different system or commander. Addressless FSS aggregate events
    require continuous ordered source context after a verified session/arrival,
    with no pending hyperspace change. Body-specific events require exact address.
+   A skipped malformed/oversized record breaks G2B trust; re-enter a commander
+   session and establish a confirmed arrival to recover. A clear missing its
+   timestamp cannot restore routes until a dated clear/new verified session.
 7. Disconnect/rejoin the laptop network and revoke a test device after updates.
    The disconnected page must hide stale live data; recovery must not replay old
    RPC results. Copy system name must write only this device's clipboard after a

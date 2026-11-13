@@ -188,3 +188,41 @@ func TestG2BBroadcastSnapshotsAreIndependent(t *testing.T) {
 		t.Fatal("subscriber mutated dedup baseline")
 	}
 }
+
+func TestG2BMalformedRecordsBreakAttribution(t *testing.T) {
+	badRecords := map[string]string{
+		"arrival":   `{"event":"FSDJump","StarSystem":"Fixture Other","SystemAddress":1.5}`,
+		"identity":  `{"event":"LoadGame","FID":"SYNTHETIC-B",`,
+		"oversized": strings.Repeat("x", (1<<20)+100),
+	}
+	for name, bad := range badRecords {
+		t.Run(name, func(t *testing.T) {
+			dir := g2bSource(t)
+			s := startService(t, dir)
+			waitProjection(t, s, func() bool { return len(s.Navigation().Hops) == 2 && len(s.Exploration().Bodies) == 1 })
+			appendEvent(t, dir, bad)
+			appendEvent(t, dir, `{"event":"FSSDiscoveryScan","BodyCount":99,"Progress":1}`)
+			waitState(t, s, func(v Summary) bool { return v.EventsRead == 10 })
+			n, e := s.Navigation(), s.Exploration()
+			if len(n.Hops) != 0 || n.TargetSystem != "" || len(e.Bodies) != 0 || e.ReportedBodyCount != nil {
+				t.Fatalf("skipped source record retained trusted attribution: nav=%+v survey=%+v", n, e)
+			}
+			// A complete explicit session and arrival restore trustworthy context.
+			appendEvent(t, dir, `{"event":"LoadGame","timestamp":"2026-01-01T00:00:20Z","FID":"SYNTHETIC-B"}`)
+			appendEvent(t, dir, `{"event":"Location","StarSystem":"Fixture Recovered","SystemAddress":7}`)
+			appendEvent(t, dir, `{"event":"FSSDiscoveryScan","BodyCount":7,"Progress":0.5}`)
+			waitProjection(t, s, func() bool {
+				v := s.Exploration()
+				return v.SystemName == "Fixture Recovered" && v.ReportedBodyCount != nil && *v.ReportedBodyCount == 7
+			})
+		})
+	}
+}
+func TestG2BValidUnknownRecordPreservesContinuity(t *testing.T) {
+	dir := g2bSource(t)
+	s := startService(t, dir)
+	waitProjection(t, s, func() bool { return len(s.Exploration().Bodies) == 1 })
+	appendEvent(t, dir, `{"event":"FutureSyntheticEvent","UnknownValue":"not displayed"}`)
+	appendEvent(t, dir, `{"event":"FSSDiscoveryScan","BodyCount":15,"Progress":0.5}`)
+	waitProjection(t, s, func() bool { v := s.Exploration(); return v.ReportedBodyCount != nil && *v.ReportedBodyCount == 15 })
+}

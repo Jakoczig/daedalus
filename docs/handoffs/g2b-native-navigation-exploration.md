@@ -83,6 +83,73 @@ and destination with an explicit partial warning; body view truncation is marked
 partial. Signals/genus arrays are bounded at 32 per event and strings at 128 runes.
 No user journals or identifying screenshots were committed; fixtures are fabricated.
 
+## Final source review and corrections
+
+The fresh whole-branch review of `07c2084..7b0b4ca` completed after the credit-limit
+interruption. It found no Critical issues, three Important correctness defects
+and one strict-coordinate-token Minor. All four were independently reproduced
+with failing regressions, then corrected in one implementation pass:
+
+- Completed malformed/oversized records now consume an internal per-file source
+  sequence number even though they are not emitted as game events. A gap breaks
+  G2B identity/system trust in both reducers. A complete LoadGame and confirmed
+  arrival restore exploration context. Valid unknown future events preserve
+  continuity. G2A valid-event counts/schema remain unchanged; malformed data is
+  never forwarded. Actual reader/service tests cover bad arrival, bad identity
+  and oversized records followed by an addressless FSS aggregate.
+- An untimestamped NavRouteClear keeps a conservative unknown-clear barrier. Old
+  markers/files cannot restore the route. A dated clear or verified new session
+  can establish a fresh barrier before a newly correlated route is accepted.
+- Any confirmed-arrival category clears previous target/count evidence before
+  validating the new system identity; incomplete arrivals cannot retain their
+  pre-arrival target as the next target.
+- Coordinates require actual JSON numeric tokens; quoted numeric strings and
+  null values cannot become measured geometry. This strict-token correction was
+  independently started before the reviewer returned its Minor grade.
+
+The new cases are also included in mandatory 25-repeat Windows/Linux stress and
+25-repeat Linux race gates. No per-send auth guard, assertion or timeout was
+weakened. Final verification below must use the correction head, not merely the
+initial implementation's already-green CI.
+
+### Review rulings and remaining manual boundaries
+
+- Physical gameplay/Proton/CI/artifacts were not inferred from source review;
+  automated evidence is recorded separately, physical acceptance stays manual.
+- Unobserved crashes have no trustworthy shutdown signal: replay is explicitly
+  last-known, not a wall-clock guarantee. Cost: no claim of current game activity.
+- Off-route departures without FSDTarget retain only labeled plotted-waypoint
+  evidence and never advance arrival. Cost: next target can remain unknown.
+- Same-timestamp sidecar correlation is the approved deterministic evidence rule;
+  a journal marker does not attest a content hash. Cost: same-second plot changes
+  can be ambiguous; the provenance label must not imply game control/certainty.
+- Same-commander/exact-system caches are intentional bounded historical source
+  observations. Cost: revisits can contain previously witnessed scans, not a claim
+  that every row was newly scanned in the current visit.
+- Missing/invalid nested values stay unknown/rejected; exact identifiers retain
+  decimal strings. Cost: unsupported values can be omitted rather than guessed.
+- Pre-authorized bytes already in transport buffers cannot be recalled by revoke;
+  delayed-close tests instead reject newly generated post-revoke game data.
+- Snapshot copies, one-slot coalescing, subscriber caps and byte budgets bound the
+  inspected paths. No end-to-end resource/performance guarantee was inferred.
+- Native URLs permit only canonical root/two pages on explicit 127.0.0.1 ports;
+  dual-view readiness requires the actual owner connection. No broader native
+  origin or role is trusted.
+- UI async cleanup, device-local copy and unsupported-page boundaries were checked;
+  physical mobile layout/clipboard policy remains a manual compatibility gate.
+- Rotation lacking a new verifiable session becomes unverified. Cost: conservative
+  withholding until explicit session/arrival evidence, rather than guessing FID.
+- Existing dedicated checkout/new branch and portable ledger helpers were reused;
+  previous branches are untouched. Cost: manual task bookkeeping, checked against
+  published trees and commit history.
+- Both public DTOs use a 256 KiB budget and independently copied deliveries.
+  Cost: oversized route evidence is hidden and survey rows can be explicitly
+  partial; per-subscriber copying is bounded work.
+- Native smoke needed the two known page URLs; the guard stayed narrow and its
+  negative-origin/encoded/query/owner-path tests remain mandatory.
+- Implementation commits precede CI because GitHub needs a published SHA to run;
+  final evidence is a separate handoff-only commit verified afterward.
+
 ## Verification status
 
 Implementation verification is still in progress. Do not infer Windows/Linux CI,
@@ -108,7 +175,9 @@ large real archives and filesystem/power-loss behavior remain manual. See the
 Not every game route cancellation is journaled; a verified marker is an evidence
 claim, not a control channel or guarantee of unreported current game state.
 Conservative timestamp matching can leave rapid same-second or incomplete route
-evidence unverified. Bounded caches are in-memory and are rebuilt by replay;
+evidence unverified. Untimestamped clears require a dated clear or new verified
+session before route recovery. Skipped-record gaps require a complete explicit
+session/arrival before G2B attribution resumes. Bounded caches are in-memory and are rebuilt by replay;
 there is no historical database. Same-identity in-place file edits preserving
 size/mtime can evade the inherited reader checks. OS/network filesystem stalls
 cannot be forcibly interrupted; the profile lock is retained until readers stop.

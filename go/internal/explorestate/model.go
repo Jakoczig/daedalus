@@ -52,6 +52,7 @@ type contextState struct {
 	verified, arrived, pending, continuous, seen bool
 	address, name, fileID                        string
 	offset                                       int64
+	sequence                                     uint64
 }
 type systemKey struct{ commander, address string }
 type bodyState struct {
@@ -116,10 +117,10 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 	s := m.context(key)
 	// Only a new explicit session restores identity after unordered source data.
 	if e.Type == "LoadGame" || e.Type == "Fileheader" {
-		*s = contextState{verified: e.Type == "LoadGame" && key != "" && e.FID != "", continuous: true, seen: true, fileID: e.Position.FileID, offset: e.Position.Offset}
+		*s = contextState{verified: e.Type == "LoadGame" && key != "" && e.FID != "", continuous: true, seen: true, fileID: e.Position.FileID, offset: e.Position.Offset, sequence: e.Position.Sequence}
 		return
 	}
-	if s.seen && (e.Position.FileID == "" || e.Position.FileID != s.fileID || e.Position.Offset <= s.offset) {
+	if s.seen && (e.Position.FileID == "" || e.Position.FileID != s.fileID || e.Position.Offset <= s.offset || (s.sequence != 0 && e.Position.Sequence != 0 && e.Position.Sequence != s.sequence+1)) {
 		s.continuous = false
 		s.verified = false
 		s.arrived = false
@@ -127,6 +128,7 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 	s.seen = true
 	s.fileID = e.Position.FileID
 	s.offset = e.Position.Offset
+	s.sequence = e.Position.Sequence
 	switch e.Type {
 	case "Shutdown":
 		s.verified = false

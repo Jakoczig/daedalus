@@ -53,14 +53,14 @@ jobs:
       - name: Journal startup and revocation stress
         run: cd go && go test -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
       - name: G2B projection stress
-        run: cd go && go test -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent)'
+        run: cd go && go test -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar|UntimestampedClearCannotResurrectOldEvidence|CoordinatesRequireActualJSONNumbers|IncompleteArrivalClearsPreviousTarget)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent|MalformedRecordsBreakAttribution|ValidUnknownRecordPreservesContinuity)'
       - name: Race detector
         if: runner.os == 'Linux'
         run: |
           cd go
           go test -race -count=1 -timeout=4m ./...
           go test -race -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
-          go test -race -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent)'
+          go test -race -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar|UntimestampedClearCannotResurrectOldEvidence|CoordinatesRequireActualJSONNumbers|IncompleteArrivalClearsPreviousTarget)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent|MalformedRecordsBreakAttribution|ValidUnknownRecordPreservesContinuity)'
       - name: Build native desktop
         run: cd go && go build -o bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/daedalus
       - name: Allow this preview to create WebKit sandbox namespaces
