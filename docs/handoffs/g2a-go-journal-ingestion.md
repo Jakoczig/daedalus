@@ -20,6 +20,7 @@ Approved architecture/spec/seven-task plan were read from documentation branch
 | `8c152d5e845901642298bcf2412f8efdf65079a4` | Reviewed correction: reject invalid UTF-8 sidecars without destroying last-good data |
 | `6346fa922fc608d944b7967485655491878fd620` | One shared per-commander service, narrow authenticated RPC/events, protected owner selection, G2A runtime |
 | `a7d3d7de0ed613ca248143ae5e4600efdd1ddcb3` | Minimal React journal card, real connection/source states, owner-only setup and async recovery guards |
+| `20fddfa87ae0fd6a4557ca7aa2558c38e2c78d36` | Cross-platform CI gates, four smoke modes, replay benchmark, synthetic fixture helper and experimental artifacts/runbook |
 
 CI/smoke/handoff commits and final checked head are recorded in the PR description
 after publication. Publishing uses GitHub connector trees/commits because local
@@ -83,8 +84,15 @@ and React. Confirmed findings received explicit failing-then-passing regressions
 - React reconnect error messages persisting after success, and delayed initial
   owner status replacing newer directory edits/actions.
 
-Full-branch external review and current-head CI results are recorded below when
-complete. No actual player journals/identifiers or provider credentials were used
+Fresh independent whole-branch review at `20fddfa` found **no Critical or Important
+findings**. Journal/sidecar/gamestate tests, focused transport/security tests and
+25 UI/build checks passed independently. One confirmed Minor was deferred: the
+owner advanced source settings can retain an old private error/path after automatic
+recovery/discovery until reconnect or an owner action; the streamed live card is
+correct. Refreshing owner details on health transitions must preserve dirty edits
+and operation generations in a later polish fix. Linux/race/physical gameplay and
+artifact checks were not inferred from that source review. Current-head CI evidence
+is recorded below after completion. No actual player journals/identifiers or provider credentials were used
 as fixtures. All committed fixture records, IDs and systems are fabricated.
 
 ## Local verification before CI
