@@ -111,3 +111,9 @@ test('G2A delayed initial owner status cannot replace a newer directory selectio
   assert.match(html, /D:\\NEW/)
   assert.doesNotMatch(html, /C:\\OLD/)
 })
+
+test('G2B source card describes the supported survey without claiming full exploration parity', async () => {
+  const h = harness('viewer'); h.props.stage = 'G2B'; h.html(); const html = await h.flush()
+  assert.match(html, /navigation route and current-system survey are journal-only/i)
+  assert.doesNotMatch(html, /Exploration, ship and engineering features remain unimplemented/)
+})

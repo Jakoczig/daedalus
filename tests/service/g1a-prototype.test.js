@@ -49,6 +49,7 @@ function harness (initialState, options = {}) {
   }
   const loader = loadClientModule('components/loader.js', require).default
   const layout = loadClientModule('components/layout.js', name => name === 'components/loader' ? loader : require(name)).default
+  const panel = loadClientModule('components/panel.js', name => name === 'components/panel-navigation' ? () => null : require(name)).default
   const socket = loadClientModule('lib/socket.js', name => {
     if (name === 'react') {
       return {
@@ -60,12 +61,14 @@ function harness (initialState, options = {}) {
         useEffect: callback => { effect ??= callback }
       }
     }
-    if (name === 'next/router') return { __esModule: true, default: {}, useRouter: () => ({ pathname: '/exploration/system' }) }
+    if (name === 'next/router') return { __esModule: true, default: {}, useRouter: () => ({ pathname: options.pathname || '/exploration/system' }) }
     if (name === 'lib/notification') return () => {}
     if (name === 'components/primary-navigation') return () => React.createElement('nav', null, 'Existing primary navigation')
     if (name === 'components/layout') return layout
-    if (name === 'components/panel') return ({ children }) => React.createElement('div', null, children)
+    if (name === 'components/panel') return panel
     if (name === 'components/remote-displays') return () => React.createElement('section', null, 'Owner remote display settings')
+    if (name === 'components/go-navigation') return () => React.createElement('section', null, 'Native route projection')
+    if (name === 'components/go-exploration-system') return () => React.createElement('section', null, 'Native exploration projection')
     if (name === 'components/go-journal-status') return () => React.createElement('section', null, 'G2A current-system card')
     if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
     return require(name)
@@ -300,4 +303,37 @@ test('timed-out offline work is removed and is never replayed on connect', async
   const opened = connection.onopen()
   assert.ok(connection.sent.every(request => request.name === 'getLoadingStatus'), 'timed-out action was replayed')
   connection.message({ ...connection.sent[0], message: { loadingComplete: true } }); await opened
+})
+
+test('TestG2BLegacySocketAndG2AStillWork', async () => {
+  const client = harness(undefined, { fetch: async () => ({ ok: true, json: async () => ({ role: 'viewer', prototype: { stage: 'G2B', offline: false } }) }) })
+  client.render(); await client.start(); assert.equal(client.state.prototype?.stage, 'G2B'); assert.match(client.render(), /Native exploration projection/); assert.doesNotMatch(client.render(), /Owner remote display settings/)
+  const g2a = harness({ role: 'owner', prototype: { stage: 'G2A', offline: false }, connected: true, ready: true }); assert.doesNotMatch(g2a.render(), /Native exploration projection/)
+  assert.match(render(null, React.createElement('p', null, 'Legacy untouched')), /Legacy untouched/)
+})
+test('TestG2BOtherRoutesRemainUnimplemented', () => {
+  for (const pathname of ['/nav/route', '/exploration/system', '/nav/map', '/eng/engineers']) {
+    const h = harness({ role: 'viewer', prototype: { stage: 'G2B', offline: false }, connected: true, ready: true }, { pathname }); const html = h.render()
+    if (pathname === '/nav/route') assert.match(html, /Native route projection/)
+    else if (pathname === '/exploration/system') assert.match(html, /Native exploration projection/)
+    else { assert.match(html, /unimplemented|not implemented/i); assert.doesNotMatch(html, /Native route projection|Native exploration projection/) }
+  }
+})
+
+test('G2B live pages keep source status and content inside the real scrollable panel', () => {
+  for (const pathname of ['/nav/route', '/exploration/system']) {
+    const h = harness({ role: 'viewer', prototype: { stage: 'G2B', offline: false }, connected: true, ready: true }, { pathname })
+    const html = h.render()
+    assert.match(html, /layout__full-width scrollable/)
+    assert.ok(html.indexOf('G2A current-system card') > html.indexOf('class="layout__main'), 'source card overlays the absolute page outside its scrolling content')
+  }
+})
+
+test('G2B native fixture shell renders both real read-only page slots only for the owner test mode', () => {
+  for (const role of ['owner', 'viewer']) {
+    const h = harness({ role, prototype: { stage: 'G2B', offline: false, navigationSmoke: true }, connected: true, ready: true }, { pathname: '/nav/route' })
+    const html = h.render(); assert.match(html, /Native route projection/)
+    if (role === 'owner') assert.match(html, /Native exploration projection/)
+    else assert.doesNotMatch(html, /Native exploration projection/)
+  }
 })

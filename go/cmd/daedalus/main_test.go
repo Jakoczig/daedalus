@@ -60,8 +60,8 @@ func TestNormalRuntimeProvidesOwnerRemoteSettings(t *testing.T) {
 		}
 		defer res.Body.Close()
 		body, _ := io.ReadAll(res.Body)
-		if !strings.Contains(string(body), `"stage":"G2A"`) {
-			t.Fatal("normal runtime has no G2A journal status", string(body))
+		if !strings.Contains(string(body), `"stage":"G2B"`) {
+			t.Fatal("normal runtime has no G2B navigation/survey stage", string(body))
 		}
 		return nil
 	}

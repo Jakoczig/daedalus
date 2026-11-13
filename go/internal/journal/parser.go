@@ -16,6 +16,8 @@ const MaxRecordBytes = 1 << 20
 type SourcePosition struct {
 	Path, FileID string
 	Offset       int64
+	// Sequence counts all completed source records, including skipped malformed lines.
+	Sequence uint64
 }
 type Event struct {
 	Type                                                             string

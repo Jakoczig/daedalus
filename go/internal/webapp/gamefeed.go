@@ -12,11 +12,13 @@ import (
 )
 
 type Options struct {
-	StorageDir    string
-	EnableJournal bool
-	JournalDir    string
-	Discovery     journal.DiscoveryOptions
-	PollInterval  time.Duration
+	StorageDir       string
+	EnableJournal    bool
+	EnableNavigation bool
+	NavigationSmoke  bool
+	JournalDir       string
+	Discovery        journal.DiscoveryOptions
+	PollInterval     time.Duration
 }
 
 func (s *Server) startGame(ctx context.Context, opts Options) {
@@ -32,6 +34,8 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 			configError = err.Error()
 		}
 	}
+	s.g2b = opts.EnableNavigation
+	s.navigationSmoke = opts.NavigationSmoke && s.g2b
 	s.game, _ = gamestate.NewService(gamestate.Options{Directory: directory, Discovery: opts.Discovery, ConfigError: configError, PollInterval: opts.PollInterval})
 	gameCtx, cancel := context.WithCancel(ctx)
 	s.gameCancel = cancel
@@ -46,8 +50,15 @@ func (s *Server) prototype() map[string]any {
 	}
 	if s.game != nil {
 		stage = "G2A"
+		if s.g2b {
+			stage = "G2B"
+		}
 	}
-	return map[string]any{"stage": stage, "offline": s.game == nil}
+	marker := map[string]any{"stage": stage, "offline": s.game == nil}
+	if s.navigationSmoke {
+		marker["navigationSmoke"] = true
+	}
+	return marker
 }
 func (s *Server) ownerJournal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" || !s.sameOrigin(r) || !s.sessions.valid(s.sessions.token(r)) {

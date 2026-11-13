@@ -257,3 +257,21 @@ func TestReaderAllowsRotationWhileReadHandleIsOpen(t *testing.T) {
 		t.Fatal("reader blocked game file rotation", err)
 	}
 }
+
+func TestReaderSequenceIncludesSkippedCompleteRecords(t *testing.T) {
+	dir := t.TempDir()
+	raw := "{\"event\":\"Fileheader\"}\n{bad json}\n{\"event\":\"FutureSyntheticEvent\"}\n" + strings.Repeat("x", MaxRecordBytes+10) + "\n{\"event\":\"Location\",\"StarSystem\":\"Fixture\"}\n"
+	if err := os.WriteFile(journalPath(dir), []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r, events, _, _ := startReader(t, dir)
+	for _, want := range []uint64{1, 3, 5} {
+		if got := nextEvent(t, events).Event.Position.Sequence; got != want {
+			t.Fatalf("source sequence=%d want %d", got, want)
+		}
+	}
+	waitReader(t, func() bool { return !r.Stats().ImportInProgress })
+	if s := r.Stats(); s.EventsRead != 3 || s.MalformedLines != 2 {
+		t.Fatal("private source gaps changed valid event counters", s)
+	}
+}

@@ -6,7 +6,7 @@ export async function journalAction (action, values = {}) {
   return response.json()
 }
 
-export default function GoJournalStatus ({ connected, ready, role, sendEvent, eventListener }) {
+export default function GoJournalStatus ({ stage, connected, ready, role, sendEvent, eventListener }) {
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState('')
   const [source, setSource] = useState(null)
@@ -51,7 +51,7 @@ export default function GoJournalStatus ({ connected, ready, role, sendEvent, ev
       <p role='status'>{status}</p>
       {connected && ready && summary?.currentSystem && <p>Current / last known system: <strong>{summary.currentSystem}</strong></p>}
       {connected && ready && summary && <p>Events read: {summary.eventsRead || 0}. Last safe event: {summary.lastEventType || 'none'} {summary.lastEventAt && <time dateTime={summary.lastEventAt}>{summary.lastEventAt}</time>}</p>}
-      <p>No provider uploads. Exploration, ship and engineering features remain unimplemented; keep the separate legacy app for those workflows.</p>
+      <p>{stage === 'G2B' ? 'No provider uploads. The navigation route and current-system survey are journal-only. Other ship, engineering and exploration features remain unfinished.' : 'No provider uploads. Exploration, ship and engineering features remain unimplemented; keep the separate legacy app for those workflows.'}</p>
       {error && <p role='alert'>{error}</p>}
       {statusError && <p role='alert'>{statusError}</p>}
       {role === 'owner' && (

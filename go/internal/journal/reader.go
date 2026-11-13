@@ -38,6 +38,7 @@ type cursor struct {
 	info                os.FileInfo
 	offset, replayUntil int64
 	id                  string
+	sequence            uint64
 	prefix, anchor      []byte
 	discard, pending    bool
 }
@@ -265,8 +266,9 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 		}
 		complete := len(fragment) > 0 && fragment[len(fragment)-1] == '\n'
 		if complete {
+			c.sequence++
 			if !c.discard {
-				e, eventErr := ParseLine(bytes.TrimSuffix(line, []byte("\n")), SourcePosition{Path: path, FileID: c.id, Offset: start})
+				e, eventErr := ParseLine(bytes.TrimSuffix(line, []byte("\n")), SourcePosition{Path: path, FileID: c.id, Offset: start, Sequence: c.sequence})
 				if eventErr != nil {
 					r.change(func(s *ReaderStats) { s.MalformedLines++ })
 				} else {

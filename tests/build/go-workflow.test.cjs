@@ -40,7 +40,24 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2a-.*experimental-unsigned-local-journal-no-uploads/)
+  assert.match(job.steps[upload].with.name, /g2b-.*experimental-unsigned-local-route-survey-no-uploads/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
+})
+
+test('G2B stacks on G2A and gates both preview uploads on native navigation and race/stress', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8'))
+  const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
+  assert.ok(workflow.on.pull_request.branches.includes('go/g2a-journal-ingestion'))
+  assert.ok(legacy.on.pull_request.branches.includes('go/g2a-journal-ingestion'))
+  assert.ok(workflow.on.push.branches.includes('go/g2b-local-nav-exploration'))
+  const steps = workflow.jobs.desktop.steps
+  for (const name of ['Prepare synthetic navigation fixture', 'Executable navigation survey smoke', 'Native navigation survey smoke', 'Benchmark projection replay', 'G2B projection stress']) {
+    const step = steps.find(s => s.name === name); assert.ok(step?.run, name); assert.equal(step.if, undefined)
+  }
+  assert.match(steps.find(s => s.name === 'Executable navigation survey smoke').run, /--navigation-smoke-test.*--journal-dir/)
+  assert.match(steps.find(s => s.name === 'Native navigation survey smoke').run, /--desktop-navigation-smoke-test/)
+  assert.match(steps.find(s => s.name === 'Race detector').run, /go test -race -count=1 -timeout=4m \.\/\.\.\./)
+  assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2B/)
+  assert.ok(steps.findIndex(s => s.name === 'Package experimental preview') > steps.findIndex(s => s.name === 'Native navigation survey smoke'))
 })
