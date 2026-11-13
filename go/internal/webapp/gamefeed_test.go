@@ -37,7 +37,11 @@ func gameFixture(t *testing.T) (*Server, *http.Client, *http.Client, string, str
 	dir := t.TempDir()
 	writeGameEvent(t, dir, `{"event":"LoadGame","FID":"SYNTHETIC-PRIVATE","Commander":"PRIVATE_COMMANDER"}`)
 	writeGameEvent(t, dir, `{"event":"Location","StarSystem":"Fixture System","SystemAddress":9223372036854775807}`)
-	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
+	return startGameFixture(t, dir, false, "Fixture System")
+}
+func startGameFixture(t *testing.T, dir string, navigation bool, expected string) (*Server, *http.Client, *http.Client, string, string) {
+	t.Helper()
+	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, EnableNavigation: navigation, Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +64,7 @@ func gameFixture(t *testing.T) (*Server, *http.Client, *http.Client, string, str
 		t.Fatal("pairing", result)
 	}
 	deadline := time.Now().Add(3 * time.Second)
-	for s.game.Snapshot().CurrentSystem != "Fixture System" {
+	for s.game.Snapshot().CurrentSystem != expected {
 		if time.Now().After(deadline) {
 			t.Fatal("journal did not replay")
 		}

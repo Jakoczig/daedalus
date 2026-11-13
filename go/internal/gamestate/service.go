@@ -44,6 +44,7 @@ type selection struct {
 }
 type Service struct {
 	mu           sync.Mutex
+	views        projectionState
 	opts         Options
 	summary      Summary
 	details      SourceDetails
@@ -63,7 +64,7 @@ func NewService(opts Options) (*Service, error) {
 	if opts.PollInterval <= 0 {
 		opts.PollInterval = 500 * time.Millisecond
 	}
-	return &Service{opts: opts, summary: Summary{SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
+	return &Service{views: newProjectionState(), opts: opts, summary: Summary{SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
 }
 func (s *Service) Snapshot() Summary { s.mu.Lock(); defer s.mu.Unlock(); return s.summary }
 func (s *Service) Details() SourceDetails {
@@ -77,6 +78,7 @@ func (s *Service) Details() SourceDetails {
 	return d
 }
 func (s *Service) publishLocked() {
+	s.publishProjectionsLocked()
 	for ch := range s.subscribers {
 		select {
 		case ch <- s.summary:
@@ -172,6 +174,7 @@ func (s *Service) Run(ctx context.Context) error {
 		stopReader()
 		s.mu.Lock()
 		s.closed = true
+		s.closeProjectionsLocked()
 		s.summary.SourceState = "stopped"
 		for ch := range s.subscribers {
 			delete(s.subscribers, ch)
@@ -198,6 +201,7 @@ func (s *Service) Run(ctx context.Context) error {
 			reader = nil
 			snapshots = nil
 			s.mu.Lock()
+			s.resetProjectionsLocked()
 			s.commanders = map[string]commanderState{}
 			s.order = nil
 			s.unknown = commanderState{}
@@ -260,6 +264,7 @@ func (s *Service) Run(ctx context.Context) error {
 				s.mu.Lock()
 				for _, change := range changes {
 					s.details.Sidecars[change.Kind] = change.State
+					s.sidecarProjectionLocked(change)
 				}
 				s.mu.Unlock()
 			}
@@ -282,6 +287,7 @@ func (s *Service) Run(ctx context.Context) error {
 			} else {
 				s.summary.ImportInProgress = false
 			}
+			s.publishProjectionsLocked()
 			if s.summary != before {
 				s.publishLocked()
 			}
@@ -338,6 +344,7 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 	case "Shutdown":
 		s.stopped = true
 	}
+	s.applyProjectionsLocked(event, phase)
 	state := s.unknown
 	if s.active != "" {
 		state = s.commanders[s.active]

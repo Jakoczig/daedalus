@@ -381,6 +381,7 @@ func (m *Model) View(key, address string) ExplorationView {
 		}
 		return ids[i] < ids[j]
 	})
+	budget := 1024
 	for _, id := range ids {
 		b := state.bodies[id].view
 		b.Landable = copyPtr(b.Landable)
@@ -392,6 +393,12 @@ func (m *Model) View(key, address string) ExplorationView {
 		b.PreviouslyDiscovered = copyPtr(b.PreviouslyDiscovered)
 		b.PreviouslyMapped = copyPtr(b.PreviouslyMapped)
 		b.Genuses = append([]string{}, b.Genuses...)
+		encoded, err := json.Marshal(b)
+		if err != nil || budget+len(encoded)+1 > 256<<10 {
+			v.Truncated = true
+			break
+		}
+		budget += len(encoded) + 1
 		v.Bodies = append(v.Bodies, b)
 	}
 	if len(v.Bodies) > 0 || state.count != nil || state.progress != nil {
@@ -400,7 +407,7 @@ func (m *Model) View(key, address string) ExplorationView {
 	if state.all {
 		v.SurveyState = "scanner_complete"
 	}
-	if state.partial || state.overflow {
+	if state.partial || v.Truncated {
 		v.SurveyState = "partial"
 	}
 	if s.pending {

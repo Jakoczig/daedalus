@@ -229,3 +229,17 @@ func TestRouteRejectsNullCoordinatesAndCombinedStarClass(t *testing.T) {
 		})
 	}
 }
+
+func TestRoutePublicPayloadHasByteBudget(t *testing.T) {
+	hop := `{"StarSystem":"` + strings.Repeat("🚀", 128) + `","SystemAddress":123,"StarPos":[0,0,0],"StarClass":"G"}`
+	raw := `{"event":"NavRoute","timestamp":"2026-01-01T00:00:02Z","Route":[` + strings.TrimSuffix(strings.Repeat(hop+",", 2048), ",") + `]}`
+	m := NewModel()
+	session(t, m, "A")
+	marker(t, m, "A")
+	m.ApplySidecar(file(raw))
+	v := m.View("A")
+	data, _ := json.Marshal(v)
+	if len(data) > 256<<10 || !v.Truncated || len(v.Hops) != 0 || v.DestinationSystem != "" {
+		t.Fatal("unbounded/fake partial route", len(data), len(v.Hops), v.Truncated)
+	}
+}

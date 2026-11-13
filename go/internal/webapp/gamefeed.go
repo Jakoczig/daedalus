@@ -12,11 +12,12 @@ import (
 )
 
 type Options struct {
-	StorageDir    string
-	EnableJournal bool
-	JournalDir    string
-	Discovery     journal.DiscoveryOptions
-	PollInterval  time.Duration
+	StorageDir       string
+	EnableJournal    bool
+	EnableNavigation bool
+	JournalDir       string
+	Discovery        journal.DiscoveryOptions
+	PollInterval     time.Duration
 }
 
 func (s *Server) startGame(ctx context.Context, opts Options) {
@@ -32,6 +33,7 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 			configError = err.Error()
 		}
 	}
+	s.g2b = opts.EnableNavigation
 	s.game, _ = gamestate.NewService(gamestate.Options{Directory: directory, Discovery: opts.Discovery, ConfigError: configError, PollInterval: opts.PollInterval})
 	gameCtx, cancel := context.WithCancel(ctx)
 	s.gameCancel = cancel
@@ -46,6 +48,9 @@ func (s *Server) prototype() map[string]any {
 	}
 	if s.game != nil {
 		stage = "G2A"
+		if s.g2b {
+			stage = "G2B"
+		}
 	}
 	return map[string]any{"stage": stage, "offline": s.game == nil}
 }

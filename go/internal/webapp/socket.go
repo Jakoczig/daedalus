@@ -133,6 +133,31 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			}
 		}()
 	}
+	if s.g2b && s.game != nil {
+		changes, unsubscribe := s.game.SubscribeProjections(readCtx)
+		defer unsubscribe()
+		go func() {
+			for {
+				select {
+				case <-readCtx.Done():
+					return
+				case p, ok := <-changes:
+					if !ok {
+						return
+					}
+					if send(map[string]any{"name": "goNavigationChanged", "message": p.Navigation}) != nil {
+						conn.CloseNow()
+						return
+					}
+					if send(map[string]any{"name": "goExplorationChanged", "message": p.Exploration}) != nil {
+						conn.CloseNow()
+						return
+					}
+				}
+			}
+		}()
+	}
+
 	for {
 		kind, data, err := conn.Read(readCtx)
 		if err != nil {
@@ -159,6 +184,18 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoNavigation":
+			if !s.g2b || s.game == nil {
+				response["error"] = "Navigation not enabled"
+			} else {
+				response["message"] = s.game.Navigation()
+			}
+		case "getGoExploration":
+			if !s.g2b || s.game == nil {
+				response["error"] = "Exploration not enabled"
+			} else {
+				response["message"] = s.game.Exploration()
+			}
 		case "getJournalSummary":
 			if s.game == nil {
 				response["error"] = "Journal ingestion disabled"

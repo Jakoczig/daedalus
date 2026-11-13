@@ -27,6 +27,7 @@ type Server struct {
 	readyOnce                 sync.Once
 	remote                    *remoteManager
 	pingInterval, pongTimeout time.Duration
+	g2b                       bool
 	game                      *gamestate.Service
 	gameCancel                context.CancelFunc
 	gameDone                  chan struct{}

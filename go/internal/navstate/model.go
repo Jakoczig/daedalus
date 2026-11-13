@@ -293,6 +293,17 @@ func (m *Model) View(key string) NavigationView {
 	} else if s.targetName != "" && len(v.Hops) > 0 {
 		v.TargetEvidence = "route_conflict"
 	}
+	if raw, err := json.Marshal(v); err != nil || len(raw) > 256<<10 {
+		v.Hops = []Hop{}
+		v.DestinationSystem = ""
+		v.RemainingJumps = nil
+		v.Truncated = true
+		v.RouteState = "partial"
+		if v.TargetEvidence == "verified_route_next" {
+			v.TargetSystem = ""
+			v.TargetEvidence = "unknown"
+		}
+	}
 	return v
 }
 func safeText(s string) bool {

@@ -170,3 +170,17 @@ func TestExplorationSupercruiseDoesNotPretendSystemChange(t *testing.T) {
 		t.Fatal("supercruise blocked known-system FSS", v)
 	}
 }
+
+func TestExplorationPublicPayloadHasByteBudget(t *testing.T) {
+	m := start(t)
+	g := `{"Genus_Localised":"` + strings.Repeat("🚀", 128) + `"}`
+	for i := 0; i < 512; i++ {
+		apply(t, m, "A", fmt.Sprintf(`{"event":"Scan","SystemAddress":9007199254740993,"BodyID":%d,"BodyName":"Fixture Body %d"}`, i, i))
+		apply(t, m, "A", fmt.Sprintf(`{"event":"SAASignalsFound","SystemAddress":9007199254740993,"BodyID":%d,"Genuses":[%s]}`, i, g))
+	}
+	v := m.View("A", "9007199254740993")
+	raw, _ := json.Marshal(v)
+	if len(raw) > 256<<10 || !v.Truncated || v.SurveyState != "partial" {
+		t.Fatal("unbounded public survey", len(raw), v.Truncated)
+	}
+}
