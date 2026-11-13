@@ -32,6 +32,8 @@ type Server struct {
 	gameDone                  chan struct{}
 	gameConfigMu              sync.Mutex
 	profile                   string
+	journalReady              chan struct{}
+	journalReadyOnce          sync.Once
 }
 
 func StartLocal(ctx context.Context, assets fs.FS) (*Server, error) {
@@ -62,6 +64,7 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 		return nil, errors.New("cannot start local service")
 	}
 	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{}), clientReady: make(chan struct{}), pingInterval: 20 * time.Second, pongTimeout: 10 * time.Second}
+	server.journalReady = make(chan struct{})
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	server.sessions = newSessionStore(port, time.Now)
 	server.sockets = make(map[*websocket.Conn]struct{})
@@ -106,7 +109,8 @@ func (s *Server) URL() string           { return s.url }
 func (s *Server) Done() <-chan struct{} { return s.done }
 
 // ClientReady is signaled only after an authenticated loading-status RPC.
-func (s *Server) ClientReady() <-chan struct{} { return s.clientReady }
+func (s *Server) ClientReady() <-chan struct{}        { return s.clientReady }
+func (s *Server) JournalClientReady() <-chan struct{} { return s.journalReady }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
 		s.gameConfigMu.Lock()

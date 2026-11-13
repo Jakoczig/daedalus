@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -91,6 +92,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		}
 	}()
 	var writeMu sync.Mutex
+	var journalRequested atomic.Bool
 	send := func(value any) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
@@ -123,6 +125,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 					if send(map[string]any{"name": "journalSummaryChanged", "message": summary}) != nil {
 						conn.CloseNow()
 						return
+					}
+					if principal.role == "owner" && journalRequested.Load() && summary.CurrentSystem != "" {
+						s.journalReadyOnce.Do(func() { close(s.journalReady) })
 					}
 				}
 			}
@@ -158,6 +163,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			if s.game == nil {
 				response["error"] = "Journal ingestion disabled"
 			} else {
+				journalRequested.Store(true)
 				response["message"] = s.game.Snapshot()
 			}
 		default:
@@ -168,6 +174,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		}
 		if request.Name == "getLoadingStatus" && principal.role == "owner" {
 			s.readyOnce.Do(func() { close(s.clientReady) })
+		}
+		if request.Name == "getJournalSummary" && principal.role == "owner" && s.game != nil && s.game.Snapshot().CurrentSystem != "" {
+			s.journalReadyOnce.Do(func() { close(s.journalReady) })
 		}
 	}
 }

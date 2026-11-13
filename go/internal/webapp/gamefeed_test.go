@@ -275,3 +275,23 @@ func TestSlowJournalSelectionCannotWriteAfterProfileReleased(t *testing.T) {
 		t.Fatal("stale handler changed another owner's locked profile")
 	}
 }
+
+func TestJournalNativeReadinessRequiresOwnerCardRequest(t *testing.T) {
+	s, _, viewer, url, _ := gameFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	remote := pairedSocket(t, viewer, url)
+	callRPC(t, ctx, remote, "getJournalSummary")
+	select {
+	case <-s.JournalClientReady():
+		t.Fatal("viewer spoofed native journal readiness")
+	default:
+	}
+	owner, ownerCtx := dialOwner(t, s)
+	callRPC(t, ownerCtx, owner, "getJournalSummary")
+	select {
+	case <-s.JournalClientReady():
+	case <-ctx.Done():
+		t.Fatal("native card request not observed")
+	}
+}

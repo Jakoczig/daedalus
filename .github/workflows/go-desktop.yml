@@ -2,9 +2,9 @@ name: Go desktop foundation
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays]
   push:
-    branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays]
+    branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion]
 
 permissions:
   contents: read
@@ -79,13 +79,32 @@ jobs:
           else
             go/bin/daedalus.exe --desktop-smoke-test
           fi
+      - name: Prepare synthetic journal fixture
+        id: journal_fixture
+        run: node scripts/build/journal-smoke-fixture.cjs
+      - name: Executable journal smoke
+        env:
+          G2A_JOURNAL_DIR: ${{ steps.journal_fixture.outputs.directory }}
+        run: go/bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} --journal-smoke-test --journal-dir "$G2A_JOURNAL_DIR"
+      - name: Native journal smoke
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          G2A_JOURNAL_DIR: ${{ steps.journal_fixture.outputs.directory }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- go/bin/daedalus --desktop-journal-smoke-test --journal-dir "$G2A_JOURNAL_DIR"
+          else
+            go/bin/daedalus.exe --desktop-journal-smoke-test --journal-dir "$G2A_JOURNAL_DIR"
+          fi
+      - name: Benchmark journal replay
+        run: cd go && go test ./internal/journal -run '^$' -bench '^BenchmarkJournalReplay$' -benchmem -benchtime=3x
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
-      - name: Upload experimental unsigned offline preview
+      - name: Upload experimental unsigned local journal preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g1b-${{ runner.os }}-x64-experimental-unsigned-offline-preview
+          name: daedalus-g2a-${{ runner.os }}-x64-experimental-unsigned-local-journal-no-uploads
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

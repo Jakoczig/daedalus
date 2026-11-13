@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -76,5 +78,63 @@ func TestSmokeUsesNoPersonalJournals(t *testing.T) {
 	}
 	if output.String() != "G1A offline smoke passed\n" {
 		t.Fatal("smoke ceased to be isolated/offline")
+	}
+}
+
+func TestSyntheticJournalSmokeAndExplicitSource(t *testing.T) {
+	assets := fstest.MapFS{"index.html": {Data: []byte("index")}, "exploration/system.html": {Data: []byte("system")}}
+	var output bytes.Buffer
+	launch := func(context.Context, string, func()) error {
+		t.Fatal("headless fixture smoke launched window")
+		return nil
+	}
+	dir := t.TempDir()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "testdata", "g2a", "replay.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "Journal.20260101.01.log"), raw, 0600)
+	if err := run(context.Background(), []string{"--journal-smoke-test", "--journal-dir", dir}, assets, launch, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "G2A synthetic journal smoke passed") {
+		t.Fatal("no actual journal smoke result")
+	}
+	if err := run(context.Background(), []string{"--journal-smoke-test"}, assets, launch, &output); err == nil {
+		t.Fatal("journal smoke attempted default personal discovery")
+	}
+}
+
+func TestNativeOfflineSmokeIgnoresJournalDirectory(t *testing.T) {
+	assets := fstest.MapFS{"index.html": {Data: []byte("index")}}
+	checked := false
+	launch := func(_ context.Context, url string, _ func()) error {
+		req, _ := http.NewRequest("POST", url+"/auth/session", nil)
+		req.Header.Set("Origin", url)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cookies := res.Cookies()
+		res.Body.Close()
+		req, _ = http.NewRequest("POST", url+"/owner/journal", strings.NewReader(`{"action":"status"}`))
+		req.Header.Set("Origin", url)
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+		res, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 404 {
+			t.Fatal("native offline smoke enabled journal reading", res.StatusCode)
+		}
+		checked = true
+		return errors.New("deliberate test window stop")
+	}
+	var out bytes.Buffer
+	if err := run(context.Background(), []string{"--desktop-smoke-test", "--journal-dir", t.TempDir()}, assets, launch, &out); err == nil || !checked {
+		t.Fatal("native isolation was not checked")
 	}
 }

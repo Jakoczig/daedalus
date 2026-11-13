@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays]
 
 jobs:
   regression-tests:
