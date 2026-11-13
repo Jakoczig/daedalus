@@ -1,0 +1,266 @@
+// Package navstate projects journal-attested plotted routes. No file IO or network.
+package navstate
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+)
+
+const MaxHops = 2048
+
+type Hop struct {
+	Name                   string   `json:"name"`
+	StarClass              string   `json:"starClass"`
+	DistanceFromPreviousLY *float64 `json:"distanceFromPreviousLY"`
+	IsCurrent              bool     `json:"isCurrent"`
+	IsNext                 bool     `json:"isNext"`
+}
+type NavigationView struct {
+	CurrentSystem          string `json:"currentSystem"`
+	TargetSystem           string `json:"targetSystem"`
+	DestinationSystem      string `json:"destinationSystem"`
+	RouteState             string `json:"routeState"`
+	TargetEvidence         string `json:"targetEvidence"`
+	RemainingJumps         *int   `json:"remainingJumps"`
+	ReportedRemainingJumps *int   `json:"reportedRemainingJumps"`
+	Hops                   []Hop  `json:"hops"`
+	Truncated              bool   `json:"truncated"`
+}
+type routeHop struct {
+	name, class, address string
+	pos                  [3]float64
+}
+type route struct {
+	stamp time.Time
+	hops  []routeHop
+	owner string
+	epoch uint64
+}
+type sessionState struct {
+	verified               bool
+	epoch                  uint64
+	reset, marker, barrier time.Time
+	route                  *route
+	state                  string
+}
+
+// Model is owned by the enclosing service's mutex. Returned views own all memory.
+type Model struct {
+	sessions    map[string]*sessionState
+	order       []string
+	active      string
+	candidate   *route
+	sourceValid bool
+	overflow    bool
+	serial      uint64
+}
+
+func NewModel() *Model { m := &Model{}; m.ResetSource(); return m }
+func (m *Model) ResetSource() {
+	m.sessions = map[string]*sessionState{}
+	m.order = nil
+	m.active = ""
+	m.candidate = nil
+	m.sourceValid = false
+	m.overflow = false
+}
+func (m *Model) state(key string) *sessionState {
+	if s := m.sessions[key]; s != nil {
+		return s
+	}
+	if len(m.order) >= 64 {
+		delete(m.sessions, m.order[0])
+		m.order = m.order[1:]
+	}
+	s := &sessionState{state: "no_route"}
+	m.sessions[key] = s
+	m.order = append(m.order, key)
+	return s
+}
+func (m *Model) ApplyEvent(key string, e journal.Event) {
+	m.active = key
+	s := m.state(key)
+	switch e.Type {
+	case "LoadGame", "Fileheader", "Shutdown":
+		m.serial++
+		*s = sessionState{epoch: m.serial, reset: e.Timestamp, state: "unverified", verified: e.Type == "LoadGame" && key != "" && e.FID != "" && !e.Timestamp.IsZero()}
+	case "NavRouteClear":
+		s.route = nil
+		s.marker = time.Time{}
+		s.state = "cleared"
+		if e.Timestamp.After(s.barrier) {
+			s.barrier = e.Timestamp
+		}
+	case "NavRoute":
+		if !s.verified || e.Timestamp.IsZero() || !e.Timestamp.After(s.reset) || !e.Timestamp.After(s.barrier) {
+			return
+		}
+		s.marker = e.Timestamp
+		s.state = "unverified"
+		s.route = nil
+		m.correlate(key, s)
+	}
+}
+
+// Correlation is exact UTC timestamp equality, strictly after this session's
+// LoadGame and latest clear. A candidate is claimed by one session epoch only.
+// Both file-before-marker and marker-before-file are supported without guessing.
+func (m *Model) correlate(key string, s *sessionState) {
+	c := m.candidate
+	if !s.verified || !m.sourceValid || c == nil || !c.stamp.Equal(s.marker) || !c.stamp.After(s.reset) || !c.stamp.After(s.barrier) {
+		return
+	}
+	if c.owner != "" && (c.owner != key || c.epoch != s.epoch) {
+		return
+	}
+	c.owner = key
+	c.epoch = s.epoch
+	s.route = c
+	s.state = "verified"
+}
+func (m *Model) ApplySidecar(c sidecar.Change) {
+	if c.Kind != "NavRoute" {
+		return
+	}
+	if !c.Valid {
+		m.sourceValid = false
+		return
+	}
+	r, overflow, err := parseRoute(c)
+	m.sourceValid = err == nil
+	m.overflow = overflow
+	if err != nil {
+		return
+	}
+	// Keep an existing claim when a byte-identical/equal-time file is polled again.
+	if m.candidate != nil && m.candidate.stamp.Equal(r.stamp) {
+		r.owner = m.candidate.owner
+		r.epoch = m.candidate.epoch
+	}
+	m.candidate = r
+	if s := m.sessions[m.active]; s != nil {
+		m.correlate(m.active, s)
+	}
+}
+func (m *Model) View(key string) NavigationView {
+	v := NavigationView{RouteState: "no_route", TargetEvidence: "unknown", Hops: []Hop{}}
+	s := m.sessions[key]
+	if s == nil {
+		return v
+	}
+	v.RouteState = s.state
+	v.Truncated = m.overflow
+	if s.state == "cleared" {
+		return v
+	}
+	if s.route == nil {
+		if m.candidate != nil || !m.sourceValid {
+			v.RouteState = "unverified"
+		}
+		return v
+	}
+	if !m.sourceValid || m.candidate == nil || !s.route.stamp.Equal(m.candidate.stamp) {
+		v.RouteState = "stale"
+		return v
+	}
+	for _, h := range s.route.hops {
+		v.Hops = append(v.Hops, Hop{Name: h.name, StarClass: h.class})
+	}
+	if len(v.Hops) > 0 {
+		v.DestinationSystem = v.Hops[len(v.Hops)-1].Name
+	}
+	return v
+}
+func safeText(s string) bool {
+	if s == "" || !utf8.ValidString(s) || utf8.RuneCountInString(s) > 128 {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
+}
+func exactID(n json.Number) (string, error) {
+	s := string(n)
+	if strings.ContainsAny(s, "+-.eE") {
+		return "", errors.New("invalid identifier")
+	}
+	x, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatUint(x, 10), nil
+}
+func starClass(s string) bool {
+	return strings.Contains("|O|B|A|F|G|K|M|L|T|Y|TTS|AeBe|W|WN|WNC|WC|WO|CS|C|CN|CJ|CH|CHd|MS|S|D|DA|DAB|DAO|DAZ|DAV|DB|DBZ|DBV|DO|DOV|DQ|DC|DCV|DX|N|H|X|", "|"+s+"|") && s != ""
+}
+func parseRoute(c sidecar.Change) (*route, bool, error) {
+	bad := errors.New("invalid bounded route")
+	if len(c.Raw) > 4<<20 || !utf8.Valid(c.Raw) {
+		return nil, false, bad
+	}
+	var env struct {
+		Event     string
+		Timestamp time.Time
+		Route     json.RawMessage
+	}
+	d := json.NewDecoder(bytes.NewReader(c.Raw))
+	if d.Decode(&env) != nil || d.Decode(new(any)) != io.EOF || env.Event != "NavRoute" || env.Timestamp.IsZero() || !env.Timestamp.Equal(c.Timestamp) {
+		return nil, false, bad
+	}
+	d = json.NewDecoder(bytes.NewReader(env.Route))
+	d.UseNumber()
+	token, err := d.Token()
+	if err != nil || token != json.Delim('[') {
+		return nil, false, bad
+	}
+	r := &route{stamp: env.Timestamp}
+	for d.More() {
+		if len(r.hops) >= MaxHops {
+			return nil, true, bad
+		}
+		var h struct {
+			StarSystem, StarClass string
+			SystemAddress         json.Number
+			StarPos               []float64
+		}
+		if d.Decode(&h) != nil || !safeText(h.StarSystem) || !starClass(h.StarClass) || len(h.StarPos) != 3 {
+			return nil, false, bad
+		}
+		address, err := exactID(h.SystemAddress)
+		if err != nil {
+			return nil, false, bad
+		}
+		v := routeHop{name: h.StarSystem, class: h.StarClass, address: address}
+		for i, x := range h.StarPos {
+			if math.IsNaN(x) || math.IsInf(x, 0) || math.Abs(x) > 1e6 {
+				return nil, false, bad
+			}
+			v.pos[i] = x
+		}
+		if len(r.hops) > 0 {
+			p := r.hops[len(r.hops)-1].pos
+			if math.Sqrt(math.Pow(v.pos[0]-p[0], 2)+math.Pow(v.pos[1]-p[1], 2)+math.Pow(v.pos[2]-p[2], 2)) > 200000 {
+				return nil, false, bad
+			}
+		}
+		r.hops = append(r.hops, v)
+	}
+	if _, err := d.Token(); err != nil || d.Decode(new(any)) != io.EOF || len(r.hops) == 0 {
+		return nil, false, bad
+	}
+	return r, false, nil
+}
