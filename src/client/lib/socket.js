@@ -6,6 +6,7 @@ import PrimaryNavigation from 'components/primary-navigation'
 import Layout from 'components/layout'
 import Panel from 'components/panel'
 import RemoteDisplays from 'components/remote-displays'
+import GoJournalStatus from 'components/go-journal-status'
 import * as navigation from 'lib/navigation-items'
 
 let connecting = false
@@ -118,7 +119,8 @@ async function connect (socketState, setSocketState) {
     const { role, prototype } = await response.json()
     if (generation !== connectionGeneration) return
     if (!['owner', 'viewer'].includes(role)) throw new Error('Invalid session response')
-    setSocketState(previous => ({ ...previous, role, prototype: ['G1A', 'G1B'].includes(prototype?.stage) && prototype?.offline === true ? prototype : null, needsPairing: false }))
+    const preview = (['G1A', 'G1B'].includes(prototype?.stage) && prototype?.offline === true) || (prototype?.stage === 'G2A' && prototype?.offline === false)
+    setSocketState(previous => ({ ...previous, role, prototype: preview ? prototype : null, needsPairing: false }))
   } catch {
     if (generation === connectionGeneration) scheduleReconnect(socketState, setSocketState)
     return
@@ -418,7 +420,7 @@ function PrototypeShell () {
     ? 'Disconnected. Waiting to reconnect to the local Go service.'
     : !ready
         ? 'Connected. Waiting for the local Go service to become ready.'
-        : 'Connected and ready. Game features remain unimplemented.'
+        : stage === 'G2A' ? 'Connected and ready. Journal availability is shown separately.' : 'Connected and ready. Game features remain unimplemented.'
   const [, group, page = ''] = router.pathname.split('/')
   const menus = {
     cmdr: navigation.CmdrPanelNavItems,
@@ -436,14 +438,15 @@ function PrototypeShell () {
   return (
     <>
       <header><h1>DAEDALUS Terminal</h1><PrimaryNavigation /></header>
-      <p role='status'>{stage} offline preview: {status}</p>
-      {stage === 'G1B' && role === 'owner' && <RemoteDisplays />}
+      <p role='status'>{stage} {stage === 'G2A' ? 'local journal' : 'offline'} preview: {status}</p>
+      {['G1B', 'G2A'].includes(stage) && role === 'owner' && <RemoteDisplays />}
+      {stage === 'G2A' && <GoJournalStatus connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />}
       <Layout connected={connected} ready={ready}>
         <Panel navigation={items}>
-          <h2>{stage} — offline desktop foundation</h2>
-          <p>Game features are not implemented in this preview. No journals are read, no commander data is loaded, and no provider calls or uploads run.</p>
+          <h2>{stage} — {stage === 'G2A' ? 'limited local journal preview' : 'offline desktop foundation'}</h2>
+          <p>{stage === 'G2A' ? 'Only local journal ingestion and the sanitized current-system card are implemented. Other gameplay pages remain unimplemented. No provider calls or uploads run.' : 'Game features are not implemented in this preview. No journals are read, no commander data is loaded, and no provider calls or uploads run.'}</p>
           <p>Selected route: <code>{router.pathname}</code></p>
-          <p>{stage === 'G1B' ? 'Paired displays are read-only. Remote access is controlled by the local owner.' : 'Remote displays and pairing are not enabled in G1A.'} Navigation and reload test the existing exported interface only. Keep using the separate legacy application for game features.</p>
+          <p>{stage !== 'G1A' ? 'Paired displays are read-only. Remote access is controlled by the local owner.' : 'Remote displays and pairing are not enabled in G1A.'} Navigation and reload test the existing exported interface only. Keep using the separate legacy application for game features.</p>
         </Panel>
       </Layout>
     </>

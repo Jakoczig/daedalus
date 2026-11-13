@@ -66,6 +66,7 @@ function harness (initialState, options = {}) {
     if (name === 'components/layout') return layout
     if (name === 'components/panel') return ({ children }) => React.createElement('div', null, children)
     if (name === 'components/remote-displays') return () => React.createElement('section', null, 'Owner remote display settings')
+    if (name === 'components/go-journal-status') return () => React.createElement('section', null, 'G2A current-system card')
     if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
     return require(name)
   }, browser)
@@ -168,6 +169,18 @@ test('legacy service still renders its existing page when no prototype marker is
     assert.match(html, /Existing live interface/)
     assert.doesNotMatch(html, /G1A|role="status"|id="loader"/)
   }
+})
+
+test('G2A marker enables a limited live journal shell and preserves owner remote settings', async () => {
+  const client = harness(undefined, { fetch: async () => ({ ok: true, json: async () => ({ role: 'owner', prototype: { stage: 'G2A', offline: false } }) }) })
+  client.render(); await client.start()
+  assert.equal(client.state.prototype?.stage, 'G2A')
+  const html = client.render()
+  assert.match(html, /G2A.*local journal/i)
+  assert.match(html, /G2A current-system card/)
+  assert.match(html, /Owner remote display settings/)
+  assert.doesNotMatch(html, /No journals are read/)
+  assert.match(html, /unimplemented|not implemented/i)
 })
 
 function assertStatus (client, connected, ready, message) {
