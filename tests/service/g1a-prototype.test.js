@@ -328,3 +328,12 @@ test('G2B live pages keep source status and content inside the real scrollable p
     assert.ok(html.indexOf('G2A current-system card') > html.indexOf('class="layout__main'), 'source card overlays the absolute page outside its scrolling content')
   }
 })
+
+test('G2B native fixture shell renders both real read-only page slots only for the owner test mode', () => {
+  for (const role of ['owner', 'viewer']) {
+    const h = harness({ role, prototype: { stage: 'G2B', offline: false, navigationSmoke: true }, connected: true, ready: true }, { pathname: '/nav/route' })
+    const html = h.render(); assert.match(html, /Native route projection/)
+    if (role === 'owner') assert.match(html, /Native exploration projection/)
+    else assert.doesNotMatch(html, /Native exploration projection/)
+  }
+})

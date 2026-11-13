@@ -273,3 +273,28 @@ func TestG2BG2AStageRemainsCompatible(t *testing.T) {
 		t.Fatal("G2A implicitly opted in")
 	}
 }
+
+func TestG2BNativeReadinessRequiresBothOwnerViews(t *testing.T) {
+	s, _, viewer, url, _ := g2bFixture(t)
+	remote := pairedSocket(t, viewer, url)
+	owner, ctx := dialOwner(t, s)
+	callRPC(t, ctx, remote, "getGoNavigation")
+	callRPC(t, ctx, remote, "getGoExploration")
+	select {
+	case <-s.NavigationClientReady():
+		t.Fatal("viewer satisfied native readiness")
+	default:
+	}
+	callRPC(t, ctx, owner, "getGoNavigation")
+	select {
+	case <-s.NavigationClientReady():
+		t.Fatal("single view satisfied dual-view readiness")
+	default:
+	}
+	callRPC(t, ctx, owner, "getGoExploration")
+	select {
+	case <-s.NavigationClientReady():
+	case <-time.After(time.Second):
+		t.Fatal("both owner projections were not acknowledged")
+	}
+}

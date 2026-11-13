@@ -51,3 +51,24 @@ func TestFactoryFailureStopsService(t *testing.T) {
 		t.Fatal("startup left service running")
 	}
 }
+
+func TestKnownLocalNavigationPagesAllowed(t *testing.T) {
+	for _, path := range []string{"/nav/route", "/exploration/system"} {
+		host := &fakeHost{}
+		stops := 0
+		url := "http://127.0.0.1:45678" + path
+		err := run(context.Background(), url, func() { stops++ }, func(stop func()) (windowHost, error) { host.shutdown = stop; return host, nil })
+		if err != nil || stops != 1 || len(host.urls) != 1 || host.urls[0] != url {
+			t.Fatal("known local page failed", url, err)
+		}
+	}
+}
+func TestKnownPageDoesNotRelaxDesktopOriginGuard(t *testing.T) {
+	for _, url := range []string{"http://192.168.1.2:42/nav/route", "http://127.0.0.1:42/nav/route?role=owner", "http://127.0.0.1:42/nav/route#token", "http://127.0.0.1:42/%6eav/route", "http://127.0.0.1:42/owner/journal"} {
+		called := false
+		err := run(context.Background(), url, func() {}, func(func()) (windowHost, error) { called = true; return nil, nil })
+		if err == nil || called {
+			t.Fatal("unsafe native URL admitted", url)
+		}
+	}
+}

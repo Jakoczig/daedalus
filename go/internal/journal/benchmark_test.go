@@ -53,7 +53,7 @@ func TestReplayNeverWritesGameSources(t *testing.T) {
 	}
 }
 func TestIngestionPackagesCannotPerformProviderRequestsOrSpawnRuntimes(t *testing.T) {
-	for _, name := range []string{"journal", "sidecar", "gamestate"} {
+	for _, name := range []string{"journal", "sidecar", "gamestate", "navstate", "explorestate"} {
 		root := filepath.Join("..", name)
 		files, err := os.ReadDir(root)
 		if err != nil {

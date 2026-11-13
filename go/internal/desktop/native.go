@@ -38,7 +38,7 @@ func newNativeHost(stop func()) (windowHost, error) {
 }
 
 func (h *nativeHost) Open(localURL string) error {
-	h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "DAEDALUS — G1A Offline Preview", Width: 1280, Height: 850, URL: localURL})
+	h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "DAEDALUS — Experimental Go Preview", Width: 1280, Height: 850, URL: localURL})
 	return nil
 }
 func (h *nativeHost) Run() error { defer h.stopped.Store(true); return h.app.Run() }

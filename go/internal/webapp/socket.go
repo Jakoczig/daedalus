@@ -93,6 +93,12 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	}()
 	var writeMu sync.Mutex
 	var journalRequested atomic.Bool
+	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
+	navigationReady := func() {
+		if principal.role == "owner" && navRequested.Load() && surveyRequested.Load() && navDelivered.Load() && surveyDelivered.Load() {
+			s.navigationReadyOnce.Do(func() { close(s.navigationReady) })
+		}
+	}
 	send := func(value any) error {
 		writeMu.Lock()
 		defer writeMu.Unlock()
@@ -149,10 +155,18 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 						conn.CloseNow()
 						return
 					}
+					if len(p.Navigation.Hops) > 0 && navRequested.Load() {
+						navDelivered.Store(true)
+					}
 					if send(map[string]any{"name": "goExplorationChanged", "message": p.Exploration}) != nil {
 						conn.CloseNow()
 						return
 					}
+					if len(p.Exploration.Bodies) > 0 && surveyRequested.Load() {
+						surveyDelivered.Store(true)
+					}
+					navigationReady()
+
 				}
 			}
 		}()
@@ -179,6 +193,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			continue
 		}
 		response := map[string]any{"requestId": request.RequestID, "name": request.Name}
+		navigationNonempty, surveyNonempty := false, false
 		switch request.Name {
 		case "getLoadingStatus":
 			response["message"] = s.loadingStatus()
@@ -188,13 +203,19 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			if !s.g2b || s.game == nil {
 				response["error"] = "Navigation not enabled"
 			} else {
-				response["message"] = s.game.Navigation()
+				navRequested.Store(true)
+				value := s.game.Navigation()
+				navigationNonempty = len(value.Hops) > 0
+				response["message"] = value
 			}
 		case "getGoExploration":
 			if !s.g2b || s.game == nil {
 				response["error"] = "Exploration not enabled"
 			} else {
-				response["message"] = s.game.Exploration()
+				surveyRequested.Store(true)
+				value := s.game.Exploration()
+				surveyNonempty = len(value.Bodies) > 0
+				response["message"] = value
 			}
 		case "getJournalSummary":
 			if s.game == nil {
@@ -209,6 +230,13 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		if send(response) != nil {
 			return
 		}
+		if navigationNonempty {
+			navDelivered.Store(true)
+		}
+		if surveyNonempty {
+			surveyDelivered.Store(true)
+		}
+		navigationReady()
 		if request.Name == "getLoadingStatus" && principal.role == "owner" {
 			s.readyOnce.Do(func() { close(s.clientReady) })
 		}

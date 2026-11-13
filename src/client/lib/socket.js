@@ -447,7 +447,12 @@ function PrototypeShell () {
         <Panel navigation={items} scrollable={stage === 'G2B'}>
           {stage === 'G2B' && <GoJournalStatus stage={stage} connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />}
           {stage === 'G2B' && router.pathname === '/nav/route'
-            ? <GoNavigation connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />
+            ? (
+              <>
+                <GoNavigation connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />
+                {prototype?.navigationSmoke === true && role === 'owner' && <GoExplorationSystem connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />}
+              </>
+              )
             : stage === 'G2B' && router.pathname === '/exploration/system'
               ? <GoExplorationSystem connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} />
               : (
