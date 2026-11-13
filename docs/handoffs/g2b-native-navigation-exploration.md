@@ -6,6 +6,99 @@ Draft stacked PR: https://github.com/Jakoczig/daedalus/pull/7. Branch
 Approved spec and six-task plan read from docs branch
 `69b50f633584735fc85fcfda84ab16adf575b079`.
 
+## External-review provenance correction — cc3bd67
+
+The [external review](https://github.com/Jakoczig/daedalus/pull/7#issuecomment-6865474643)
+Important finding was independently confirmed. The previous implementation copied
+owner/epoch for equal timestamps and checked view freshness by timestamp, so a
+changed file could inherit an old marker's verification. This supersedes the
+older timestamp-correlation ruling and green-head evidence below.
+
+Implementation commit: `cc3bd67618e1d370636e9b8b825045231c2e0627`.
+Only the navigation model/tests and mandatory stress selection changed; owner/viewer
+authorization, shared reader, public DTOs, pairing, legacy application and dependency
+pins are unchanged.
+
+- A private SHA-256 fingerprint binds the claim to the observed sidecar bytes.
+  Only an uninterrupted byte-identical observation retains the same candidate.
+- A changed same-timestamp candidate, or a same-timestamp repair after invalid
+  input, stays explicitly `unverified`, with no hops, destination, plotted next
+  target or computed remaining jumps. Independent journal targets retain their
+  separate evidence label. Repeated files and indistinguishable same-second
+  markers do not clear ambiguity; reverting the file cannot restore the old claim.
+- A bounded claimed-time barrier prevents reusing a consumed timestamp after
+  another candidate. Views require exact candidate identity, not timestamp equality.
+- A newer matching timestamp restores correlation in both marker-before-file and
+  file-before-marker order. Continuous identical polls remain verified. Existing
+  commander/session ownership, clear and reset barriers are preserved.
+
+Deterministic tests were first run against the original implementation and failed
+with actionable `verified` routes. The corrected suite passes, including:
+`TestRouteSameTimestampChangedContentCannotReuseOldMarker` (destination, exact ID,
+coordinates and byte-only change),
+`TestRouteSameTimestampInvalidThenRepairedNeedsNewEvidence` (invalid flag/parser
+rejection, identical/changed repair),
+`TestRouteSameTimestampProvenanceRecoversWithNewerEvidence` (both orderings),
+`TestRouteSameTimestampOldClaimCannotReturnAfterAnotherCandidate`, and
+`TestRouteSameTimestampChangedBeforeMarkerIsAmbiguous`. Original-code mutation
+checks also reproduced failures for the latter two. All `TestRouteSameTimestamp*`
+and original order tests run in mandatory 25-repeat Windows/Linux stress and
+25-repeat Linux race gates; no assertions, timeouts or gates were weakened.
+
+Local checks: 11 Go packages PASS (webapp 71.950 s), Go vet/module verification
+PASS; navigation full suite count=25 PASS (1.811 s); 63 JavaScript tests, nine build
+tests, security/build lint PASS; React export 62 routes/278 assets PASS.
+
+Exact-source-head CI independently checked completed/success on 2026-11-13:
+
+- [Windows/Linux desktop push 43513049157](https://github.com/Jakoczig/daedalus/actions/runs/43513049157)
+  ([Windows job](https://github.com/Jakoczig/daedalus/actions/runs/43513049157/job/132187866926),
+  [Linux job](https://github.com/Jakoczig/daedalus/actions/runs/43513049157/job/132187866474)).
+- [Windows/Linux desktop PR 43513252381](https://github.com/Jakoczig/daedalus/actions/runs/43513252381)
+  and [additional PR run 43513185678](https://github.com/Jakoczig/daedalus/actions/runs/43513185678).
+- [Legacy/security 43513252341](https://github.com/Jakoczig/daedalus/actions/runs/43513252341)
+  and [additional run 43513185640](https://github.com/Jakoczig/daedalus/actions/runs/43513185640):
+  all five jobs each PASS. PR #7 alone was reopened to trigger initially absent PR
+  workflows; draft/base/head preserved and previous PRs unchanged.
+
+Both OSes passed full Go tests, vet/pinned modules, 63 JavaScript tests, nine build
+tests, security/build lint, React build/export, startup/revocation and G2B stress
+(count=25), native builds, and all six headless/native smoke modes. Linux passed
+full `go test -race -count=1 -timeout=4m ./...` and both repeated race selections
+(count=25), including the new provenance and original ordering cases. Job logs
+identify clean `cc3bd67618e1d370636e9b8b825045231c2e0627` executables. Windows race
+is not claimed. No gate was softened or skipped beyond preexisting OS selection.
+
+Downloaded and independently verified source-head previews (14-day retention):
+[Windows artifact 14078973196](https://github.com/Jakoczig/daedalus/actions/runs/43513049157/artifacts/14078973196),
+[Linux artifact 14078529579](https://github.com/Jakoczig/daedalus/actions/runs/43513049157/artifacts/14078529579).
+Each archive contains exactly executable, README.md and SHA256SUMS; both internal
+file hashes and GitHub's archive digest match. PE/ELF signatures and unsigned,
+experimental/local-route/survey/no-provider-upload labels and runtime prerequisites
+were checked. No profiles, keys, tokens, credentials or journals are packaged.
+
+| Verified source-head file | SHA-256 |
+| --- | --- |
+| Windows daedalus.exe | `82ab572d9000d59847e40d4bd6f176260015b1063f9ef2d87de4a00c6dfd6c59` |
+| Windows README.md | `54100d89a128c23f0a6d9c412011e343c0bf900d6681ea20cbb766a66cd12ac3` |
+| Windows ZIP | `4e3fbbd14df3daa38dfcc54a96381ebaacb6e88dec4081a753402ec08dfb6008` |
+| Linux daedalus | `06604c08bc98c8bb20d2ad47d285589dd4bd5f82837dbb25d27260fac9c47b95` |
+| Linux README.md | `4cdb4292cf6a198cc57a616f28d0ad49418a06c1c7a183f72ed7e2573a3fc20c` |
+| Linux ZIP | `6f0c101b519fd1519119f2394e8f3b469ab1de73d56310fbcfe1a424a9f32931` |
+
+The subsequent handoff-only commit changes this document alone. Its own exact-head
+CI/artifacts are independently verified and recorded in PR #7 to avoid a self-
+referencing documentation commit loop. The source-head evidence above remains immutable.
+
+
+These fingerprints establish continuity of observed files; journal markers do not
+contain content hashes. Unobserved replacements before a poll cannot be attested
+cryptographically. Even harmless formatting changes or an identical repair after
+an invalid write are conservatively withheld at a consumed timestamp. A newly
+plotted, later-timestamp matching file/marker can recover; source reset discards
+all in-memory provenance and reconstructs it from available evidence. No physical
+G2B gameplay, Linux/Proton or mobile acceptance is inferred from these tests.
+
 ## Implementation and evidence boundaries
 
 The existing single Go journal/sidecar service now owns bounded navigation and
@@ -64,6 +157,7 @@ fallback when browser permission is denied; no host/game action is exposed.
 | 23b2a7d577369791411600e739a14bb1e11e0867 | Two actual React pages, safe reconnect/copy behavior and scrollable layout |
 | 7b0b4ca9700d059fe569df632c3c43c58652f6da | Six real smoke modes, native dual-owner-view readiness, Windows/Linux gates, fixtures, preview/runbook and benchmarks |
 | 8c359e26aa723b655d7dd6f4c7011d07ff382650 | Final-review regressions: skipped-record trust, undated clear, incomplete arrival and strict coordinate tokens |
+| cc3bd67618e1d370636e9b8b825045231c2e0627 | External-review provenance regression: bind route claims to observed content; same-timestamp replacements stay unverified |
 
 These are canonical published source commits; local intermediate metadata hashes
 are not the published identifiers. Every connector-published tree was checked
@@ -124,9 +218,10 @@ already-green CI.
   last-known, not a wall-clock guarantee. Cost: no claim of current game activity.
 - Off-route departures without FSDTarget retain only labeled plotted-waypoint
   evidence and never advance arrival. Cost: next target can remain unknown.
-- Same-timestamp sidecar correlation is the approved deterministic evidence rule;
-  a journal marker does not attest a content hash. Cost: same-second plot changes
-  can be ambiguous; the provenance label must not imply game control/certainty.
+- Superseded by the external-review correction above: timestamp equality alone
+  cannot retain proof across observed content changes. Changed/repaired same-time
+  candidates stay unverified until independently newer matching evidence. A journal
+  marker still does not cryptographically attest file contents.
 - Same-commander/exact-system caches are intentional bounded historical source
   observations. Cost: revisits can contain previously witnessed scans, not a claim
   that every row was newly scanned in the current visit.
