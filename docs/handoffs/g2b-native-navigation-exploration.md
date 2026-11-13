@@ -62,10 +62,14 @@ fallback when browser permission is denied; no host/game action is exposed.
 | ddca7a55352a939d596017baafa92d040828f5f2 | Verified current-system scan/signal/DSS reducer, exact IDs and source continuity |
 | c175980a31a1d958631a0ff4abbcef183d086b33 | Shared projections, 256 KiB payload caps, deep snapshot isolation, secure opt-in API/revocation |
 | 23b2a7d577369791411600e739a14bb1e11e0867 | Two actual React pages, safe reconnect/copy behavior and scrollable layout |
+| 7b0b4ca9700d059fe569df632c3c43c58652f6da | Six real smoke modes, native dual-owner-view readiness, Windows/Linux gates, fixtures, preview/runbook and benchmarks |
+| 8c359e26aa723b655d7dd6f4c7011d07ff382650 | Final-review regressions: skipped-record trust, undated clear, incomplete arrival and strict coordinate tokens |
 
-Later canonical implementation commits are added after publication; local
-metadata hashes are not final published identifiers. Every connector-published
-tree is checked against its tested local tree.
+These are canonical published source commits; local intermediate metadata hashes
+are not the published identifiers. Every connector-published tree was checked
+against its tested local tree. The final handoff-only commit changes this document
+only; its fresh current-head results/artifacts are recorded in PR #7 after checking
+them, avoiding a self-referencing documentation-commit loop.
 
 All six tasks use failing tests before implementation. Independent reviews
 between model, service/security and UI boundaries confirmed/fixed null-as-zero
@@ -109,8 +113,8 @@ with failing regressions, then corrected in one implementation pass:
 
 The new cases are also included in mandatory 25-repeat Windows/Linux stress and
 25-repeat Linux race gates. No per-send auth guard, assertion or timeout was
-weakened. Final verification below must use the correction head, not merely the
-initial implementation's already-green CI.
+weakened. The correction-head verification below supersedes the initial implementation's
+already-green CI.
 
 ### Review rulings and remaining manual boundaries
 
@@ -150,14 +154,85 @@ initial implementation's already-green CI.
 - Implementation commits precede CI because GitHub needs a published SHA to run;
   final evidence is a separate handoff-only commit verified afterward.
 
-## Verification status
+## Passing verification — correction head 8c359e2
 
-Implementation verification is still in progress. Do not infer Windows/Linux CI,
-race/native success or artifact hashes from workflow wiring. Exact current-head
-CI results, published commit hashes and independently inspected preview ZIPs will
-replace this section after completion. Earlier G2A acceptance is baseline only.
+All workflow conclusions were independently checked as completed/success for exact
+`8c359e26aa723b655d7dd6f4c7011d07ff382650` on 2026-11-13:
 
-Local projection-only replay measurement (50,000 synthetic updates, three
+| Immutable CI evidence | Verified result |
+| --- | --- |
+| [Desktop branch push 43507990581](https://github.com/Jakoczig/daedalus/actions/runs/43507990581) | Windows + Ubuntu 24.04 PASS, exact branch commit build |
+| [Desktop PR 43508263938](https://github.com/Jakoczig/daedalus/actions/runs/43508263938) | Windows + Ubuntu PASS against unchanged G2A base |
+| [Legacy/security 43508264067](https://github.com/Jakoczig/daedalus/actions/runs/43508264067) | All five jobs PASS: Windows/Linux regressions and security lint, legacy launcher build/smoke, React build and existing advisory style job |
+| [Reopened desktop PR 43508191473](https://github.com/Jakoczig/daedalus/actions/runs/43508191473) | Windows + Ubuntu PASS on the same corrected head |
+| [Reopened legacy/security 43508191497](https://github.com/Jakoczig/daedalus/actions/runs/43508191497) | All five jobs PASS on the same corrected head |
+
+Inspected exact-commit desktop logs:
+[Windows job 132170535818](https://github.com/Jakoczig/daedalus/actions/runs/43507990581/job/132170535818),
+[Linux job 132170535418](https://github.com/Jakoczig/daedalus/actions/runs/43507990581/job/132170535418).
+Both confirm Go 1.26.10 / Wails 3.0.0, vcs.modified=false and the exact correction
+revision. The required gates all passed:
+
+- 63 JavaScript security/legacy/UI regressions; nine build/fixture/package tests;
+  mandatory security/build lint; React build/export preserving 62 routes and
+  278 embedded assets; pinned module verification and go vet.
+- Complete uncached Go tests across all 11 packages on Windows and Ubuntu,
+  preserving G1A/G1B/G2A security, profile-lock, TLS/pairing and long-idle tests.
+- Full Linux `go test -race` and 25-repeat Linux race checks of prior startup/
+  revocation cases plus G2B clear/arrival/FID/source-gap/broadcast/revocation cases.
+  The same G2B cases also ran 25 times without race on both OSes.
+- Native Windows/Linux builds and **all six** smoke modes per OS: G1A headless and
+  real native React; G2A explicit-fixture headless and native journal card; G2B
+  explicit-fixture headless route/survey and real native dual-owner-view React.
+  Linux uses Xvfb/DBus/software rendering and the existing executable-specific
+  AppArmor userns permission, retaining WebKit sandbox/global policy.
+- Preview packaging/upload only after the above gates, with no soft security or
+  native checks. No release, installer, deployment or game/provider action.
+
+Local correction re-verification also passed: full 11-package Go suite (webapp
+71.048 s), vet/modules, 63 JS tests, nine build tests, both lints and focused
+25-repeat regressions. Clean Windows correction binary passed all six real
+modes. WebView2 157.0.4341.46 logged the inherited nonfatal cleanup warning 1412
+following successful shutdown; no smoke failure was hidden. Linux/race execution
+is verified in CI; no local Linux installation or Windows cgo race result is
+claimed.
+
+### Downloaded experimental previews and independently checked SHA-256
+
+Exact correction-commit branch-push artifacts, retention 14 days:
+
+- [Windows x64 artifact 14078110797](https://github.com/Jakoczig/daedalus/actions/runs/43507990581/artifacts/14078110797)
+- [Linux x64 artifact 14078095804](https://github.com/Jakoczig/daedalus/actions/runs/43507990581/artifacts/14078095804)
+
+Both ZIPs were actually downloaded and opened. Each contains exactly its platform
+executable, README.md and SHA256SUMS. Both manifest entries match independently
+computed uncompressed file hashes; complete ZIP digests match GitHub's artifact
+metadata. PE/ELF signatures, experimental/unsigned/no-provider-uploads labels,
+Windows WebView2/Linux GTK-WebKit prerequisites and verification instructions were
+checked. No user profile, private CA key, token, credentials or journal files are
+packaged. README hashes differ because each runner uses its own checkout line
+endings; each matches its own manifest. These are not publisher signatures.
+
+| Verified correction artifact file | SHA-256 |
+| --- | --- |
+| Windows daedalus.exe | `d8efdd2dfd75f2209086edd5c5ed2447ad989d8d5036d6757f2db545eb73454a` |
+| Windows README.md | `54100d89a128c23f0a6d9c412011e343c0bf900d6681ea20cbb766a66cd12ac3` |
+| Windows ZIP | `e1f0bec9782b976f258555b0790f2b2ddd398712be35f1ab8f070960742985d5` |
+| Linux daedalus | `15c637942bdcc78ce0832037038c9998e649fa83c564bd8a2aec29f5d142c978` |
+| Linux README.md | `4cdb4292cf6a198cc57a616f28d0ad49418a06c1c7a183f72ed7e2573a3fc20c` |
+| Linux ZIP | `21566a1cbd7b891bc63ef7d9e19d6c8bc44e64ce903517be85ced16a74c55b35` |
+
+### Measurements, with limits
+
+Correction-head CI projection-only replay, 50,000 fabricated updates, three
+iterations; parser/source IO, network, Wails and UI excluded:
+
+| Runner | ns/op | events/s | allocated B/op | allocs/op |
+| --- | ---: | ---: | ---: | ---: |
+| Windows amd64 | 273586967 | 182757 | 68421989 | 1150217 |
+| Ubuntu amd64 | 175754545 | 284488 | 68421712 | 1150215 |
+
+Earlier pre-correction local projection-only measurement (50,000 synthetic updates, three
 iterations, Windows amd64 Ryzen 7 6800U): 194,909,500 ns/op, 256,530 events/s,
 68,425,234 allocated B/op and 1,150,214 allocs/op. This excludes source IO/parser,
 network, Wails and UI; allocated bytes are not retained RSS. No idle CPU/RAM or
