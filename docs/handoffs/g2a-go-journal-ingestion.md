@@ -119,14 +119,27 @@ No idle CPU/RSS, end-to-end latency or legacy-versus-Go savings claim is made.
 
 ## Windows/Linux CI and experimental artifacts
 
-**BLOCKED — GitHub Actions is disabled repository-wide.** On 2026-11-13 the
-[repository Actions page](https://github.com/Jakoczig/daedalus/actions) displayed
-"GitHub Actions is currently disabled for this repository" and directed the owner
-to GitHub Support. The public API and connector returned zero run/check records
-for the G2A heads, although both workflow definitions are active and the stacked
-PR is mergeable. Reopening only draft PR #6 and a contents-API documentation push
-did not create runs. No repo security/settings bypass or Support communication
-was attempted. The owner has been asked to resolve this external restriction.
+**BLOCKED — GitHub Actions still refuses to schedule runs.** On 2026-11-13,
+after the maintainer reported disabling/re-enabling Actions in repository
+settings, an authorized empty retry commit
+[`11403bb541aaa6304a185ddb631cdd9a2e20185c`](https://github.com/Jakoczig/daedalus/commit/11403bb541aaa6304a185ddb631cdd9a2e20185c)
+was pushed to `go/g2a-journal-ingestion`. Its tree is identical to `4818ba0`;
+no runtime, workflow or security settings changed.
+
+A fresh [repository Actions page](https://github.com/Jakoczig/daedalus/actions)
+now displays this exact message:
+
+> Workflows are not currently being run on this fork due to the scale of GitHub Actions usage. A repository maintainer can choose to re-enable these.
+
+Both connector and public REST head-filtered run queries returned **zero runs**;
+the REST check-runs endpoint also returned **zero checks** for `11403bb`.
+Neither workflow started, so there are no job failures/logs or artifact checksums
+to assess. This is a scheduling restriction, not a reported test failure.
+Previously the page said Actions was disabled and directed the owner to GitHub
+Support; the newer fork/usage message above is the current observed restriction.
+The maintainer must resolve the remaining Actions restriction (or contact GitHub
+Support if re-enabling does not clear it), then request another fresh trigger.
+No repository security/settings bypass or Support communication was attempted.
 
 Consequently **no G2A Windows/Linux CI, Linux race/native result, CI benchmark or
 CI artifact URL exists yet**. The earlier G1B checks are baseline evidence only,
@@ -201,3 +214,4 @@ EDDN, CAPI, uploads, game controls, merge, deployment, release or replacement.
 
 Stop after G2A and request ChatGPT external review. A later separately authorized
 slice may build navigation/current-system UI on this service; G2B has not begun.
+
