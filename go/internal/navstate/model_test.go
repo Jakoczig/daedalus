@@ -135,3 +135,84 @@ func TestRouteExactLargeSystemAddress(t *testing.T) {
 		}
 	}
 }
+
+func verified(t *testing.T) *Model {
+	t.Helper()
+	m := NewModel()
+	session(t, m, "A")
+	marker(t, m, "A")
+	m.ApplySidecar(file(routeFixture))
+	return m
+}
+func arrive(t *testing.T, m *Model, name, address string) {
+	t.Helper()
+	m.ApplyEvent("A", event(t, `{"event":"FSDJump","timestamp":"2026-01-01T00:00:04Z","StarSystem":"`+name+`","SystemAddress":`+address+`}`))
+}
+func TestRouteAdvancesOnlyOnConfirmedArrival(t *testing.T) {
+	m := verified(t)
+	arrive(t, m, "Fixture Alpha", "9007199254740993")
+	v := m.View("A")
+	if v.CurrentSystem != "Fixture Alpha" || v.RemainingJumps == nil || *v.RemainingJumps != 1 || !v.Hops[0].IsCurrent || !v.Hops[1].IsNext || v.Hops[1].DistanceFromPreviousLY == nil || *v.Hops[1].DistanceFromPreviousLY != 5 {
+		t.Fatalf("bad initial progression: %+v", v)
+	}
+	m.ApplyEvent("A", event(t, `{"event":"StartJump","timestamp":"2026-01-01T00:00:05Z","StarSystem":"Fixture Beta","SystemAddress":9007199254740994,"JumpType":"Hyperspace"}`))
+	if v = m.View("A"); v.CurrentSystem != "Fixture Alpha" || *v.RemainingJumps != 1 {
+		t.Fatal("StartJump advanced route", v)
+	}
+	arrive(t, m, "Fixture Beta", "9007199254740994")
+	v = m.View("A")
+	if v.CurrentSystem != "Fixture Beta" || *v.RemainingJumps != 0 || !v.Hops[1].IsCurrent {
+		t.Fatal("arrival failed", v)
+	}
+}
+func TestFSDTargetBeforeArrivalDoesNotMoveCurrent(t *testing.T) {
+	m := verified(t)
+	arrive(t, m, "Fixture Alpha", "9007199254740993")
+	m.ApplyEvent("A", event(t, `{"event":"FSDTarget","timestamp":"2026-01-01T00:00:05Z","Name":"Fixture Beta","SystemAddress":9007199254740994,"RemainingJumpsInRoute":7}`))
+	v := m.View("A")
+	if v.TargetSystem != "Fixture Beta" || v.TargetEvidence != "journal_target" || v.CurrentSystem != "Fixture Alpha" || v.ReportedRemainingJumps == nil || *v.ReportedRemainingJumps != 7 || *v.RemainingJumps != 1 {
+		t.Fatalf("target confused with position/count: %+v", v)
+	}
+}
+func TestRouteTargetConflictMarked(t *testing.T) {
+	m := verified(t)
+	arrive(t, m, "Fixture Alpha", "9007199254740993")
+	m.ApplyEvent("A", event(t, `{"event":"FSDTarget","timestamp":"2026-01-01T00:00:05Z","Name":"Fixture Elsewhere","SystemAddress":99}`))
+	v := m.View("A")
+	if v.TargetSystem != "Fixture Elsewhere" || v.TargetEvidence != "route_conflict" || v.DestinationSystem != "Fixture Beta" || v.Hops[1].IsNext {
+		t.Fatal("conflict hidden", v)
+	}
+}
+func TestRouteUnmatchedCurrentHasUnknownRemaining(t *testing.T) {
+	m := verified(t)
+	arrive(t, m, "Fixture Alpha", "999")
+	v := m.View("A")
+	if v.RemainingJumps != nil || v.TargetSystem != "" || v.Hops[0].IsCurrent {
+		t.Fatal("matched by name or invented next", v)
+	}
+}
+func TestRouteDirectJumpDoesNotFakePlottedRoute(t *testing.T) {
+	m := NewModel()
+	session(t, m, "A")
+	arrive(t, m, "Fixture Direct", "42")
+	if v := m.View("A"); v.CurrentSystem != "Fixture Direct" || v.RemainingJumps != nil || v.DestinationSystem != "" || len(v.Hops) != 0 {
+		t.Fatal("invented plotted route", v)
+	}
+}
+func TestRouteClearRemovesActiveHopsAndCannotResurrect(t *testing.T) {
+	TestRouteNavRouteClearStaysCleared(t)
+}
+func TestRouteReplayEvidenceAndSessionReset(t *testing.T) {
+	m := NewModel()
+	session(t, m, "A")
+	m.ApplyEventPhase("A", event(t, `{"event":"NavRoute","timestamp":"2026-01-01T00:00:02Z"}`), journal.Replay)
+	m.ApplySidecar(file(routeFixture))
+	if v := m.View("A"); v.RouteState != "verified_last_known" {
+		t.Fatal("replayed route claimed live", v)
+	}
+	m.ApplyEvent("A", event(t, `{"event":"LoadGame","FID":"SYNTHETIC-A","timestamp":"2026-01-01T00:00:03Z"}`))
+	marker(t, m, "A")
+	if v := m.View("A"); len(v.Hops) != 0 || v.TargetSystem != "" {
+		t.Fatal("same commander stale session reused", v)
+	}
+}

@@ -48,11 +48,15 @@ type route struct {
 	epoch uint64
 }
 type sessionState struct {
-	verified               bool
-	epoch                  uint64
-	reset, marker, barrier time.Time
-	route                  *route
-	state                  string
+	verified                                               bool
+	epoch                                                  uint64
+	reset, marker, barrier                                 time.Time
+	route                                                  *route
+	state                                                  string
+	currentName, currentAddress, targetName, targetAddress string
+	arrival                                                time.Time
+	reported                                               *int
+	markerLive, targetLive                                 bool
 }
 
 // Model is owned by the enclosing service's mutex. Returned views own all memory.
@@ -88,14 +92,27 @@ func (m *Model) state(key string) *sessionState {
 	m.order = append(m.order, key)
 	return s
 }
-func (m *Model) ApplyEvent(key string, e journal.Event) {
+func (m *Model) ApplyEvent(key string, e journal.Event) { m.ApplyEventPhase(key, e, journal.Live) }
+
+// Explicit phase keeps replayed evidence last-known, never a fresh game target.
+func (m *Model) ApplyEventPhase(key string, e journal.Event, phase journal.Phase) {
 	m.active = key
 	s := m.state(key)
 	switch e.Type {
-	case "LoadGame", "Fileheader", "Shutdown":
+	case "Shutdown":
+		s.verified = false
+		s.targetName = ""
+		s.targetAddress = ""
+		s.reported = nil
+		s.state = "waiting_game"
+		s.route = nil
+	case "LoadGame", "Fileheader":
 		m.serial++
 		*s = sessionState{epoch: m.serial, reset: e.Timestamp, state: "unverified", verified: e.Type == "LoadGame" && key != "" && e.FID != "" && !e.Timestamp.IsZero()}
 	case "NavRouteClear":
+		s.targetName = ""
+		s.targetAddress = ""
+		s.reported = nil
 		s.route = nil
 		s.marker = time.Time{}
 		s.state = "cleared"
@@ -107,9 +124,54 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 			return
 		}
 		s.marker = e.Timestamp
+		s.markerLive = phase == journal.Live
 		s.state = "unverified"
 		s.route = nil
 		m.correlate(key, s)
+	case "Location", "FSDJump", "CarrierJump":
+		if !safeText(e.SystemName) || e.SystemAddress == "" {
+			s.currentName = ""
+			s.currentAddress = ""
+			return
+		}
+		s.currentName = e.SystemName
+		s.currentAddress = e.SystemAddress
+		s.arrival = e.Timestamp
+		s.targetName = ""
+		s.targetAddress = ""
+		s.reported = nil
+	case "StartJump":
+		// A jump is pending, not arrived. An existing FSDTarget stays distinct.
+		if s.targetName != "" {
+			s.targetLive = false
+		}
+	case "FSDTarget":
+		if !s.verified || e.Timestamp.IsZero() || !e.Timestamp.After(s.reset) || e.Timestamp.Before(s.arrival) {
+			return
+		}
+		var target struct {
+			Name                  string
+			SystemAddress         json.Number
+			RemainingJumpsInRoute *int
+		}
+		d := json.NewDecoder(bytes.NewReader(e.Raw))
+		d.UseNumber()
+		if d.Decode(&target) != nil || !safeText(target.Name) {
+			return
+		}
+		address, err := exactID(target.SystemAddress)
+		if err != nil {
+			return
+		}
+		s.targetName = target.Name
+		s.targetAddress = address
+		s.targetLive = phase == journal.Live
+		s.reported = nil
+		if target.RemainingJumpsInRoute != nil && *target.RemainingJumpsInRoute >= 0 && *target.RemainingJumpsInRoute <= MaxHops {
+			n := *target.RemainingJumpsInRoute
+			s.reported = &n
+		}
+
 	}
 }
 
@@ -159,13 +221,25 @@ func (m *Model) View(key string) NavigationView {
 	if s == nil {
 		return v
 	}
+	v.CurrentSystem = s.currentName
 	v.RouteState = s.state
 	v.Truncated = m.overflow
-	if s.state == "cleared" {
+	if s.targetName != "" {
+		v.TargetSystem = s.targetName
+		v.TargetEvidence = "last_known_target"
+		if s.targetLive {
+			v.TargetEvidence = "journal_target"
+		}
+		if s.reported != nil {
+			n := *s.reported
+			v.ReportedRemainingJumps = &n
+		}
+	}
+	if s.state == "cleared" || s.state == "waiting_game" {
 		return v
 	}
 	if s.route == nil {
-		if m.candidate != nil || !m.sourceValid {
+		if m.candidate != nil {
 			v.RouteState = "unverified"
 		}
 		return v
@@ -174,11 +248,50 @@ func (m *Model) View(key string) NavigationView {
 		v.RouteState = "stale"
 		return v
 	}
-	for _, h := range s.route.hops {
-		v.Hops = append(v.Hops, Hop{Name: h.name, StarClass: h.class})
+	if !s.markerLive {
+		v.RouteState = "verified_last_known"
+	}
+	index := -1
+	matches := 0
+	for i, h := range s.route.hops {
+		if h.address == s.currentAddress {
+			index = i
+			matches++
+		}
+	}
+	if matches != 1 {
+		index = -1
+	}
+	for i, h := range s.route.hops {
+		hop := Hop{Name: h.name, StarClass: h.class, IsCurrent: i == index}
+		if i > 0 {
+			p := s.route.hops[i-1].pos
+			d := math.Sqrt(math.Pow(h.pos[0]-p[0], 2) + math.Pow(h.pos[1]-p[1], 2) + math.Pow(h.pos[2]-p[2], 2))
+			hop.DistanceFromPreviousLY = &d
+		}
+		v.Hops = append(v.Hops, hop)
 	}
 	if len(v.Hops) > 0 {
 		v.DestinationSystem = v.Hops[len(v.Hops)-1].Name
+	}
+	if index >= 0 {
+		n := len(v.Hops) - index - 1
+		v.RemainingJumps = &n
+	}
+	next := index + 1
+	if index >= 0 && next < len(v.Hops) {
+		expected := s.route.hops[next]
+		if s.targetName == "" {
+			v.TargetSystem = expected.name
+			v.TargetEvidence = "verified_route_next"
+			v.Hops[next].IsNext = true
+		} else if s.targetAddress == expected.address {
+			v.Hops[next].IsNext = true
+		} else {
+			v.TargetEvidence = "route_conflict"
+		}
+	} else if s.targetName != "" && len(v.Hops) > 0 {
+		v.TargetEvidence = "route_conflict"
 	}
 	return v
 }
