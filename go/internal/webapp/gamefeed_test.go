@@ -39,9 +39,9 @@ func gameFixture(t *testing.T) (*Server, *http.Client, *http.Client, string, str
 	writeGameEvent(t, dir, `{"event":"Location","StarSystem":"Fixture System","SystemAddress":9223372036854775807}`)
 	return startGameFixture(t, dir, false, "Fixture System")
 }
-func startGameFixture(t *testing.T, dir string, navigation bool, expected string) (*Server, *http.Client, *http.Client, string, string) {
+func startGameFixture(t *testing.T, dir string, navigation bool, expected string, exploration ...bool) (*Server, *http.Client, *http.Client, string, string) {
 	t.Helper()
-	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, EnableNavigation: navigation, Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
+	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, EnableNavigation: navigation, EnableExploration: len(exploration) > 0 && exploration[0], Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}

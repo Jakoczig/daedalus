@@ -209,9 +209,10 @@ func TestG2BRevokedViewerReceivesNoNewNavigationOrSurvey(t *testing.T) {
 			ownerAction(t, s, owner, map[string]any{"action": "revoke", "deviceId": devices[0].ID})
 			writeGameEvent(t, dir, `{"event":"FSDTarget","timestamp":"2026-01-01T00:00:10Z","Name":"NEW_AFTER_REVOKE_TARGET","SystemAddress":43}`)
 			writeGameEvent(t, dir, `{"event":"Scan","SystemAddress":9007199254740993,"BodyID":2,"BodyName":"NEW_AFTER_REVOKE_BODY","PlanetClass":"Rocky body"}`)
+			writeGameEvent(t, dir, `{"event":"ScanOrganic","timestamp":"2026-01-01T00:00:11Z","SystemAddress":9007199254740993,"Body":2,"Genus":"Bacterium","Species":"NEW_AFTER_REVOKE_BIO","ScanType":"Log"}`)
 			// Both producers must be live after revoke, independently observed by owner.
-			seenNav, seenSurvey := false, false
-			for !seenNav || !seenSurvey {
+			seenNav, seenSurvey, seenBio := false, false, false
+			for !seenNav || !seenSurvey || !seenBio {
 				_, raw, err := ownerConn.Read(ctx)
 				if err != nil {
 					t.Fatal(err)
@@ -225,6 +226,9 @@ func TestG2BRevokedViewerReceivesNoNewNavigationOrSurvey(t *testing.T) {
 				}
 				if frame.Name == "goNavigationChanged" && strings.Contains(string(raw), "NEW_AFTER_REVOKE_TARGET") {
 					seenNav = true
+				}
+				if frame.Name == "goExplorationChanged" && strings.Contains(string(raw), "NEW_AFTER_REVOKE_BIO") {
+					seenBio = true
 				}
 				if frame.Name == "goExplorationChanged" && strings.Contains(string(raw), "NEW_AFTER_REVOKE_BODY") {
 					seenSurvey = true

@@ -68,6 +68,7 @@ function harness (initialState, options = {}) {
     if (name === 'components/panel') return panel
     if (name === 'components/remote-displays') return () => React.createElement('section', null, 'Owner remote display settings')
     if (name === 'components/go-navigation') return () => React.createElement('section', null, 'Native route projection')
+    if (name === 'components/go-exploration-workspace') return () => React.createElement('section', null, 'Native G2C exploration workspace')
     if (name === 'components/go-exploration-system') return () => React.createElement('section', null, 'Native exploration projection')
     if (name === 'components/go-journal-status') return () => React.createElement('section', null, 'G2A current-system card')
     if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
@@ -336,4 +337,13 @@ test('G2B native fixture shell renders both real read-only page slots only for t
     if (role === 'owner') assert.match(html, /Native exploration projection/)
     else assert.doesNotMatch(html, /Native exploration projection/)
   }
+})
+
+test('G2C shell enables only supported exploration routes and keeps viewers read-only', () => {
+  for (const pathname of ['/nav/route', '/nav/map', '/nav/list', '/exploration/route', '/exploration/system', '/exploration/biologicals']) {
+    const h = harness({ role: 'viewer', prototype: { stage: 'G2C', offline: false }, connected: true, ready: true }, { pathname })
+    const html = h.render(); assert.match(html, /Native G2C exploration workspace/); assert.doesNotMatch(html, /Owner remote display settings/)
+  }
+  const h = harness({ role: 'viewer', prototype: { stage: 'G2C', offline: false }, connected: true, ready: true }, { pathname: '/ship/overview' })
+  assert.match(h.render(), /remains unfinished/)
 })

@@ -15,8 +15,10 @@ const labels = {
 export default function GoNavigation (props) {
   const { value, error } = useGoProjection(props, 'getGoNavigation', 'goNavigationChanged')
   const [copyNotice, setCopyNotice] = useState('')
+  const [query, setQuery] = useState('')
+  const [routePage, setRoutePage] = useState(null)
   const focus = useRef(null)
-  useEffect(() => { focus.current?.scrollIntoView?.({ block: 'nearest' }); setCopyNotice('') }, [value, props.connected])
+  useEffect(() => { focus.current?.scrollIntoView?.({ block: 'nearest' }); setCopyNotice(''); setRoutePage(null) }, [value, props.connected])
   if (!props.connected) return <section aria-label='Navigation route'><h2>Navigation — plotted game route</h2><p role='status'>Service disconnected. Route unavailable until reconnect.</p></section>
   if (!props.ready) return <p role='status'>Waiting for the Go service to become ready.</p>
   const copy = async name => {
@@ -27,12 +29,17 @@ export default function GoNavigation (props) {
     } catch { setCopyNotice('Copy unavailable. Select the system name and copy it manually on this device.') }
   }
   const nextExists = value?.hops?.some(hop => hop.isNext)
+  const waypoints = (value?.hops || []).map((hop, index) => ({ hop, index })).filter(({ hop }) => !props.enhanced || hop.name.toLowerCase().includes(query.toLowerCase()))
+  const focusIndex = Math.max(0, waypoints.findIndex(({ hop }) => hop.isNext || (!nextExists && hop.isCurrent)))
+  const start = props.enhanced ? Math.min(routePage ?? Math.floor(focusIndex / 80) * 80, Math.max(0, Math.floor((waypoints.length - 1) / 80) * 80)) : 0
+  const visible = props.enhanced ? waypoints.slice(start, start + 80) : waypoints
   return (
     <section aria-label='Navigation route' style={{ minWidth: 0 }}>
       <h2>Navigation — plotted game route</h2>
       <p>Journal-only route and target observations. This read-only screen cannot control the game.</p>
       <p role='status'>{labels[value?.routeState] || 'Loading local route evidence…'}</p>
       {error && <p role='alert'>{error}</p>}
+      {props.enhanced && <><p><a href='/exploration/system'>Current-system map</a> · <a href='/exploration/biologicals'>Exobiology worklist</a></p><label>Find waypoint <input value={query} onChange={e => { setQuery(e.target.value); setRoutePage(0) }} /></label><p>{waypoints.length} matching waypoints. Showing {start + 1}–{Math.min(start + 80, waypoints.length)}. KGB FOAM fuel-scoop classes are annotated; fuel availability is not inferred.</p><button type='button' disabled={start === 0} onClick={() => setRoutePage(Math.max(0, start - 80))}>Previous waypoints</button> <button type='button' disabled={start + 80 >= waypoints.length} onClick={() => setRoutePage(start + 80)}>Next waypoints</button> <button type='button' onClick={() => { setQuery(''); setRoutePage(null) }}>Show current / next</button></>}
       {value?.truncated && <p role='alert'>Route exceeds the display budget or is incomplete. Do not infer a destination from a partial list.</p>}
       {value && (
         <>
@@ -48,10 +55,10 @@ export default function GoNavigation (props) {
           {value.hops?.length > 0 && (
             <div style={{ overflowX: 'auto', maxHeight: '55vh', overflowY: 'auto' }}>
               <ol aria-label='Plotted waypoints' style={{ paddingInlineStart: '2rem' }}>
-                {value.hops.map((hop, index) => (
+                {visible.map(({ hop, index }) => (
                   <li key={index} ref={hop.isNext || (!nextExists && hop.isCurrent) ? focus : null} aria-current={hop.isCurrent ? 'location' : undefined} style={{ padding: '.6rem', overflowWrap: 'anywhere', borderBottom: '1px solid currentColor' }}>
                     <strong>{hop.name}</strong> {hop.isCurrent && <span> — Current</span>} {hop.isNext && <span> — Next</span>}
-                    <p>Star class: {hop.starClass || 'Unknown'} · Previous hop: {hop.distanceFromPreviousLY == null ? 'Unknown' : `${hop.distanceFromPreviousLY.toFixed(2)} LY`}</p>
+                    <p>Star class: {hop.starClass || 'Unknown'} {props.enhanced && ['K', 'G', 'B', 'F', 'O', 'A', 'M'].includes(hop.starClass) && '(fuel-scoop class)'} · Previous hop: {hop.distanceFromPreviousLY == null ? 'Unknown' : `${hop.distanceFromPreviousLY.toFixed(2)} LY`}</p>
                     <button type='button' onClick={() => copy(hop.name)}>Copy waypoint name</button>
                   </li>
                 ))}

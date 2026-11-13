@@ -40,7 +40,7 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2b-.*experimental-unsigned-local-route-survey-no-uploads/)
+  assert.match(job.steps[upload].with.name, /g2c-.*experimental-unsigned-local-exploration-biology-no-uploads/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -60,4 +60,19 @@ test('G2B stacks on G2A and gates both preview uploads on native navigation and 
   assert.match(steps.find(s => s.name === 'Race detector').run, /go test -race -count=1 -timeout=4m \.\/\.\.\./)
   assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2B/)
   assert.ok(steps.findIndex(s => s.name === 'Package experimental preview') > steps.findIndex(s => s.name === 'Native navigation survey smoke'))
+})
+
+test('G2C final batch includes both native OSes, original regressions and extended race stress', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8'))
+  assert.ok(workflow.on.pull_request.branches.includes('go/g2b-local-nav-exploration'))
+  assert.ok(workflow.on.push.branches.includes('go/g2c-exploration-parity'))
+  const steps = workflow.jobs.desktop.steps
+  assert.match(steps.find(s => s.name === 'G2C details and organic stress').run, /-count=25.*TestG2C/)
+  assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2C/)
+  assert.equal(steps.find(s => s.name === 'G2C details and organic stress').if, undefined)
+  for (const name of ['Executable G2C exploration smoke', 'Native G2C exploration smoke']) {
+    const step = steps.find(s => s.name === name); assert.ok(step?.run); assert.equal(step.if, undefined)
+  }
+  const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
+  assert.ok(legacy.on.pull_request.branches.includes('go/g2b-local-nav-exploration'))
 })

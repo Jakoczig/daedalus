@@ -22,21 +22,23 @@ const (
 )
 
 type BodyView struct {
-	Name                 string   `json:"name"`
-	Kind                 string   `json:"kind"`
-	BodyID               string   `json:"bodyId"`
-	Atmosphere           string   `json:"atmosphere"`
-	Volcanism            string   `json:"volcanism"`
-	Landable             *bool    `json:"landable"`
-	Terraformable        *bool    `json:"terraformable"`
-	GravityG             *float64 `json:"gravityG"`
-	DistanceLS           *float64 `json:"distanceLS"`
-	BioSignals           *int     `json:"bioSignals"`
-	GeoSignals           *int     `json:"geoSignals"`
-	PreviouslyDiscovered *bool    `json:"previouslyDiscovered"`
-	PreviouslyMapped     *bool    `json:"previouslyMapped"`
-	DSSMapped            bool     `json:"dssMapped"`
-	Genuses              []string `json:"genuses"`
+	Details              *BodyDetails   `json:"details,omitempty"`
+	Organisms            []OrganismView `json:"organisms,omitempty"`
+	Name                 string         `json:"name"`
+	Kind                 string         `json:"kind"`
+	BodyID               string         `json:"bodyId"`
+	Atmosphere           string         `json:"atmosphere"`
+	Volcanism            string         `json:"volcanism"`
+	Landable             *bool          `json:"landable"`
+	Terraformable        *bool          `json:"terraformable"`
+	GravityG             *float64       `json:"gravityG"`
+	DistanceLS           *float64       `json:"distanceLS"`
+	BioSignals           *int           `json:"bioSignals"`
+	GeoSignals           *int           `json:"geoSignals"`
+	PreviouslyDiscovered *bool          `json:"previouslyDiscovered"`
+	PreviouslyMapped     *bool          `json:"previouslyMapped"`
+	DSSMapped            bool           `json:"dssMapped"`
+	Genuses              []string       `json:"genuses"`
 }
 type ExplorationView struct {
 	SystemName        string     `json:"systemName"`
@@ -49,6 +51,7 @@ type ExplorationView struct {
 	Truncated         bool       `json:"truncated"`
 }
 type contextState struct {
+	activeOrganic                                *organismState
 	verified, arrived, pending, continuous, seen bool
 	address, name, fileID                        string
 	offset                                       int64
@@ -56,8 +59,9 @@ type contextState struct {
 }
 type systemKey struct{ commander, address string }
 type bodyState struct {
-	view    BodyView
-	scanned bool
+	view      BodyView
+	scanned   bool
+	organisms []*organismState
 }
 type systemState struct {
 	name                   string
@@ -67,6 +71,7 @@ type systemState struct {
 	bodies                 map[string]*bodyState
 }
 type Model struct {
+	cached   *surveyCache
 	sessions map[string]*contextState
 	order    []string
 	systems  map[systemKey]*systemState
@@ -75,6 +80,7 @@ type Model struct {
 
 func NewModel() *Model { m := &Model{}; m.ResetSource(); return m }
 func (m *Model) ResetSource() {
+	m.cached = nil
 	m.sessions = map[string]*contextState{}
 	m.order = nil
 	m.systems = map[systemKey]*systemState{}
@@ -114,6 +120,7 @@ func (m *Model) system(key systemKey, name string) *systemState {
 	return s
 }
 func (m *Model) ApplyEvent(key string, e journal.Event) {
+	m.cached = nil
 	s := m.context(key)
 	// Only a new explicit session restores identity after unordered source data.
 	if e.Type == "LoadGame" || e.Type == "Fileheader" {
@@ -160,7 +167,7 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		return
 	}
 	switch e.Type {
-	case "Scan", "SAAScanComplete", "FSSBodySignals", "SAASignalsFound", "FSSDiscoveryScan", "FSSAllBodiesFound":
+	case "Scan", "SAAScanComplete", "FSSBodySignals", "SAASignalsFound", "FSSDiscoveryScan", "FSSAllBodiesFound", "ScanOrganic":
 	default:
 		return
 	}
@@ -172,6 +179,16 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		return
 	}
 	target := m.system(systemKey{key, s.address}, s.name)
+	if len(e.Raw) > journal.MaxRecordBytes || !utf8.Valid(e.Raw) {
+		target.partial = true
+		return
+	}
+	if e.Type == "ScanOrganic" {
+		if !s.pending {
+			m.organic(target, s, e)
+		}
+		return
+	}
 	var data struct {
 		BodyID                                json.Number
 		BodyName, StarType, PlanetClass       string
@@ -250,6 +267,9 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 	case "SAAScanComplete":
 		b.DSSMapped = true
 	case "Scan":
+		if !physical(e.Raw, b) {
+			target.partial = true
+		}
 		body.scanned = true
 		b.Name = data.BodyName
 		if data.StarType != "" {
@@ -351,7 +371,7 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		}
 	}
 }
-func (m *Model) View(key, address string) ExplorationView {
+func (m *Model) buildView(key, address string) ExplorationView {
 	v := ExplorationView{SurveyState: "unknown", Bodies: []BodyView{}}
 	s := m.sessions[key]
 	if s == nil {
@@ -373,7 +393,7 @@ func (m *Model) View(key, address string) ExplorationView {
 	v.Truncated = state.overflow
 	ids := []string{}
 	for id, b := range state.bodies {
-		if b.scanned {
+		if b.scanned || len(b.organisms) > 0 || b.view.BioSignals != nil || len(b.view.Genuses) > 0 {
 			ids = append(ids, id)
 		}
 	}
@@ -386,15 +406,12 @@ func (m *Model) View(key, address string) ExplorationView {
 	budget := 1024
 	for _, id := range ids {
 		b := state.bodies[id].view
-		b.Landable = copyPtr(b.Landable)
-		b.Terraformable = copyPtr(b.Terraformable)
-		b.GravityG = copyPtr(b.GravityG)
-		b.DistanceLS = copyPtr(b.DistanceLS)
-		b.BioSignals = copyPtr(b.BioSignals)
-		b.GeoSignals = copyPtr(b.GeoSignals)
-		b.PreviouslyDiscovered = copyPtr(b.PreviouslyDiscovered)
-		b.PreviouslyMapped = copyPtr(b.PreviouslyMapped)
-		b.Genuses = append([]string{}, b.Genuses...)
+		b = CloneBody(b)
+		for _, o := range state.bodies[id].organisms {
+			v := o.view
+			v.Samples = copyPtr(v.Samples)
+			b.Organisms = append(b.Organisms, v)
+		}
 		encoded, err := json.Marshal(b)
 		if err != nil || budget+len(encoded)+1 > 256<<10 {
 			v.Truncated = true
