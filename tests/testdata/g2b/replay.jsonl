@@ -1,0 +1,9 @@
+{"timestamp":"2026-01-01T00:00:00Z","event":"Fileheader","gameversion":"synthetic"}
+{"timestamp":"2026-01-01T00:00:01Z","event":"LoadGame","FID":"SYNTHETIC-G2B","Commander":"PRIVATE_SYNTHETIC"}
+{"timestamp":"2026-01-01T00:00:02Z","event":"NavRoute"}
+{"timestamp":"2026-01-01T00:00:03Z","event":"Location","StarSystem":"Fixture Alpha","SystemAddress":9007199254740993}
+{"timestamp":"2026-01-01T00:00:04Z","event":"FSDTarget","Name":"Fixture Beta","SystemAddress":9007199254740994,"RemainingJumpsInRoute":1}
+{"timestamp":"2026-01-01T00:00:05Z","event":"FSSDiscoveryScan","BodyCount":12,"Progress":0.25}
+{"timestamp":"2026-01-01T00:00:06Z","event":"Scan","SystemAddress":9007199254740993,"BodyID":9007199254740997,"BodyName":"Fixture Alpha 1","PlanetClass":"Rocky body","Landable":true,"SurfaceGravity":9.80665,"WasMapped":false,"Materials":[{"Name":"PRIVATE_SENTINEL","Percent":1}]}
+{"timestamp":"2026-01-01T00:00:07Z","event":"SAASignalsFound","SystemAddress":9007199254740993,"BodyID":9007199254740997,"Signals":[{"Type":"$SAA_SignalType_Biological;","Count":3}],"Genuses":[{"Genus":"$Codex_Ent_Bacterial_Genus_Name;","Genus_Localised":"Bacterium"}]}
+{"timestamp":"2026-01-01T00:00:08Z","event":"SAAScanComplete","SystemAddress":9007199254740993,"BodyID":9007199254740997}
