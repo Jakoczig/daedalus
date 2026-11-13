@@ -101,9 +101,5 @@ func (s *Server) session(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: s.sessions.cookieName, Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 	w.Header().Set("Content-Type", "application/json")
-	stage := "G1A"
-	if s.remote != nil {
-		stage = "G1B"
-	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"role": "owner", "prototype": map[string]any{"stage": stage, "offline": true}})
+	_ = json.NewEncoder(w).Encode(map[string]any{"role": "owner", "prototype": s.prototype()})
 }

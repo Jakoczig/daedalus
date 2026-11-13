@@ -25,14 +25,26 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	flags.SetOutput(io.Discard)
 	smoke := flags.Bool("smoke-test", false, "verify offline service without a window")
 	nativeSmoke := flags.Bool("desktop-smoke-test", false, "open native window, require React authentication and RPC, then close")
+	journalSmoke := flags.Bool("journal-smoke-test", false, "verify an explicitly supplied synthetic journal fixture")
+	nativeJournalSmoke := flags.Bool("desktop-journal-smoke-test", false, "verify native React journal card using an explicit fixture")
 	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
+	journalDir := flags.String("journal-dir", "", "local owner journal directory override")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
 		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
 	}
-	if *smoke && *nativeSmoke {
+	modes := 0
+	for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke} {
+		if enabled {
+			modes++
+		}
+	}
+	if modes > 1 {
 		return errors.New("choose one smoke mode")
 	}
-	if *smoke || *nativeSmoke {
+	if (*journalSmoke || *nativeJournalSmoke) && *journalDir == "" {
+		return errors.New("journal smoke requires --journal-dir with a synthetic fixture")
+	}
+	if modes > 0 {
 		temporary, err := os.MkdirTemp("", "daedalus-go-smoke-")
 		if err != nil {
 			return errors.New("cannot create isolated smoke profile")
@@ -46,7 +58,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		}
 		*dataDir = filepath.Join(config, "daedalus-go")
 	}
-	service, err := webapp.StartLocalWithStorage(ctx, assets, *dataDir)
+	service, err := webapp.StartLocalWithOptions(ctx, assets, webapp.Options{StorageDir: *dataDir, EnableJournal: !*smoke && !*nativeSmoke, JournalDir: *journalDir})
 	if err != nil {
 		return errors.New("cannot start embedded local service")
 	}
@@ -66,14 +78,27 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		fmt.Fprintln(out, "G1A offline smoke passed")
 		return nil
 	}
+	if *journalSmoke {
+		checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := webapp.JournalSmokeTest(checkCtx, service); err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "G2A synthetic journal smoke passed")
+		return nil
+	}
 	var ready atomic.Bool
-	if *nativeSmoke {
+	if *nativeSmoke || *nativeJournalSmoke {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		go func() {
+			readyChannel := service.ClientReady()
+			if *nativeJournalSmoke {
+				readyChannel = service.JournalClientReady()
+			}
 			select {
-			case <-service.ClientReady():
+			case <-readyChannel:
 				ready.Store(true)
 				select {
 				case <-time.After(time.Second):
@@ -87,11 +112,15 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	if err := launch(ctx, service.URL(), stop); err != nil {
 		return fmt.Errorf("native desktop failed: %w", err)
 	}
-	if *nativeSmoke {
+	if *nativeSmoke || *nativeJournalSmoke {
 		if !ready.Load() {
 			return errors.New("native React bootstrap was not observed")
 		}
-		fmt.Fprintln(out, "G1A native React bootstrap and shutdown passed")
+		if *nativeJournalSmoke {
+			fmt.Fprintln(out, "G2A native journal bootstrap and shutdown passed")
+		} else {
+			fmt.Fprintln(out, "G1A native React bootstrap and shutdown passed")
+		}
 	}
 	return nil
 }

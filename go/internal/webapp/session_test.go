@@ -36,7 +36,10 @@ func ownerClient(t *testing.T, s *Server) *http.Client {
 	if s.remote != nil {
 		expectedStage = "G1B"
 	}
-	if json.NewDecoder(response.Body).Decode(&body) != nil || body.Role != "owner" || body.Prototype.Stage != expectedStage || !body.Prototype.Offline {
+	if s.game != nil {
+		expectedStage = "G2A"
+	}
+	if json.NewDecoder(response.Body).Decode(&body) != nil || body.Role != "owner" || body.Prototype.Stage != expectedStage || body.Prototype.Offline != (s.game == nil) {
 		t.Fatalf("incorrect bootstrap: %+v", body)
 	}
 	cookies := response.Cookies()

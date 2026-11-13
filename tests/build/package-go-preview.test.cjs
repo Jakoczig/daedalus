@@ -14,8 +14,9 @@ test('preview contains only executable, prerequisites and matching SHA256 hashes
   await fs.writeFile(path.join(root, 'tls.json'), 'PRIVATE KEY MUST NEVER SHIP')
   await fs.writeFile(path.join(root, 'remote.json'), 'viewer token MUST NEVER SHIP')
   const readme = path.join(root, 'instructions.md')
-  await fs.writeFile(readme, 'EXPERIMENTAL, UNSIGNED, OFFLINE PREVIEW\nWindows requires WebView2; Linux requires GTK4/WebKitGTK.\n')
+  await fs.writeFile(readme, 'EXPERIMENTAL, UNSIGNED, LOCAL JOURNAL PREVIEW (NO PROVIDER UPLOADS)\nWindows requires WebView2; Linux requires GTK4/WebKitGTK.\n')
   const directory = await packagePreview({ binaryPath: binary, readmePath: readme, outputParent: root, platform: 'Windows' })
+  assert.match(path.basename(directory), /^daedalus-g2a-experimental-unsigned-local-journal-no-uploads-/)
   assert.deepEqual((await fs.readdir(directory)).sort(), ['README.md', 'SHA256SUMS', 'daedalus.exe'])
   const hashes = await fs.readFile(path.join(directory, 'SHA256SUMS'), 'utf8')
   for (const name of ['daedalus.exe', 'README.md']) {
