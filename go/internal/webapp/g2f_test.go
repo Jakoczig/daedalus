@@ -6,6 +6,8 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/community"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,7 +18,19 @@ type communityTransport func(*http.Request) (*http.Response, error)
 
 func (f communityTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 func TestG2FViewersCannotEnableOrTriggerProvider(t *testing.T) {
-	s, _, v, u, _ := g2eFixture(t)
+	dir := t.TempDir()
+	raw := `{"timestamp":"2026-01-01T00:00:01Z","event":"LoadGame","FID":"SYNTHETIC-PROVIDER"}` + "\n" + `{"timestamp":"2026-01-01T00:00:02Z","event":"Location","StarSystem":"Fixture Alpha","SystemAddress":9007199254740993}` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "Journal.20260101.01.log"), []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s, _, v, u, _ := startGameFixture(t, dir, true, "Fixture Alpha", true, true, true)
+	deadline := time.Now().Add(3 * time.Second)
+	for name, _ := s.game.SystemIdentity(); name != "Fixture Alpha"; name, _ = s.game.SystemIdentity() {
+		if time.Now().After(deadline) {
+			t.Fatal("current system identity not ready")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	s.community.Close()
 	var calls atomic.Int32
 	s.community = community.New("", &http.Client{Transport: communityTransport(func(*http.Request) (*http.Response, error) {
@@ -39,7 +53,7 @@ func TestG2FViewersCannotEnableOrTriggerProvider(t *testing.T) {
 		t.Fatal(string(reply["error"]))
 	}
 	var got community.View
-	if json.Unmarshal(reply["message"], &got) != nil || !got.Enabled {
+	if json.Unmarshal(reply["message"], &got) != nil || !got.Enabled || got.SystemName != "Fixture Alpha" {
 		t.Fatal("read-only cached status unavailable")
 	}
 	if calls.Load() != 0 {

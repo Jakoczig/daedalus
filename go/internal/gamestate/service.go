@@ -375,7 +375,7 @@ func (s *Service) SystemIdentity() (string, string) {
 	}
 	c := s.commanders[s.active]
 	v := s.views.exploration.View(s.active, c.systemAddress)
-	if v.SystemName != c.system || (v.SurveyState != "observed" && v.SurveyState != "scanner_complete" && v.SurveyState != "partial") {
+	if v.SystemName != c.system || (v.SurveyState == "unverified" || v.SurveyState == "in_transit_last_known") {
 		return "", ""
 	}
 	return c.system, c.systemAddress

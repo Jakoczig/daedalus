@@ -252,3 +252,20 @@ func TestFighterModuleUsesDisplayAliasWithoutInventingClass(t *testing.T) {
 		t.Fatal("fighter display or unverified facts", modules)
 	}
 }
+
+func TestStatusBeforeLoadGameRequiresFreshObservation(t *testing.T) {
+	m := NewModel()
+	observation := func(seq uint64) sidecar.Change {
+		stamp := event(t, seq, "Status", "").Timestamp
+		return sidecar.Change{Kind: "Status", Timestamp: stamp, Valid: true, Raw: []byte(fmt.Sprintf(`{"event":"Status","timestamp":%q,"Flags":16777216,"Fuel":{"FuelMain":5}}`, stamp.Format("2006-01-02T15:04:05Z")))}
+	}
+	m.ApplySidecar("a", observation(1))
+	m.ApplyEvent("a", event(t, 2, "LoadGame", `,"FID":"SYNTHETIC"`))
+	if m.View("a").Status.State == "known" {
+		t.Fatal("unattributed status was silently restored")
+	}
+	m.ApplySidecar("a", observation(3))
+	if m.View("a").Status.State != "known" {
+		t.Fatal("fresh attributable status not accepted")
+	}
+}
