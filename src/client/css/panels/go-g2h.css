@@ -21,3 +21,6 @@
 .go-provider-reference{font-size:1rem;padding:.5rem;max-height:30vh;overflow:auto}.go-provider-reference dl>div{display:grid;grid-template-columns:1fr 1fr}.go-provider-reference dd{margin:0}
 
 .go-terminal .go-cartography .navigation-panel__inspector-heading>.icon{position:static;display:inline-block;float:left;width:2.2rem;height:2.2rem;line-height:2.2rem;font-size:2.2rem;margin:0 .7rem .2rem 0}
+
+/* Compact padding cannot retain the older inspector title negative margins. */
+.go-terminal .go-cartography .go-inspector .inspector__title{margin:0 0 .4rem}
