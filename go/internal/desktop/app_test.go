@@ -72,3 +72,26 @@ func TestKnownPageDoesNotRelaxDesktopOriginGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestCompanionCommandsAndCloseMode(t *testing.T) {
+	c := &Controller{}
+	if c.Action("quit") == nil {
+		t.Fatal("unbound native action")
+	}
+	calls := 0
+	c.Bind(func(string) error { calls++; return nil })
+	if c.Action("execute") == nil || calls != 0 {
+		t.Fatal("arbitrary command")
+	}
+	c.SetCloseMode("quit")
+	if !c.quitOnClose.Load() {
+		t.Fatal("quit close ignored")
+	}
+	c.SetCloseMode("tray")
+	if c.quitOnClose.Load() {
+		t.Fatal("tray close ignored")
+	}
+	if c.Action("closeLauncher") != nil || calls != 1 {
+		t.Fatal("launcher close unavailable")
+	}
+}

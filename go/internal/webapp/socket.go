@@ -96,6 +96,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	}()
 	var writeMu sync.Mutex
 	var journalRequested atomic.Bool
+	var contextRequested atomic.Bool
 	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
 	var shipRequested, shipDelivered atomic.Bool
 	var workspaceRequested, workspaceDelivered atomic.Bool
@@ -121,6 +122,31 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	if send(map[string]any{"name": "loadingProgress", "message": s.loadingStatus()}) != nil {
 		return
 	}
+	if s.game != nil && s.g2e {
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			var previous any
+			for {
+				select {
+				case <-readCtx.Done():
+					return
+				case <-ticker.C:
+					if !contextRequested.Load() {
+						continue
+					}
+					v := s.contextView(principal)
+					if !reflect.DeepEqual(previous, v) {
+						previous = v
+						if send(map[string]any{"name": "goNavigationContextChanged", "message": v}) != nil {
+							return
+						}
+					}
+				}
+			}
+		}()
+	}
+
 	if s.game != nil {
 		changes, unsubscribe := s.game.Subscribe(readCtx)
 		defer unsubscribe()
@@ -235,6 +261,66 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoNavigationContext":
+			if !s.g2e || s.game == nil {
+				response["error"] = "Navigation context unavailable"
+			} else {
+				contextRequested.Store(true)
+				response["message"] = s.contextView(principal)
+			}
+		case "getGoSystem", "lookupGoSystem":
+			if !s.g2e || s.game == nil || s.community == nil {
+				response["error"] = "System lookup unavailable"
+				break
+			}
+			if request.Name == "lookupGoSystem" && principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			var q struct {
+				Name string `json:"name"`
+			}
+			if strictDecode(request.Message, &q) != nil || !cleanSystemName(q.Name) {
+				response["error"] = "Invalid system name"
+				break
+			}
+			response["message"] = s.systemView(readCtx, q.Name, request.Name == "lookupGoSystem")
+		case "getGoLauncher", "setGoCompanion", "desktopAction":
+			if principal.role != "owner" || s.companion == nil {
+				response["error"] = "Local owner required"
+				break
+			}
+			if request.Name == "setGoCompanion" {
+				if err := s.saveDisplayConfig(request.Message); err != nil {
+					response["error"] = err.Error()
+					break
+				}
+			}
+			if request.Name == "desktopAction" {
+				var q struct {
+					Action string `json:"action"`
+				}
+				if strictDecode(request.Message, &q) != nil {
+					response["error"] = "Invalid desktop action"
+					break
+				}
+				if q.Action != "dashboard" && q.Action != "launcher" && q.Action != "hide" && q.Action != "closeDashboard" && q.Action != "closeLauncher" && q.Action != "quit" {
+					response["error"] = "Unsupported desktop action"
+					break
+				}
+				if s.companion.action == nil {
+					response["error"] = "Native desktop unavailable"
+					break
+				}
+				if err := s.companion.action(q.Action); err != nil {
+					response["error"] = err.Error()
+					break
+				}
+			}
+			response["message"] = s.launcherView()
+			if request.Name == "getGoLauncher" {
+				s.launcherOnce.Do(func() { close(s.launcherReady) })
+			}
 		case "getGoCommunity", "refreshGoCommunity", "setGoCommunityEnabled":
 			if s.community == nil || s.game == nil {
 				response["error"] = "Community enrichment unavailable"

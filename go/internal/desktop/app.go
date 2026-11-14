@@ -27,7 +27,7 @@ func run(ctx context.Context, localURL string, onShutdown func(), factory hostFa
 	stop := func() { once.Do(onShutdown) }
 	defer stop()
 	parsed, err := url.Parse(localURL)
-	if err != nil || parsed.Scheme != "http" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/nav/route" && parsed.Path != "/exploration/system") || parsed.RawPath != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if err != nil || parsed.Scheme != "http" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/nav/route" && parsed.Path != "/exploration/system" && parsed.Path != "/launcher") || parsed.RawPath != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return errors.New("invalid local desktop URL")
 	}
 	host, port, err := net.SplitHostPort(parsed.Host)
@@ -40,6 +40,11 @@ func run(ctx context.Context, localURL string, onShutdown func(), factory hostFa
 	native, err := factory(stop)
 	if err != nil {
 		return err
+	}
+	if c, ok := ctx.Value(controllerKey{}).(*Controller); ok {
+		if h, ok := native.(interface{ Bind(*Controller) }); ok {
+			h.Bind(c)
+		}
 	}
 	if err = native.Open(localURL); err != nil {
 		return err

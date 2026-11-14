@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import SystemMapObject from './panels/nav/system-map/system-map-object'
 import { layoutBodies, legacyStarSubtype } from '../lib/go-survey'
 import { Icon } from './go-terminal-widgets'
@@ -6,19 +6,19 @@ export function chartScene (bodies, contextBodies = bodies) {
   const ids = new Set(bodies.map(b => b.bodyId)); const nodes = layoutBodies(contextBodies).filter(n => ids.has(n.body.bodyId)); const roots = new Map(); const positions = new Map(); let y = 1800; let width = 14000
   for (const n of nodes) { let root = n; const seen = new Set(); while (root.parent && !root.unresolved && !seen.has(root)) { seen.add(root); root = root.parent } if (!roots.has(root))roots.set(root, []); roots.get(root).push(n) }
   for (const group of roots.values()) {
-    let x = 1600; let column = 0; let bottom = y + 1800; let columnBottom = y
+    let x = 1600; let column = 0; let bottom = y + 1800; let columnBottom = y; let rowY = y
     for (const n of group) {
       if (n.depth <= 1) {
-        if (n.depth === 1) column++
+        if (n.depth === 1) { column++; if (column > 6) { column = 1; rowY = bottom + 2200 } }
         x = 1600 + column * 3600
-        columnBottom = y
+        columnBottom = rowY
       } else {
         x = positions.get(n.parent?.body.bodyId)?.x || x
       }
       const parent = positions.get(n.parent?.body.bodyId)
       // Nodes are in depth-first order. Reserve a fresh row after the entire
       // previous subtree so siblings cannot share glyphs, labels or hit targets.
-      const py = n.depth > 1 ? Math.max((parent?.y ?? y) + 2600, columnBottom + 2600) : y
+      const py = n.depth > 1 ? Math.max((parent?.y ?? y) + 2600, columnBottom + 2600) : rowY
       const radius = n.body.details?.isStar ? 650 : Math.max(220, Math.min(500, Math.sqrt(n.body.details?.radiusKM || 1200) * 8))
       positions.set(n.body.bodyId, { ...n, x, y: py, radius })
       columnBottom = py
@@ -29,8 +29,9 @@ export function chartScene (bodies, contextBodies = bodies) {
   }
   return { nodes: nodes.map(n => positions.get(n.body.bodyId)), width, height: Math.max(6000, y) }
 }
-export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect }) {
-  const [zoom, setZoom] = useState(1); const [fit, setFit] = useState(false); const viewport = useRef(null)
+export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect, systemKey }) {
+  const [zoom, setZoom] = useState(1); const [fit, setFit] = useState(true); const viewport = useRef(null)
+  useEffect(() => { setFit(true); setZoom(1); if (viewport.current) { viewport.current.scrollTop = 0; viewport.current.scrollLeft = 0 } }, [systemKey])
   const scene = useMemo(() => chartScene(bodies, contextBodies), [bodies, contextBodies])
   return (
     <section className='go-chart navigation-panel__map' aria-label='System visual map'>
@@ -46,8 +47,8 @@ export default function GoTerminalChart ({ bodies, contextBodies, selected, onSe
                 {p && !n.unresolved && <path d={`M ${p.x} ${p.y} L ${n.x} ${p.y} L ${n.x} ${n.y}`} fill='none' stroke='currentColor' strokeWidth='12' opacity='.3' />}
                 {selected === b.bodyId && <circle cx={n.x} cy={n.y} r={n.radius + 230} className='go-chart__selection' />}
                 <SystemMapObject systemObject={object} setSystemObject={choose} labels={false} />
-                <text x={n.x} y={n.y - n.radius - 450} textAnchor='middle' className='go-chart__name'>{object.name}</text>
-                <text x={n.x} y={n.y + n.radius + 540} textAnchor='middle' className='go-chart__caption'>{n.unresolved ? 'Parent unobserved' : b.details?.isStar ? `Class ${b.kind}` : b.distanceLS == null ? 'Distance unknown' : `${b.distanceLS.toFixed(1)} LS`}</text>
+                {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y - n.radius - 450} textAnchor='middle' className='go-chart__name'>{object.name}</text>}
+                {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y + n.radius + 540} textAnchor='middle' className='go-chart__caption'>{n.unresolved ? 'Parent unobserved' : b.details?.isStar ? `Class ${b.kind}` : b.distanceLS == null ? 'Distance unknown' : `${b.distanceLS.toFixed(1)} LS`}</text>}
                 {b.bioSignals > 0 && <text x={n.x} y={n.y + n.radius + 880} textAnchor='middle' className='go-chart__bio'>BIO {b.bioSignals}</text>}
               </g>
             )

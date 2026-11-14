@@ -31,6 +31,7 @@ type Station struct {
 	UpdatedAt  string   `json:"updatedAt"`
 }
 type View struct {
+	Coordinates       *[3]float64             `json:"coordinates,omitempty"`
 	Enabled           bool                    `json:"enabled"`
 	Status            string                  `json:"status"`
 	Notice            string                  `json:"notice"`
@@ -48,6 +49,7 @@ type entry struct {
 	expires time.Time
 }
 type Manager struct {
+	positions  map[string]View
 	mu         sync.Mutex
 	profile    string
 	client     *http.Client
@@ -66,7 +68,7 @@ func New(profile string, client *http.Client) *Manager {
 	if client == nil {
 		client = &http.Client{Timeout: 8 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, MaxIdleConns: 2, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second}, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect rejected") }}
 	}
-	m := &Manager{profile: profile, client: client, cache: map[string]entry{}, now: time.Now}
+	m := &Manager{profile: profile, client: client, positions: map[string]View{}, cache: map[string]entry{}, now: time.Now}
 	if profile != "" {
 		raw, err := privatefs.Read(profile, "community.json")
 		if err == nil {
@@ -102,6 +104,7 @@ func (m *Manager) SetEnabled(enabled bool) error {
 	m.enabled = enabled
 	m.notice = ""
 	m.cache = map[string]entry{}
+	m.positions = map[string]View{}
 	m.order = nil
 	m.next = time.Time{}
 	return nil
@@ -148,10 +151,30 @@ func (m *Manager) View(name, address string) View {
 	defer m.mu.Unlock()
 	return m.viewLocked(name, address)
 }
-func (m *Manager) Refresh(ctx context.Context, name, address string) View {
+func (m *Manager) Named(name string) View {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.positions[strings.ToLower(name)]
+	if !ok || !m.enabled {
+		return View{Enabled: m.enabled, Status: "not_cached", SystemName: name}
+	}
+	return m.viewLocked(p.SystemName, p.SystemAddress)
+}
+func (m *Manager) Lookup(ctx context.Context, name string) View {
+	return m.refresh(ctx, name, "", true)
+}
+func (m *Manager) Refresh(ctx context.Context, name, address string) View {
+	return m.refresh(ctx, name, address, false)
+}
+func (m *Manager) refresh(ctx context.Context, name, address string, resolve bool) View {
+	m.mu.Lock()
+	if resolve {
+		if known, ok := m.positions[strings.ToLower(name)]; ok {
+			address = known.SystemAddress
+		}
+	}
 	v := m.viewLocked(name, address)
-	if !m.enabled || v.Status == "waiting_for_journal" || v.Status == "cached" {
+	if !m.enabled || (!resolve && v.Status == "waiting_for_journal") || (v.Status == "cached" && (!resolve || v.Coordinates != nil)) {
 		m.mu.Unlock()
 		return v
 	}
@@ -171,7 +194,32 @@ func (m *Manager) Refresh(ctx context.Context, name, address string) View {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	m.cancel = cancel
 	m.mu.Unlock()
-	loaded, err := m.load(ctx, name, address)
+	var coords *[3]float64
+	var err error
+	if resolve {
+		var resolved struct {
+			Name   string
+			ID64   json.Number
+			Coords *struct{ X, Y, Z *float64 }
+		}
+		err = m.get(ctx, "api-v1/system", name, &resolved)
+		if err == nil {
+			if !strings.EqualFold(resolved.Name, name) || exactID(resolved.ID64.String()) == "" {
+				err = errors.New("system identity unavailable")
+			} else {
+				address = exactID(resolved.ID64.String())
+				name = resolved.Name
+				if resolved.Coords != nil && number(resolved.Coords.X, -1e6, 1e6) != nil && number(resolved.Coords.Y, -1e6, 1e6) != nil && number(resolved.Coords.Z, -1e6, 1e6) != nil {
+					coords = &[3]float64{*resolved.Coords.X, *resolved.Coords.Y, *resolved.Coords.Z}
+				}
+			}
+		}
+	}
+	var loaded View
+	if err == nil {
+		loaded, err = m.load(ctx, name, address)
+		loaded.Coordinates = coords
+	}
 	cancel()
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -199,10 +247,19 @@ func (m *Manager) Refresh(ctx context.Context, name, address string) View {
 	}
 	m.order = append(m.order, k)
 	m.cache[k] = entry{loaded, m.now().Add(ttl)}
+	if len(m.positions) >= 16 {
+		m.positions = map[string]View{}
+	}
+	m.positions[strings.ToLower(name)] = clone(loaded)
 	return clone(loaded)
 }
 func (m *Manager) get(ctx context.Context, path, name string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.edsm.net/"+path+"?"+url.Values{"systemName": {name}}.Encode(), nil)
+	params := url.Values{"systemName": {name}}
+	if path == "api-v1/system" {
+		params.Set("showCoordinates", "1")
+		params.Set("showId", "1")
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.edsm.net/"+path+"?"+params.Encode(), nil)
 	if err != nil {
 		return err
 	}
@@ -288,6 +345,7 @@ type providerBody struct {
 
 func (m *Manager) load(ctx context.Context, name, address string) (View, error) {
 	var raw struct {
+		ID        json.Number
 		Name      string
 		ID64      json.Number
 		Bodies    []providerBody
@@ -339,6 +397,7 @@ func (m *Manager) load(ctx context.Context, name, address string) (View, error) 
 	}
 	// Stations are independently timestamped and may fail without discarding bodies.
 	var stations struct {
+		ID       json.Number
 		Name     string
 		ID64     json.Number
 		Stations []struct {
@@ -348,7 +407,7 @@ func (m *Manager) load(ctx context.Context, name, address string) (View, error) 
 			UpdateTime        struct{ Information string }
 		}
 	}
-	if err := m.get(ctx, "api-system-v1/stations", name, &stations); err == nil && strings.EqualFold(stations.Name, name) && exactID(stations.ID64.String()) == address {
+	if err := m.get(ctx, "api-system-v1/stations", name, &stations); err == nil && strings.EqualFold(stations.Name, name) && ((stations.ID64 != "" && exactID(stations.ID64.String()) == address) || (stations.ID64 == "" && exactID(raw.ID.String()) != "" && exactID(stations.ID.String()) == exactID(raw.ID.String()))) {
 		v.StationsFetchedAt = m.now().UTC().Format(time.RFC3339)
 		if len(stations.Stations) > 64 {
 			stations.Stations = stations.Stations[:64]

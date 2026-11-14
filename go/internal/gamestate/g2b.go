@@ -5,6 +5,7 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/activitystate"
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/daedalus/go/internal/navcontext"
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
 	"github.com/Jakoczig/daedalus/go/internal/paritystate"
 	"github.com/Jakoczig/daedalus/go/internal/shipstate"
@@ -94,6 +95,9 @@ func (s *Service) Exploration() explorestate.ExplorationView {
 func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
 	s.views.ship.ApplyEvent(s.active, e)
 	if s.opts.EnableParity {
+		s.navigationContext.Apply(s.active, e, phase)
+	}
+	if s.opts.EnableParity {
 		s.views.parity.ApplyEvent(s.active, e)
 		s.views.activity.ApplyEvent(s.active, e)
 	}
@@ -104,6 +108,9 @@ func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
 func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
 	if s.opts.EnableParity {
 		s.views.parity.ApplySidecar(s.active, c)
+		if c.Kind == "Status" && !s.summary.ImportInProgress && s.summary.SourceState == "live" {
+			s.navigationContext.Status(s.active, s.views.parity.View(s.active).Status)
+		}
 		s.views.dirty = true
 	}
 	if c.Kind == "NavRoute" {
@@ -113,6 +120,7 @@ func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
 }
 func (s *Service) resetProjectionsLocked() {
 	s.views.ship.ResetSource()
+	s.navigationContext = navcontext.New()
 	s.views.parity.ResetSource()
 	s.views.activity.ResetSource()
 	s.views.navigation.ResetSource()

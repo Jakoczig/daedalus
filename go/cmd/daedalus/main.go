@@ -34,6 +34,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	terminalSmoke := flags.Bool("terminal-smoke-test", false, "verify explicit synthetic G2D terminal and ship")
 	nativeTerminalSmoke := flags.Bool("desktop-terminal-smoke-test", false, "verify native G2D terminal and ship using explicit fixture")
 	paritySmoke := flags.Bool("parity-smoke-test", false, "verify explicit synthetic native parity workspace")
+	nativeCompanionSmoke := flags.Bool("desktop-companion-smoke-test", false, "verify launcher, optional dashboard closure and shared-service shutdown")
 	nativeParitySmoke := flags.Bool("desktop-parity-smoke-test", false, "verify native React G2E parity workspace and shutdown")
 	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
 	journalDir := flags.String("journal-dir", "", "local owner journal directory override")
@@ -41,7 +42,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
 	}
 	modes := 0
-	for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke, *navigationSmoke, *nativeNavigationSmoke, *explorationSmoke, *nativeExplorationSmoke, *terminalSmoke, *nativeTerminalSmoke, *paritySmoke, *nativeParitySmoke} {
+	for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke, *navigationSmoke, *nativeNavigationSmoke, *explorationSmoke, *nativeExplorationSmoke, *terminalSmoke, *nativeTerminalSmoke, *paritySmoke, *nativeParitySmoke, *nativeCompanionSmoke} {
 		if enabled {
 			modes++
 		}
@@ -49,7 +50,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	if modes > 1 {
 		return errors.New("choose one smoke mode")
 	}
-	if (*journalSmoke || *nativeJournalSmoke || *navigationSmoke || *nativeNavigationSmoke || *explorationSmoke || *nativeExplorationSmoke || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke) && *journalDir == "" {
+	if (*journalSmoke || *nativeJournalSmoke || *navigationSmoke || *nativeNavigationSmoke || *explorationSmoke || *nativeExplorationSmoke || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke || *nativeCompanionSmoke) && *journalDir == "" {
 		return errors.New("journal smoke requires --journal-dir with a synthetic fixture")
 	}
 	if modes > 0 {
@@ -66,7 +67,11 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		}
 		*dataDir = filepath.Join(config, "daedalus-go")
 	}
-	service, err := webapp.StartLocalWithOptions(ctx, assets, webapp.Options{StorageDir: *dataDir, EnableJournal: !*smoke && !*nativeSmoke, EnableNavigation: !*smoke && !*nativeSmoke && !*journalSmoke && !*nativeJournalSmoke, EnableDashboard: modes == 0 || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke, EnableParity: modes == 0 || *paritySmoke || *nativeParitySmoke, EnableExploration: modes == 0 || *explorationSmoke || *nativeExplorationSmoke || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke, NavigationSmoke: *nativeNavigationSmoke || *nativeExplorationSmoke || *nativeTerminalSmoke || *nativeParitySmoke, JournalDir: *journalDir})
+	controller := &desktop.Controller{}
+	if modes == 0 || *nativeCompanionSmoke {
+		ctx = desktop.WithController(ctx, controller)
+	}
+	service, err := webapp.StartLocalWithOptions(ctx, assets, webapp.Options{DesktopAction: controller.Action, DesktopCloseMode: controller.SetCloseMode, StorageDir: *dataDir, EnableJournal: !*smoke && !*nativeSmoke, EnableNavigation: !*smoke && !*nativeSmoke && !*journalSmoke && !*nativeJournalSmoke, EnableDashboard: modes == 0 || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke || *nativeCompanionSmoke, EnableParity: modes == 0 || *paritySmoke || *nativeParitySmoke || *nativeCompanionSmoke, EnableExploration: modes == 0 || *explorationSmoke || *nativeExplorationSmoke || *terminalSmoke || *nativeTerminalSmoke || *paritySmoke || *nativeParitySmoke || *nativeCompanionSmoke, NavigationSmoke: *nativeNavigationSmoke || *nativeExplorationSmoke || *nativeTerminalSmoke || *nativeParitySmoke || *nativeCompanionSmoke, JournalDir: *journalDir})
 	if err != nil {
 		return errors.New("cannot start embedded local service")
 	}
@@ -112,6 +117,51 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		}
 		return nil
 	}
+	if *nativeCompanionSmoke {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 35*time.Second)
+		defer cancel()
+		result := make(chan error, 1)
+		go func() {
+			select {
+			case <-service.LauncherReady():
+			case <-ctx.Done():
+				result <- errors.New("launcher did not bootstrap")
+				cancel()
+				return
+			}
+			if err := controller.Action("dashboard"); err != nil {
+				result <- err
+				cancel()
+				return
+			}
+			select {
+			case <-service.NavigationClientReady():
+			case <-ctx.Done():
+				result <- errors.New("separate dashboard did not bootstrap")
+				cancel()
+				return
+			}
+			_ = controller.Action("closeDashboard")
+			_ = controller.Action("closeLauncher")
+			if err := webapp.NavigationSmokeTest(ctx, service); err != nil {
+				result <- err
+				cancel()
+				return
+			}
+			_ = controller.Action("launcher")
+			result <- nil
+			cancel()
+		}()
+		if err := launch(ctx, service.URL()+"/launcher", stop); err != nil {
+			return err
+		}
+		if err := <-result; err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "G2G native launcher, separate dashboard close, background service and quit smoke passed")
+		return nil
+	}
 	var ready atomic.Bool
 	if *nativeSmoke || *nativeJournalSmoke || *nativeNavigationSmoke || *nativeExplorationSmoke || *nativeTerminalSmoke || *nativeParitySmoke {
 		var cancel context.CancelFunc
@@ -138,6 +188,9 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		}()
 	}
 	location := service.URL()
+	if modes == 0 {
+		location += "/launcher"
+	}
 	if *nativeNavigationSmoke || *nativeExplorationSmoke || *nativeTerminalSmoke || *nativeParitySmoke {
 		location += "/nav/route"
 	}

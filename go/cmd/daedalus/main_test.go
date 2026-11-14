@@ -52,8 +52,8 @@ func TestNormalRuntimeProvidesOwnerRemoteSettings(t *testing.T) {
 	assets := fstest.MapFS{"index.html": {Data: []byte("index")}}
 	var output bytes.Buffer
 	launch := func(_ context.Context, url string, _ func()) error {
-		req, _ := http.NewRequest("POST", url+"/auth/session", nil)
-		req.Header.Set("Origin", url)
+		req, _ := http.NewRequest("POST", strings.TrimSuffix(url, "/launcher")+"/auth/session", nil)
+		req.Header.Set("Origin", strings.TrimSuffix(url, "/launcher"))
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -109,8 +109,8 @@ func TestNativeOfflineSmokeIgnoresJournalDirectory(t *testing.T) {
 	assets := fstest.MapFS{"index.html": {Data: []byte("index")}}
 	checked := false
 	launch := func(_ context.Context, url string, _ func()) error {
-		req, _ := http.NewRequest("POST", url+"/auth/session", nil)
-		req.Header.Set("Origin", url)
+		req, _ := http.NewRequest("POST", strings.TrimSuffix(url, "/launcher")+"/auth/session", nil)
+		req.Header.Set("Origin", strings.TrimSuffix(url, "/launcher"))
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -118,7 +118,7 @@ func TestNativeOfflineSmokeIgnoresJournalDirectory(t *testing.T) {
 		cookies := res.Cookies()
 		res.Body.Close()
 		req, _ = http.NewRequest("POST", url+"/owner/journal", strings.NewReader(`{"action":"status"}`))
-		req.Header.Set("Origin", url)
+		req.Header.Set("Origin", strings.TrimSuffix(url, "/launcher"))
 		for _, cookie := range cookies {
 			req.AddCookie(cookie)
 		}

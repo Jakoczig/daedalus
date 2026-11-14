@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/daedalus/go/internal/navcontext"
 	"github.com/Jakoczig/daedalus/go/internal/sidecar"
 )
 
@@ -44,28 +45,29 @@ type selection struct {
 	reply     chan error
 }
 type Service struct {
-	mu           sync.Mutex
-	views        projectionState
-	opts         Options
-	summary      Summary
-	details      SourceDetails
-	commanders   map[string]commanderState
-	order        []string
-	unknown      commanderState
-	active       string
-	stopped      bool
-	subscribers  map[chan Summary]struct{}
-	selectSource chan selection
-	done         chan struct{}
-	closed       bool
-	running      atomic.Bool
+	navigationContext *navcontext.Model
+	mu                sync.Mutex
+	views             projectionState
+	opts              Options
+	summary           Summary
+	details           SourceDetails
+	commanders        map[string]commanderState
+	order             []string
+	unknown           commanderState
+	active            string
+	stopped           bool
+	subscribers       map[chan Summary]struct{}
+	selectSource      chan selection
+	done              chan struct{}
+	closed            bool
+	running           atomic.Bool
 }
 
 func NewService(opts Options) (*Service, error) {
 	if opts.PollInterval <= 0 {
 		opts.PollInterval = 500 * time.Millisecond
 	}
-	return &Service{views: newProjectionState(), opts: opts, summary: Summary{SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
+	return &Service{navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
 }
 func (s *Service) Snapshot() Summary { s.mu.Lock(); defer s.mu.Unlock(); return s.summary }
 func (s *Service) Details() SourceDetails {
