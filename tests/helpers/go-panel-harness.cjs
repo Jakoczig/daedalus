@@ -26,19 +26,21 @@ function harness (panel = 'go-navigation', initial = navigation) {
     const mod = new Module(filename, module); mod.filename = filename; mod.paths = module.paths
     mod.require = name => {
       if (name === 'react') return react
-      if (name.startsWith('.') || name.startsWith('lib/')) {
-        const target = name.startsWith('lib/') ? path.resolve(__dirname, '../../src/client', name) : path.resolve(path.dirname(filename), name)
+      if (name === 'next/router') return { useRouter: () => ({ pathname: '/nav/map', push: () => {}, replace: () => {} }) }
+      if (name.startsWith('.') || (name.startsWith('lib/') || name.startsWith('components/'))) {
+        const target = (name.startsWith('lib/') || name.startsWith('components/')) ? path.resolve(__dirname, '../../src/client', name) : path.resolve(path.dirname(filename), name)
         return target.endsWith('.json') ? require(target) : load(target + '.js')
       }
       return require(name)
     }
-    mod._compile(`module.exports = function (navigator) { const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
+    mod._compile(`module.exports = function (navigator) { const document = { addEventListener () {}, removeEventListener () {} }; const sessionStorage = { setItem () {}, getItem () { return null } }; const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
     const result = mod.exports(browser); cache.set(filename, result); return result
   }
-  const component = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')).default
-  const props = { connected: true, ready: true, role: 'viewer', sendEvent: async name => { calls.push(name); return initial }, eventListener: (name, callback) => { listeners.set(name, callback); return () => { listeners.delete(name); unsubscribed++ } } }
+  const loaded = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')); const component = loaded.default
+  const props = { connected: true, ready: true, role: 'viewer', sendEvent: async name => { calls.push(name); return typeof initial === 'function' ? initial(name) : initial }, eventListener: (name, callback) => { listeners.set(name, callback); return () => { listeners.delete(name); unsubscribed++ } } }
   const render = () => { cursor = 0; tree = component(props); return renderToStaticMarkup(tree) }
   return {
+    exports: loaded,
     props,
     calls,
     browser,

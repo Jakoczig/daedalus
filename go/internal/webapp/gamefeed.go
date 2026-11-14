@@ -16,6 +16,7 @@ type Options struct {
 	EnableJournal     bool
 	EnableNavigation  bool
 	EnableExploration bool
+	EnableDashboard   bool
 	NavigationSmoke   bool
 	JournalDir        string
 	Discovery         journal.DiscoveryOptions
@@ -37,6 +38,7 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	}
 	s.g2b = opts.EnableNavigation
 	s.g2c = opts.EnableExploration && s.g2b
+	s.g2d = opts.EnableDashboard && s.g2c
 	s.navigationSmoke = opts.NavigationSmoke && s.g2b
 	s.game, _ = gamestate.NewService(gamestate.Options{Directory: directory, Discovery: opts.Discovery, ConfigError: configError, PollInterval: opts.PollInterval})
 	gameCtx, cancel := context.WithCancel(ctx)
@@ -56,6 +58,9 @@ func (s *Server) prototype() map[string]any {
 			stage = "G2B"
 			if s.g2c {
 				stage = "G2C"
+				if s.g2d {
+					stage = "G2D"
+				}
 			}
 		}
 	}

@@ -62,6 +62,7 @@ function harness (initialState, options = {}) {
       }
     }
     if (name === 'next/router') return { __esModule: true, default: {}, useRouter: () => ({ pathname: options.pathname || '/exploration/system' }) }
+    if (name.includes('go-terminal')) return { __esModule: true, default: () => React.createElement('div', { 'data-g2d-terminal': true }, 'G2D terminal') }
     if (name === 'lib/notification') return () => {}
     if (name === 'components/primary-navigation') return () => React.createElement('nav', null, 'Existing primary navigation')
     if (name === 'components/layout') return layout
@@ -346,4 +347,11 @@ test('G2C shell enables only supported exploration routes and keeps viewers read
   }
   const h = harness({ role: 'viewer', prototype: { stage: 'G2C', offline: false }, connected: true, ready: true }, { pathname: '/ship/overview' })
   assert.match(h.render(), /remains unfinished/)
+})
+
+test('G2D bootstrap mounts the styled terminal and legacy bootstrap remains separate', () => {
+  const h = harness({ connected: true, ready: true, role: 'viewer', prototype: { stage: 'G2D' } }, { pathname: '/ship/status' })
+  const html = h.render(React.createElement('div', null, 'LEGACY PAGE'))
+  assert.match(html, /data-g2d-terminal/)
+  assert.doesNotMatch(html, /LEGACY PAGE/)
 })

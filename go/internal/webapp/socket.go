@@ -94,8 +94,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	var writeMu sync.Mutex
 	var journalRequested atomic.Bool
 	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
+	var shipRequested, shipDelivered atomic.Bool
 	navigationReady := func() {
-		if principal.role == "owner" && navRequested.Load() && surveyRequested.Load() && navDelivered.Load() && surveyDelivered.Load() {
+		if principal.role == "owner" && (!s.g2d || (shipRequested.Load() && shipDelivered.Load())) && navRequested.Load() && surveyRequested.Load() && navDelivered.Load() && surveyDelivered.Load() {
 			s.navigationReadyOnce.Do(func() { close(s.navigationReady) })
 		}
 	}
@@ -165,6 +166,15 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 					if len(p.Exploration.Bodies) > 0 && surveyRequested.Load() {
 						surveyDelivered.Store(true)
 					}
+					if s.g2d && shipRequested.Load() {
+						if send(map[string]any{"name": "goShipChanged", "message": p.Ship}) != nil {
+							conn.CloseNow()
+							return
+						}
+						if p.Ship.ShipType != "" {
+							shipDelivered.Store(true)
+						}
+					}
 					navigationReady()
 
 				}
@@ -193,12 +203,21 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			continue
 		}
 		response := map[string]any{"requestId": request.RequestID, "name": request.Name}
-		navigationNonempty, surveyNonempty := false, false
+		navigationNonempty, surveyNonempty, shipNonempty := false, false, false
 		switch request.Name {
 		case "getLoadingStatus":
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoShip":
+			if !s.g2d || s.game == nil {
+				response["error"] = "Ship journal view not enabled"
+			} else {
+				shipRequested.Store(true)
+				value := s.game.Ship()
+				shipNonempty = value.ShipType != ""
+				response["message"] = value
+			}
 		case "getGoNavigation":
 			if !s.g2b || s.game == nil {
 				response["error"] = "Navigation not enabled"
@@ -235,6 +254,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		}
 		if surveyNonempty {
 			surveyDelivered.Store(true)
+		}
+		if shipNonempty {
+			shipDelivered.Store(true)
 		}
 		navigationReady()
 		if request.Name == "getLoadingStatus" && principal.role == "owner" {

@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2d-'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2c-.*experimental-unsigned-local-exploration-biology-no-uploads/)
+  assert.match(job.steps[upload].with.name, /g2d-.*experimental-unsigned-local-original-ui-no-uploads/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -75,4 +75,17 @@ test('G2C final batch includes both native OSes, original regressions and extend
   }
   const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
   assert.ok(legacy.on.pull_request.branches.includes('go/g2b-local-nav-exploration'))
+})
+
+test('G2D preview waits for terminal, security, visual and native gates on both OSes', () => {
+  const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8'))
+  assert.ok(w.on.pull_request.branches.includes('go/g2c-exploration-parity'))
+  assert.ok(w.on.push.branches.includes('go/g2d-original-ui-parity'))
+  const steps = w.jobs.desktop.steps; const pack = steps.findIndex(s => s.name === 'Package experimental preview')
+  for (const name of ['Executable G2D terminal smoke', 'Native G2D terminal smoke', 'Real browser visual and interaction verification', 'G2D ship and revocation stress']) {
+    const index = steps.findIndex(s => s.name === name); assert.ok(index >= 0 && index < pack); assert.equal(steps[index].if, undefined)
+  }
+  assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2D/)
+  const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
+  assert.ok(legacy.on.pull_request.branches.includes('go/g2c-exploration-parity'))
 })

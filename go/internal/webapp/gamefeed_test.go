@@ -41,7 +41,7 @@ func gameFixture(t *testing.T) (*Server, *http.Client, *http.Client, string, str
 }
 func startGameFixture(t *testing.T, dir string, navigation bool, expected string, exploration ...bool) (*Server, *http.Client, *http.Client, string, string) {
 	t.Helper()
-	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, EnableNavigation: navigation, EnableExploration: len(exploration) > 0 && exploration[0], Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
+	s, err := StartLocalWithOptions(context.Background(), fixtureFS(), Options{StorageDir: t.TempDir(), JournalDir: dir, EnableJournal: true, EnableNavigation: navigation, EnableExploration: len(exploration) > 0 && exploration[0], EnableDashboard: len(exploration) > 1 && exploration[1], Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
