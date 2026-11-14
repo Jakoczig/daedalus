@@ -170,17 +170,7 @@ func cloneProjection(p Projections) Projections {
 	q.Exploration.FSSProgress = scalarCopy(p.Exploration.FSSProgress)
 	q.Exploration.Bodies = append([]explorestate.BodyView{}, p.Exploration.Bodies...)
 	for i := range q.Exploration.Bodies {
-		src := p.Exploration.Bodies[i]
-		b := &q.Exploration.Bodies[i]
-		b.Landable = scalarCopy(src.Landable)
-		b.Terraformable = scalarCopy(src.Terraformable)
-		b.GravityG = scalarCopy(src.GravityG)
-		b.DistanceLS = scalarCopy(src.DistanceLS)
-		b.BioSignals = scalarCopy(src.BioSignals)
-		b.GeoSignals = scalarCopy(src.GeoSignals)
-		b.PreviouslyDiscovered = scalarCopy(src.PreviouslyDiscovered)
-		b.PreviouslyMapped = scalarCopy(src.PreviouslyMapped)
-		b.Genuses = append([]string{}, src.Genuses...)
+		q.Exploration.Bodies[i] = explorestate.CloneBody(p.Exploration.Bodies[i])
 	}
 	return q
 }

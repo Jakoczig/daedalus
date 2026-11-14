@@ -51,7 +51,7 @@ export default function GoJournalStatus ({ stage, connected, ready, role, sendEv
       <p role='status'>{status}</p>
       {connected && ready && summary?.currentSystem && <p>Current / last known system: <strong>{summary.currentSystem}</strong></p>}
       {connected && ready && summary && <p>Events read: {summary.eventsRead || 0}. Last safe event: {summary.lastEventType || 'none'} {summary.lastEventAt && <time dateTime={summary.lastEventAt}>{summary.lastEventAt}</time>}</p>}
-      <p>{stage === 'G2B' ? 'No provider uploads. The navigation route and current-system survey are journal-only. Other ship, engineering and exploration features remain unfinished.' : 'No provider uploads. Exploration, ship and engineering features remain unimplemented; keep the separate legacy app for those workflows.'}</p>
+      <p>{stage === 'G2C' ? 'No provider uploads. Local routes, system maps, body details and confirmed biology are supported. Other ship, engineering and provider features remain unfinished.' : stage === 'G2B' ? 'No provider uploads. The navigation route and current-system survey are journal-only. Other ship, engineering and exploration features remain unfinished.' : 'No provider uploads. Exploration, ship and engineering features remain unimplemented; keep the separate legacy app for those workflows.'}</p>
       {error && <p role='alert'>{error}</p>}
       {statusError && <p role='alert'>{statusError}</p>}
       {role === 'owner' && (

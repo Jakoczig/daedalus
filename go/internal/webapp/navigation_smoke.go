@@ -68,7 +68,22 @@ func NavigationSmokeTest(ctx context.Context, s *Server) error {
 		if rpc("getGoNavigation", &n) != nil || rpc("getGoExploration", &e) != nil {
 			return fail
 		}
-		if n.CurrentSystem == "Fixture Alpha" && n.DestinationSystem == "Fixture Beta" && n.TargetSystem == "Fixture Beta" && len(n.Hops) == 2 && n.RemainingJumps != nil && *n.RemainingJumps == 1 && e.SystemName == "Fixture Alpha" && e.ReportedBodyCount != nil && *e.ReportedBodyCount == 12 && len(e.Bodies) == 1 && e.Bodies[0].BodyID == "9007199254740997" && e.Bodies[0].DSSMapped && e.Bodies[0].BioSignals != nil && *e.Bodies[0].BioSignals == 3 {
+		validSurvey := len(e.Bodies) == 1
+		if s.g2c {
+			validSurvey = false
+			for _, body := range e.Bodies {
+				if body.BodyID == "9007199254740997" && body.Details != nil && body.Details.RadiusKM != nil && *body.Details.RadiusKM == 1000 && len(body.Organisms) == 1 && body.Organisms[0].Complete && body.Organisms[0].Species == "Fixture Bacterium" {
+					validSurvey = true
+				}
+			}
+		}
+		var found *explorestate.BodyView
+		for i := range e.Bodies {
+			if e.Bodies[i].BodyID == "9007199254740997" {
+				found = &e.Bodies[i]
+			}
+		}
+		if found != nil && validSurvey && n.CurrentSystem == "Fixture Alpha" && n.DestinationSystem == "Fixture Beta" && n.TargetSystem == "Fixture Beta" && len(n.Hops) == 2 && n.RemainingJumps != nil && *n.RemainingJumps == 1 && e.SystemName == "Fixture Alpha" && e.ReportedBodyCount != nil && *e.ReportedBodyCount == 12 && found.DSSMapped && found.BioSignals != nil && *found.BioSignals == 3 {
 			return nil
 		}
 		select {

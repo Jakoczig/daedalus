@@ -2,9 +2,9 @@ name: Go desktop foundation
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration]
   push:
-    branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration]
+    branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity]
 
 permissions:
   contents: read
@@ -54,11 +54,14 @@ jobs:
         run: cd go && go test -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
       - name: G2B projection stress
         run: cd go && go test -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(SameTimestamp|SidecarMarkerBeforeAndAfterWrite|NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar|UntimestampedClearCannotResurrectOldEvidence|CoordinatesRequireActualJSONNumbers|IncompleteArrivalClearsPreviousTarget)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent|MalformedRecordsBreakAttribution|ValidUnknownRecordPreservesContinuity)'
+      - name: G2C details and organic stress
+        run: cd go && go test -count=25 -timeout=4m ./internal/explorestate ./internal/gamestate ./internal/webapp -run '^TestG2C'
       - name: Race detector
         if: runner.os == 'Linux'
         run: |
           cd go
           go test -race -count=1 -timeout=4m ./...
+          go test -race -count=25 -timeout=4m ./internal/explorestate ./internal/gamestate ./internal/webapp -run '^TestG2C'
           go test -race -count=25 -timeout=4m ./internal/journal ./internal/webapp -run 'TestReaderStartsBeforeGameDirectoryExists|TestReaderDirectoryAppearsBeforeFirstPollReplays|TestRevocationStopsGameFeed'
           go test -race -count=25 -timeout=4m ./internal/navstate ./internal/explorestate ./internal/gamestate ./internal/webapp -run 'TestRoute(SameTimestamp|SidecarMarkerBeforeAndAfterWrite|NavRouteClearStaysCleared|AdvancesOnlyOnConfirmedArrival|OldCommanderCannotReuseSidecar|UntimestampedClearCannotResurrectOldEvidence|CoordinatesRequireActualJSONNumbers|IncompleteArrivalClearsPreviousTarget)|TestExploration(DifferentFIDCannotShareBodies|IgnoresOutOfSystemScan)|TestG2B(ProfileSwitchClearsOldRouteAndBodies|RevokedViewerReceivesNoNewNavigationOrSurvey|BroadcastSnapshotsAreIndependent|MalformedRecordsBreakAttribution|ValidUnknownRecordPreservesContinuity)'
       - name: Build native desktop
@@ -125,13 +128,32 @@ jobs:
           fi
       - name: Benchmark projection replay
         run: cd go && go test ./internal/gamestate -run '^$' -bench '^BenchmarkProjectionReplay$' -benchmem -benchtime=3x
+      - name: Prepare synthetic G2C fixture
+        id: exploration_fixture
+        run: node scripts/build/navigation-smoke-fixture.cjs --g2c
+      - name: Executable G2C exploration smoke
+        env:
+          G2C_JOURNAL_DIR: ${{ steps.exploration_fixture.outputs.directory }}
+        run: go/bin/daedalus${{ runner.os == 'Windows' && '.exe' || '' }} --exploration-smoke-test --journal-dir "$G2C_JOURNAL_DIR"
+      - name: Native G2C exploration smoke
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          G2C_JOURNAL_DIR: ${{ steps.exploration_fixture.outputs.directory }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- go/bin/daedalus --desktop-exploration-smoke-test --journal-dir "$G2C_JOURNAL_DIR"
+          else
+            go/bin/daedalus.exe --desktop-exploration-smoke-test --journal-dir "$G2C_JOURNAL_DIR"
+          fi
+      - name: Benchmark cached exploration snapshots
+        run: cd go && go test ./internal/explorestate -run '^$' -bench '^BenchmarkSurveySnapshot$' -benchmem -benchtime=200x
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g2b-${{ runner.os }}-x64-experimental-unsigned-local-route-survey-no-uploads
+          name: daedalus-g2c-${{ runner.os }}-x64-experimental-unsigned-local-exploration-biology-no-uploads
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

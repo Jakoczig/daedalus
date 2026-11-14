@@ -40,6 +40,9 @@ func ownerClient(t *testing.T, s *Server) *http.Client {
 		expectedStage = "G2A"
 		if s.g2b {
 			expectedStage = "G2B"
+			if s.g2c {
+				expectedStage = "G2C"
+			}
 		}
 	}
 	if json.NewDecoder(response.Body).Decode(&body) != nil || body.Role != "owner" || body.Prototype.Stage != expectedStage || body.Prototype.Offline != (s.game == nil) {
