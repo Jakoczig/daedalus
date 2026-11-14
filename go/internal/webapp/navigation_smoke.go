@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
+	"github.com/Jakoczig/daedalus/go/internal/gamestate"
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
 	"github.com/Jakoczig/daedalus/go/internal/shipstate"
 	"github.com/coder/websocket"
@@ -76,6 +77,13 @@ func NavigationSmokeTest(ctx context.Context, s *Server) error {
 				return fail
 			}
 			validShip = ship.ShipType == "asp" && ship.HullHealth != nil && *ship.HullHealth == 0.82 && ship.FuelMainT != nil && *ship.FuelMainT == 16
+		}
+		if s.g2e {
+			var w gamestate.WorkspaceView
+			if rpc("getGoWorkspace", &w) != nil {
+				return fail
+			}
+			validShip = validShip && len(w.Parity.Modules) == 3 && w.Parity.Status.State == "known" && w.Parity.Cargo.State == "known" && w.Parity.Materials.State == "known" && w.Parity.Inventory.State == "known" && len(w.Activity.Missions.Active) == 1 && len(w.Activity.Commander.Ranks) >= 3
 		}
 		validSurvey := len(e.Bodies) == 1
 		if s.g2c {

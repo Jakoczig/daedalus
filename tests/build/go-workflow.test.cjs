@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2d-'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2e-'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2d-.*experimental-unsigned-local-original-ui-no-uploads/)
+  assert.match(job.steps[upload].with.name, /g2e-.*experimental-unsigned-local-feature-parity-no-uploads/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -88,4 +88,12 @@ test('G2D preview waits for terminal, security, visual and native gates on both 
   assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2D/)
   const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
   assert.ok(legacy.on.pull_request.branches.includes('go/g2c-exploration-parity'))
+})
+
+test('G2E preview requires new parity native, browser and race gates', () => {
+  const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8')); const steps = w.jobs.desktop.steps
+  assert.ok(w.on.pull_request.branches.includes('go/g2d-original-ui-parity')); assert.ok(!w.on.push.branches.includes('go/g2e-feature-parity'), 'G2E uses one mandatory PR-triggered run rather than duplicate push runs')
+  const pack = steps.findIndex(s => s.name === 'Package experimental preview')
+  for (const name of ['Executable G2E parity smoke', 'Native G2E parity smoke', 'G2E real browser parity and performance verification', 'G2E attribution and revocation stress']) { const i = steps.findIndex(s => s.name === name); assert.ok(i >= 0 && i < pack); assert.equal(steps[i].if, undefined) }
+  assert.match(steps.find(s => s.name === 'Race detector').run, /-race -count=25.*TestG2E/)
 })

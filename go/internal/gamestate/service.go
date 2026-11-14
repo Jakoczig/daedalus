@@ -26,6 +26,7 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
+	EnableParity bool
 	Directory    string
 	Discovery    journal.DiscoveryOptions
 	PollInterval time.Duration

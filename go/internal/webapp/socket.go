@@ -3,7 +3,10 @@ package webapp
 import (
 	"context"
 	"encoding/json"
+	"github.com/Jakoczig/daedalus/go/internal/gamestate"
+	"github.com/Jakoczig/daedalus/go/internal/paritystate"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -95,8 +98,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	var journalRequested atomic.Bool
 	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
 	var shipRequested, shipDelivered atomic.Bool
+	var workspaceRequested, workspaceDelivered atomic.Bool
 	navigationReady := func() {
-		if principal.role == "owner" && (!s.g2d || (shipRequested.Load() && shipDelivered.Load())) && navRequested.Load() && surveyRequested.Load() && navDelivered.Load() && surveyDelivered.Load() {
+		if principal.role == "owner" && (!s.g2e || (workspaceRequested.Load() && workspaceDelivered.Load())) && (!s.g2d || (shipRequested.Load() && shipDelivered.Load())) && navRequested.Load() && surveyRequested.Load() && navDelivered.Load() && surveyDelivered.Load() {
 			s.navigationReadyOnce.Do(func() { close(s.navigationReady) })
 		}
 	}
@@ -142,6 +146,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	}
 	if s.g2b && s.game != nil {
 		changes, unsubscribe := s.game.SubscribeProjections(readCtx)
+		var previous *gamestate.Projections
 		defer unsubscribe()
 		go func() {
 			for {
@@ -152,21 +157,21 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 					if !ok {
 						return
 					}
-					if send(map[string]any{"name": "goNavigationChanged", "message": p.Navigation}) != nil {
+					if (!s.g2e || previous == nil || !reflect.DeepEqual(previous.Navigation, p.Navigation)) && send(map[string]any{"name": "goNavigationChanged", "message": p.Navigation}) != nil {
 						conn.CloseNow()
 						return
 					}
 					if len(p.Navigation.Hops) > 0 && navRequested.Load() {
 						navDelivered.Store(true)
 					}
-					if send(map[string]any{"name": "goExplorationChanged", "message": p.Exploration}) != nil {
+					if (!s.g2e || previous == nil || !reflect.DeepEqual(previous.Exploration, p.Exploration)) && send(map[string]any{"name": "goExplorationChanged", "message": p.Exploration}) != nil {
 						conn.CloseNow()
 						return
 					}
 					if len(p.Exploration.Bodies) > 0 && surveyRequested.Load() {
 						surveyDelivered.Store(true)
 					}
-					if s.g2d && shipRequested.Load() {
+					if s.g2d && shipRequested.Load() && (!s.g2e || previous == nil || !reflect.DeepEqual(previous.Ship, p.Ship)) {
 						if send(map[string]any{"name": "goShipChanged", "message": p.Ship}) != nil {
 							conn.CloseNow()
 							return
@@ -175,6 +180,27 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 							shipDelivered.Store(true)
 						}
 					}
+					if s.g2e && workspaceRequested.Load() && p.Workspace != nil {
+						var old *gamestate.WorkspaceView
+						if previous != nil {
+							old = previous.Workspace
+						}
+						if !sameStaticWorkspace(old, p.Workspace) {
+							if send(map[string]any{"name": "goWorkspaceChanged", "message": p.Workspace}) != nil {
+								conn.CloseNow()
+								return
+							}
+						} else if !reflect.DeepEqual(old.Parity.Status, p.Workspace.Parity.Status) {
+							if send(map[string]any{"name": "goFlightChanged", "message": p.Workspace.Parity.Status}) != nil {
+								conn.CloseNow()
+								return
+							}
+						}
+						if len(p.Workspace.Parity.Modules) > 0 {
+							workspaceDelivered.Store(true)
+						}
+					}
+					previous = &p
 					navigationReady()
 
 				}
@@ -203,12 +229,21 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			continue
 		}
 		response := map[string]any{"requestId": request.RequestID, "name": request.Name}
-		navigationNonempty, surveyNonempty, shipNonempty := false, false, false
+		navigationNonempty, surveyNonempty, shipNonempty, workspaceNonempty := false, false, false, false
 		switch request.Name {
 		case "getLoadingStatus":
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoWorkspace":
+			if !s.g2e || s.game == nil {
+				response["error"] = "Workspace not enabled"
+			} else {
+				workspaceRequested.Store(true)
+				value := s.game.Workspace()
+				workspaceNonempty = len(value.Parity.Modules) > 0
+				response["message"] = value
+			}
 		case "getGoShip":
 			if !s.g2d || s.game == nil {
 				response["error"] = "Ship journal view not enabled"
@@ -258,6 +293,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 		if shipNonempty {
 			shipDelivered.Store(true)
 		}
+		if workspaceNonempty {
+			workspaceDelivered.Store(true)
+		}
 		navigationReady()
 		if request.Name == "getLoadingStatus" && principal.role == "owner" {
 			s.readyOnce.Do(func() { close(s.clientReady) })
@@ -302,4 +340,15 @@ func (s *Server) handler(assets http.Handler) http.Handler {
 		}
 		assets.ServeHTTP(w, r)
 	})
+}
+
+// Status ticks must not resend static loadouts, inventories or system bodies.
+func sameStaticWorkspace(a, b *gamestate.WorkspaceView) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	x, y := *a, *b
+	x.Parity.Status = paritystate.StatusView{}
+	y.Parity.Status = paritystate.StatusView{}
+	return reflect.DeepEqual(x, y)
 }
