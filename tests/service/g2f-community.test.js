@@ -1,0 +1,30 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const Module = require('node:module')
+const { transformSync } = require('next/dist/compiled/babel/core')
+const filename = require('node:path').resolve(__dirname, '../../src/client/lib/go-community.js')
+const mod = new Module(filename, module)
+mod._compile(transformSync(fs.readFileSync(filename, 'utf8'), { babelrc: false, configFile: false, plugins: [require('next/dist/compiled/babel/plugin-transform-modules-commonjs')] }).code, filename)
+const { mergeCommunity } = mod.exports
+const local = { systemName: 'Fixture Alpha', bodies: [{ bodyId: '9007199254740993', name: 'Local planet', dssMapped: true, bioSignals: 2, genuses: ['Tussock'], organisms: [{ stage: 'sampled', samples: 2 }], details: { radiusKM: 123 } }] }
+const community = { enabled: true, status: 'cached', systemName: 'Fixture Alpha', bodies: [{ bodyId: '9007199254740993', name: 'Community planet', dssMapped: false, details: { radiusKM: 999 } }, { bodyId: '9007199254740992', name: 'Other planet', dssMapped: true, bioSignals: 99, genuses: ['Fake'], organisms: [{ complete: true }] }] }
+test('community map adds exact-ID bodies without replacing personal observations or predicting scans', () => {
+  const original = JSON.stringify({ local, community })
+  const bodies = mergeCommunity(local, community)
+  assert.equal(bodies.length, 2)
+  assert.equal(bodies[0].name, 'Local planet')
+  assert.equal(bodies[0].dssMapped, true)
+  assert.equal(bodies[0].details.radiusKM, 123)
+  assert.equal(bodies[0].organisms[0].samples, 2)
+  assert.equal(bodies[0].communityReference.details.radiusKM, 999)
+  assert.equal(bodies[1].source, 'community')
+  assert.equal(bodies[1].dssMapped, false)
+  assert.equal(bodies[1].bioSignals, null)
+  assert.deepEqual(bodies[1].organisms, [])
+  assert.equal(JSON.stringify({ local, community }), original)
+})
+test('disabled and different-system community results cannot enter current map', () => {
+  assert.equal(mergeCommunity(local, { ...community, enabled: false }).length, 1)
+  assert.equal(mergeCommunity(local, { ...community, systemName: 'Fixture Beta' }).length, 1)
+})

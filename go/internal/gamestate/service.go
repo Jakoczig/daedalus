@@ -364,3 +364,19 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 	}
 	return nil
 }
+
+// SystemIdentity is used only by the fixed-host opt-in community lookup.
+// It never exposes commander identity and is unavailable during replay/gaps.
+func (s *Service) SystemIdentity() (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.summary.ImportInProgress || s.summary.SourceState != "live" || s.active == "" {
+		return "", ""
+	}
+	c := s.commanders[s.active]
+	v := s.views.exploration.View(s.active, c.systemAddress)
+	if v.SystemName != c.system || (v.SurveyState != "observed" && v.SurveyState != "scanner_complete" && v.SurveyState != "partial") {
+		return "", ""
+	}
+	return c.system, c.systemAddress
+}

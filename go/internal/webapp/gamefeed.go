@@ -12,6 +12,8 @@ import (
 )
 
 type Options struct {
+	// CommunityClient is injectable for offline tests; no endpoint is browser-configurable.
+	CommunityClient   *http.Client
 	StorageDir        string
 	EnableJournal     bool
 	EnableNavigation  bool

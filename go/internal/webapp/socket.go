@@ -235,6 +235,36 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoCommunity", "refreshGoCommunity", "setGoCommunityEnabled":
+			if s.community == nil || s.game == nil {
+				response["error"] = "Community enrichment unavailable"
+				break
+			}
+			if request.Name != "getGoCommunity" && principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			if request.Name == "setGoCommunityEnabled" {
+				var value struct {
+					Enabled *bool `json:"enabled"`
+				}
+				decoder := json.NewDecoder(strings.NewReader(string(request.Message)))
+				decoder.DisallowUnknownFields()
+				if decoder.Decode(&value) != nil || value.Enabled == nil {
+					response["error"] = "Expected explicit enabled setting"
+					break
+				}
+				if err := s.community.SetEnabled(*value.Enabled); err != nil {
+					response["error"] = err.Error()
+					break
+				}
+			}
+			name, address := s.game.SystemIdentity()
+			if request.Name == "refreshGoCommunity" {
+				response["message"] = s.community.Refresh(readCtx, name, address)
+			} else {
+				response["message"] = s.community.View(name, address)
+			}
 		case "getGoWorkspace":
 			if !s.g2e || s.game == nil {
 				response["error"] = "Workspace not enabled"

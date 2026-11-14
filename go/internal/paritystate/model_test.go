@@ -245,3 +245,10 @@ func TestLockerKnowledgeDoesNotDependOnBackpackSnapshot(t *testing.T) {
 		t.Fatal("separate inventory evidence lost", v)
 	}
 }
+
+func TestFighterModuleUsesDisplayAliasWithoutInventingClass(t *testing.T) {
+	modules, state := parseModules(map[string]any{"Modules": []any{map[string]any{"Slot": "Slot05_Size6", "Item": "INT_FIGHTERBAYMK2_S"}}})
+	if state != "journal_last_known" || len(modules) != 1 || modules[0].Name != "Fighter Hangar Mk II" || modules[0].Reference.Class != nil || modules[0].Reference.PowerMW != nil {
+		t.Fatal("fighter display or unverified facts", modules)
+	}
+}

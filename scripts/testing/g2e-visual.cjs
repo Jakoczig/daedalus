@@ -18,6 +18,7 @@ function backendSample (pid) {
 }
 
 async function main () {
+  const focused = process.env.G2F_FOCUSED_VISUAL === '1'
   const output = path.join(root, 'temp/g2e-visual')
   await fs.mkdir(output, { recursive: true })
   const report = { scope: 'Sandboxed Chromium and separate synthetic Go fixture process; not whole Wails CPU/RAM or gameplay', pages: [], errors: [], blockedRequests: [] }
@@ -54,20 +55,29 @@ async function main () {
   }
   try {
     await client.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
-    const source = path.join(root, 'tests/testdata/g2e')
-    host = await fixture('G2D', '', source); origin = host.url
-    await navigate('/ship/status', 'ASP'); await screenshot('g2d-ship-baseline-laptop'); report.g2dBaseline = await sample()
-    await host.stop(); host = null
+    const source = path.join(root, 'tests/testdata/g2f')
+    if (!focused) {
+      host = await fixture('G2D', '', source); origin = host.url
+      await navigate('/ship/status', 'ASP'); await screenshot('g2d-ship-baseline-laptop'); report.g2dBaseline = await sample()
+      await host.stop(); host = null
+    }
     host = await fixture('G2E', '', source); origin = host.url
-    await navigate('/ship/status', 'POWER DISTRIBUTION'); report.g2eComparison = await sample()
+    await navigate('/ship/status', 'POWER DISTRIBUTION'); if (!focused) report.g2eComparison = await sample()
     report.measurementMethod = '1366×768 Ship Status, same synthetic replay, explicit renderer GC, two-second idle sample. Backend process is the test fixture at the production 500ms polling interval, without a Wails window. Windows CPU is Get-Process CPU seconds / elapsed one-core time; Linux backend CPU unmeasured. RSS is working set/VmRSS and includes resident static assets/reference caches.'
-    for (const [viewport, width, height] of [['desktop', 1920, 1080], ['laptop', 1366, 768], ['tablet', 820, 1180]]) {
+    for (const [viewport, width, height] of (focused ? [['laptop', 1366, 768]] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['tablet', 820, 1180]])) {
       await client.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
       for (const [page, pathname, text] of [['ship', '/ship/status', 'POWER DISTRIBUTION'], ['modules', '/ship/modules', 'FRAME SHIFT DRIVE'], ['cargo', '/ship/cargo', 'LIMPET'], ['inventory', '/ship/inventory', 'MEDKIT'], ['blueprints', '/eng/blueprints', 'REFERENCE RECIPES'], ['planner', '/eng/material-planner', 'MATERIAL PLANNER'], ['materials', '/eng/raw-materials', 'IRON'], ['commander', '/cmdr/overview', 'PILOT RANKS'], ['missions', '/missions/overview', 'FIXTURE DELIVERY'], ['mining', '/mining/status', 'PLATINUM'], ['rings', '/mining/rings', 'FIXTURE ALPHA 1 RING']]) {
+        if (focused && !['ship', 'modules'].includes(page)) continue
         await navigate(pathname, text)
         const layout = await evaluate('({documentWidth:document.documentElement.scrollWidth,width:innerWidth,headers:document.querySelectorAll("header").length})')
         if (layout.documentWidth > width + 2 || layout.headers !== 1) throw new Error(`Layout error ${page}/${viewport}`)
         if (page === 'modules') {
+          await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"]\')'))
+          await evaluate('document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"]\').click()')
+          await waitFor(() => evaluate('document.querySelector(\'.go-module-inspector\')?.textContent.includes(\'actual class unknown / not verified\')'))
+          if (!await evaluate('document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"] .go-module-class\').textContent.startsWith(\'0\')')) throw new Error('Unverified module class is not placeholder zero')
+          await screenshot('fighter-module-' + viewport)
+
           const selected = await evaluate('new Promise(resolve=>{const t=performance.now();const b=Array.from(document.querySelectorAll(".go-module-card")).find(b=>b.textContent.includes("Frame Shift Drive"));if(!b)return resolve(null);b.click();requestAnimationFrame(()=>requestAnimationFrame(()=>resolve({ms:performance.now()-t,text:document.querySelector(".go-module-inspector")?.innerText})))})')
           if (!selected?.text.includes('Mass Manager')) throw new Error('Engineering inspector selection failed')
           const inspector = await evaluate('(()=>{const i=document.querySelector(".go-module-inspector");return {display:getComputedStyle(i).display,width:i.clientWidth,scrollWidth:i.scrollWidth}})()')
@@ -75,6 +85,26 @@ async function main () {
           report.pages.push({ viewport, page, selectionMs: selected.ms, inspector })
         } else {
           if (page === 'ship') {
+            const switches = await evaluate('Array.from(document.querySelectorAll(\'.go-flight-switches .checkbox__control\')).map(e=>{const r=e.getBoundingClientRect();const t=getComputedStyle(e,\'::after\');return {width:r.width,height:r.height,thumb:parseFloat(t.width)*r.width/e.offsetWidth,left:parseFloat(t.left)*r.width/e.offsetWidth,label:getComputedStyle(e.parentElement.querySelector(\'small\')).fontSize}})')
+            if (switches.length !== 5 || switches.some(s => s.width < 55 || s.height < 25 || s.thumb < 15 || s.left + s.thumb > s.width)) throw new Error('Observed switch track/thumb is not legible: ' + JSON.stringify(switches))
+            report.switches = switches
+            // Pointer reveal must expire even while hover/focus remains, keyboard
+            // focus must still reveal its own label. This uses real browser input.
+            const point = await evaluate('(()=>{const b=document.querySelector(\'.go-temporary-labels .secondary-navigation__has-label\');const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()')
+            await client.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point })
+            await client.call('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point })
+            await client.call('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point })
+            await delay(150)
+            if (!await evaluate('(()=>{const b=document.querySelector(\'.go-temporary-labels .secondary-navigation__has-label\');return getComputedStyle(b.querySelector(\'.secondary-navigation__label\')).opacity!==\'0\'})()')) throw new Error('Pointer label did not reveal')
+            await delay(2400)
+            if (!await evaluate('getComputedStyle(document.querySelector(\'.go-temporary-labels .secondary-navigation__label\')).opacity===\'0\'')) throw new Error('Pointer label stuck after timeout')
+            await client.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+            await client.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+            await delay(250)
+            if (!await evaluate('(()=>{const b=document.activeElement;return b.matches(\'.go-temporary-labels .secondary-navigation__has-label\')&&getComputedStyle(b.querySelector(\'.secondary-navigation__label\')).opacity===\'1\'})()')) throw new Error('Keyboard navigation label not visible')
+            report.navigationLabels = { pointerReveals: true, timeoutHides: true, keyboardVisible: true }
+            await evaluate('document.activeElement.blur()'); await delay(250)
+
             const control = await evaluate('({count:document.querySelectorAll(".go-flight-switches input[disabled]").length,flags:document.querySelectorAll(".go-flight-indicators>div").length})')
             if (control.count !== 5 || control.flags !== 15) throw new Error('Ship instrumentation incomplete')
           }
@@ -87,6 +117,26 @@ async function main () {
         await screenshot(`${page}-${viewport}`)
       }
     }
+    await host.stop(); host = null
+    host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2f'), true); origin = host.url
+    for (const [viewport, width, height] of (focused ? [['laptop', 1366, 768]] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['tablet', 820, 1180]])) {
+      await client.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+      await navigate('/nav/map', 'SYSTEM CARTOGRAPHY')
+      await waitFor(() => evaluate('document.body.innerText.includes(\'Fixture Community Planet\')'))
+      await evaluate('Array.from(document.querySelectorAll(\'.go-chart__body\')).find(b=>b.getAttribute(\'aria-label\')===\'Inspect Fixture Community Planet\').dispatchEvent(new MouseEvent(\'click\',{bubbles:true}))')
+      await waitFor(() => evaluate('document.querySelector(\'.go-inspector\')?.innerText.includes(\'personal scan state unknown\')'))
+      const mergeCheck = await evaluate('({inspector:document.querySelector(\'.go-inspector\').innerText,privateLeak:document.body.innerText.includes(\'PRIVATE_PROVIDER\'),bodies:document.querySelectorAll(\'.go-chart__body\').length})')
+      if (!mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
+      await evaluate('Array.from(document.querySelectorAll(\'.go-community summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
+      if (!await evaluate('document.body.innerText.includes(\'Fixture Community Station\')&&document.body.innerText.includes(\'2026-01-01\')')) throw new Error('Station source freshness missing')
+      await screenshot('community-map-' + viewport)
+      report.pages.push({ viewport, page: 'community-map', provenance: true, stations: true })
+    }
+    await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()')
+    await waitFor(() => evaluate('document.querySelector(\'[aria-label="Optional EDSM enrichment"]\')?.textContent.includes(\'Disable EDSM lookups\')'))
+    await evaluate('Array.from(document.querySelectorAll(\'[aria-label="Optional EDSM enrichment"] button\')).find(b=>b.textContent===\'Disable EDSM lookups\').click()')
+    await waitFor(() => evaluate('!document.body.innerText.includes(\'Fixture Community Planet\')'))
+    report.community = { mockOnly: true, ownerDisableClears: true }
     if (report.errors.length || report.blockedRequests.length) throw new Error('Runtime errors or unexpected external requests')
     report.passed = true
     await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify(report, null, 2))
