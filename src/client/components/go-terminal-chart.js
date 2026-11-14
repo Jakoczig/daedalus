@@ -5,7 +5,28 @@ import { Icon } from './go-terminal-widgets'
 export function chartScene (bodies, contextBodies = bodies) {
   const ids = new Set(bodies.map(b => b.bodyId)); const nodes = layoutBodies(contextBodies).filter(n => ids.has(n.body.bodyId)); const roots = new Map(); const positions = new Map(); let y = 1800; let width = 14000
   for (const n of nodes) { let root = n; const seen = new Set(); while (root.parent && !root.unresolved && !seen.has(root)) { seen.add(root); root = root.parent } if (!roots.has(root))roots.set(root, []); roots.get(root).push(n) }
-  for (const group of roots.values()) { let x = 1600; let column = 0; let bottom = y + 1800; for (const n of group) { if (n.depth <= 1) { if (n.depth === 1)column++; x = 1600 + column * 3600 } else { x = positions.get(n.parent?.body.bodyId)?.x || x } const parent = positions.get(n.parent?.body.bodyId); const py = n.depth > 1 ? (parent?.y || y) + 2600 : y; const radius = n.body.details?.isStar ? 650 : Math.max(220, Math.min(500, Math.sqrt(n.body.details?.radiusKM || 1200) * 8)); positions.set(n.body.bodyId, { ...n, x, y: py, radius }); bottom = Math.max(bottom, py + 1800); width = Math.max(width, x + 4700) }y = bottom + 2000 }
+  for (const group of roots.values()) {
+    let x = 1600; let column = 0; let bottom = y + 1800; let columnBottom = y
+    for (const n of group) {
+      if (n.depth <= 1) {
+        if (n.depth === 1) column++
+        x = 1600 + column * 3600
+        columnBottom = y
+      } else {
+        x = positions.get(n.parent?.body.bodyId)?.x || x
+      }
+      const parent = positions.get(n.parent?.body.bodyId)
+      // Nodes are in depth-first order. Reserve a fresh row after the entire
+      // previous subtree so siblings cannot share glyphs, labels or hit targets.
+      const py = n.depth > 1 ? Math.max((parent?.y ?? y) + 2600, columnBottom + 2600) : y
+      const radius = n.body.details?.isStar ? 650 : Math.max(220, Math.min(500, Math.sqrt(n.body.details?.radiusKM || 1200) * 8))
+      positions.set(n.body.bodyId, { ...n, x, y: py, radius })
+      columnBottom = py
+      bottom = Math.max(bottom, py + 1800)
+      width = Math.max(width, x + 4700)
+    }
+    y = bottom + 2000
+  }
   return { nodes: nodes.map(n => positions.get(n.body.bodyId)), width, height: Math.max(6000, y) }
 }
 export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect }) {

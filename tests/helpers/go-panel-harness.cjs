@@ -36,10 +36,11 @@ function harness (panel = 'go-navigation', initial = navigation) {
     mod._compile(`module.exports = function (navigator) { const document = { addEventListener () {}, removeEventListener () {} }; const sessionStorage = { setItem () {}, getItem () { return null } }; const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
     const result = mod.exports(browser); cache.set(filename, result); return result
   }
-  const component = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')).default
+  const loaded = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')); const component = loaded.default
   const props = { connected: true, ready: true, role: 'viewer', sendEvent: async name => { calls.push(name); return typeof initial === 'function' ? initial(name) : initial }, eventListener: (name, callback) => { listeners.set(name, callback); return () => { listeners.delete(name); unsubscribed++ } } }
   const render = () => { cursor = 0; tree = component(props); return renderToStaticMarkup(tree) }
   return {
+    exports: loaded,
     props,
     calls,
     browser,
