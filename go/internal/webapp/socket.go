@@ -261,6 +261,33 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			response["message"] = s.loadingStatus()
 		case "hostInfo":
 			response["message"] = map[string]any{"urls": []string{principal.url}}
+		case "getGoShipName":
+			if principal.role != "owner" || s.game == nil {
+				response["error"] = "Local owner required"
+			} else {
+				response["message"] = map[string]string{"shipName": s.game.Ship().ShipName}
+			}
+		case "getGoGalaxyLayers":
+			if s.providers == nil {
+				response["message"] = map[string]any{"points": []any{}}
+			} else {
+				response["message"] = s.providers.Layers()
+			}
+		case "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier":
+			if principal.role != "owner" {
+				response["error"] = "Owner permission required"
+				break
+			}
+			if s.providers == nil {
+				response["error"] = "Providers unavailable"
+				break
+			}
+			value, err := s.providerRPC(readCtx, request.Name, request.Message)
+			if err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
 		case "getGoNavigationContext":
 			if !s.g2e || s.game == nil {
 				response["error"] = "Navigation context unavailable"
@@ -432,6 +459,10 @@ func (s *Server) handler(assets http.Handler) http.Handler {
 		}
 		if r.URL.Path == "/auth/session" {
 			s.session(w, r)
+			return
+		}
+		if r.URL.Path == "/owner/frontier-callback" {
+			s.frontierCallback(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/owner/") {

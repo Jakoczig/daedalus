@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher]
 
 jobs:
   regression-tests:

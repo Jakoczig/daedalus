@@ -100,7 +100,7 @@ func main() {
 	defer deadline()
 	var communityClient *http.Client
 	if *communityFixture {
-		if *stage != "G2E" || !(strings.HasSuffix(filepath.Clean(*fixture), "g2f") || strings.HasSuffix(filepath.Clean(*fixture), "g2g")) {
+		if *stage != "G2E" || !(strings.HasSuffix(filepath.Clean(*fixture), "g2f") || strings.HasSuffix(filepath.Clean(*fixture), "g2g") || strings.HasSuffix(filepath.Clean(*fixture), "g2h")) {
 			panic("community fixture requires explicit G2F synthetic directory")
 		}
 		raw, err := os.ReadFile(filepath.Join(*fixture, "EDSM.json"))

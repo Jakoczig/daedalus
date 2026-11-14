@@ -9,11 +9,14 @@ import (
 
 	"github.com/Jakoczig/daedalus/go/internal/gamestate"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/daedalus/go/internal/providers"
 )
 
 type Options struct {
-	DesktopAction    func(string) error
-	DesktopCloseMode func(string)
+	ProviderOptions   providers.Options
+	OpenAuthorization func(string) error
+	DesktopAction     func(string) error
+	DesktopCloseMode  func(string)
 	// CommunityClient is injectable for offline tests; no endpoint is browser-configurable.
 	CommunityClient   *http.Client
 	StorageDir        string
@@ -46,7 +49,11 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	s.g2d = opts.EnableDashboard && s.g2c
 	s.g2e = opts.EnableParity && s.g2d
 	s.navigationSmoke = opts.NavigationSmoke && s.g2b
-	s.game, _ = gamestate.NewService(gamestate.Options{EnableParity: s.g2e, Directory: directory, Discovery: opts.Discovery, ConfigError: configError, PollInterval: opts.PollInterval})
+	s.game, _ = gamestate.NewService(gamestate.Options{ProviderEvent: func(e journal.Event, p journal.Phase) {
+		if s.providers != nil {
+			s.providers.Observe(e, p)
+		}
+	}, EnableParity: s.g2e, Directory: directory, Discovery: opts.Discovery, ConfigError: configError, PollInterval: opts.PollInterval})
 	gameCtx, cancel := context.WithCancel(ctx)
 	s.gameCancel = cancel
 	s.gameDone = make(chan struct{})

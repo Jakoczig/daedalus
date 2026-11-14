@@ -9,19 +9,26 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
+	"unicode"
 )
 
 type View struct {
-	ShipType       string   `json:"shipType"`
-	Evidence       string   `json:"evidence"`
-	HullHealth     *float64 `json:"hullHealth"`
-	FuelMainT      *float64 `json:"fuelMainT"`
-	FuelCapacityT  *float64 `json:"fuelCapacityT"`
-	CargoCapacityT *float64 `json:"cargoCapacityT"`
-	MaxJumpRangeLY *float64 `json:"maxJumpRangeLY"`
-	UnladenMassT   *float64 `json:"unladenMassT"`
-	Docked         *bool    `json:"docked"`
-	Landed         *bool    `json:"landed"`
+	ShipName            string   `json:"-"`
+	LoadoutAt           string   `json:"loadoutAt"`
+	RebuyCredits        *float64 `json:"rebuyCredits"`
+	HullValueCredits    *float64 `json:"hullValueCredits"`
+	ModulesValueCredits *float64 `json:"modulesValueCredits"`
+	ShipType            string   `json:"shipType"`
+	Evidence            string   `json:"evidence"`
+	HullHealth          *float64 `json:"hullHealth"`
+	FuelMainT           *float64 `json:"fuelMainT"`
+	FuelCapacityT       *float64 `json:"fuelCapacityT"`
+	CargoCapacityT      *float64 `json:"cargoCapacityT"`
+	MaxJumpRangeLY      *float64 `json:"maxJumpRangeLY"`
+	UnladenMassT        *float64 `json:"unladenMassT"`
+	Docked              *bool    `json:"docked"`
+	Landed              *bool    `json:"landed"`
 }
 type state struct {
 	v        View
@@ -45,6 +52,9 @@ func copyPtr[T any](p *T) *T {
 	return &v
 }
 func Clone(v View) View {
+	v.RebuyCredits = copyPtr(v.RebuyCredits)
+	v.HullValueCredits = copyPtr(v.HullValueCredits)
+	v.ModulesValueCredits = copyPtr(v.ModulesValueCredits)
 	v.HullHealth = copyPtr(v.HullHealth)
 	v.FuelMainT = copyPtr(v.FuelMainT)
 	v.FuelCapacityT = copyPtr(v.FuelCapacityT)
@@ -152,6 +162,15 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		}
 		s.v = View{ShipType: kind, Evidence: "journal_last_known", FuelMainT: fuel}
 		s.id = id
+		if !e.Timestamp.IsZero() {
+			s.v.LoadoutAt = e.Timestamp.UTC().Format(time.RFC3339)
+		}
+		if name, ok := data["ShipName"].(string); ok && len(name) <= 80 && strings.IndexFunc(name, unicode.IsControl) < 0 {
+			s.v.ShipName = name
+		}
+		numeric(data, "Rebuy", 0, 9e15, &s.v.RebuyCredits)
+		numeric(data, "HullValue", 0, 9e15, &s.v.HullValueCredits)
+		numeric(data, "ModulesValue", 0, 9e15, &s.v.ModulesValueCredits)
 		numeric(data, "HullHealth", 0, 1, &s.v.HullHealth)
 		numeric(data, "CargoCapacity", 0, 1e6, &s.v.CargoCapacityT)
 		numeric(data, "UnladenMass", 0, 1e9, &s.v.UnladenMassT)

@@ -1,0 +1,248 @@
+package providers
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/url"
+	"slices"
+
+	"strings"
+	"time"
+)
+
+func (m *Manager) Layers() Layers {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v := m.layers
+	v.Points = slices.Clone(v.Points)
+	return v
+}
+func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, error) {
+	m.mu.Lock()
+	s := m.states[id]
+	cap := m.cap(id)
+	if m.closed || s == nil || !s.config.Read || s.config.Paused || cap.Gate != "" || !slices.Contains(cap.Read, kind) {
+		m.mu.Unlock()
+		return nil, errors.New("Provider read consent/approval required")
+	}
+	if s.busy || m.opts.Now().Before(s.next) {
+		m.mu.Unlock()
+		return nil, errors.New("Provider cooldown active")
+	}
+	s.busy = true
+	s.next = m.opts.Now().Add(time.Minute)
+	generation := s.generation
+	providerCtx := s.ctx
+	cred := m.secrets[id]
+	now := m.opts.Now()
+	identity, commander := m.identity, m.name
+	m.mu.Unlock()
+	requestCtx, cancel := context.WithTimeout(providerCtx, 8*time.Second)
+	defer cancel()
+	stop := context.AfterFunc(ctx, cancel)
+	defer stop()
+	defer func() { m.mu.Lock(); s.busy = false; m.mu.Unlock() }()
+	endpoint := cap.Endpoint
+	method := "GET"
+	ct := ""
+	var body []byte
+	bearer := ""
+	switch id {
+	case "edsm":
+		if cred.APIKey == "" || cred.Commander == "" {
+			return nil, errors.New("Store EDSM account/key first")
+		}
+		endpoint = "https://www.edsm.net/api-logs-v1/get-logs"
+		method = "POST"
+		ct = "application/x-www-form-urlencoded"
+		body = []byte(url.Values{"commanderName": {cred.Commander}, "apiKey": {cred.APIKey}, "startDateTime": {now.Add(-24 * time.Hour).UTC().Format("2006-01-02 15:04:05")}, "endDateTime": {now.UTC().Format("2006-01-02 15:04:05")}}.Encode())
+	case "inara":
+		if cred.APIKey == "" {
+			return nil, errors.New("Store Inara key first")
+		}
+		method = "POST"
+		ct = "application/json"
+		app := m.opts.InaraAppName
+		if app == "" {
+			app = InaraApplicationName
+		}
+		body, _ = json.Marshal(map[string]any{"header": map[string]any{"appName": app, "appVersion": version, "isBeingDeveloped": true, "APIkey": cred.APIKey}, "events": []any{map[string]any{"eventName": "getCommanderProfile", "eventTimestamp": now.UTC().Format(time.RFC3339), "eventData": map[string]any{}}}})
+	case "edastro":
+		if kind == "gec" {
+			endpoint = "https://edastro.com/gec/json/all"
+		} else {
+			if len(query) < 1 || len(query) > 128 || strings.ContainsAny(query, "\r\n\x00,") {
+				return nil, errors.New("Enter one bounded system name")
+			}
+			endpoint = "https://edastro.com/api/starsystem?q=" + url.QueryEscape(query)
+		}
+	case "frontier":
+		if cred.AccessToken == "" || cred.RefreshToken == "" {
+			return nil, errors.New("Connect an approved Frontier application first")
+		}
+		if now.After(cred.ExpiresAt.Add(-30 * time.Second)) {
+			form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {cred.RefreshToken}, "client_id": {m.clientID()}}
+			raw, status, err := m.request(requestCtx, "POST", "https://auth.frontierstore.net/token", "application/x-www-form-urlencoded", []byte(form.Encode()), "")
+			if err != nil || status != 200 || m.storeTokens(raw, generation, cred.RefreshToken) != nil {
+				return nil, errors.New("Frontier refresh failed; reconnect")
+			}
+			m.mu.Lock()
+			cred = m.secrets[id]
+			m.mu.Unlock()
+		}
+		endpoint += "/" + kind
+		bearer = cred.AccessToken
+	}
+	raw, status, err := m.request(requestCtx, method, endpoint, ct, body, bearer)
+	if err != nil || status != 200 {
+		m.mu.Lock()
+		if generation == s.generation {
+			s.lastError = "Read failed; no server response or secret logged"
+		}
+		m.mu.Unlock()
+		return nil, errors.New("Provider read failed")
+	}
+	if (id == "edsm" || id == "inara") && !accepted(id, raw) {
+		return nil, errors.New("Provider did not authorize or return the requested data")
+	}
+	snapshot := &Snapshot{Source: id + " / " + kind, FetchedAt: now.UTC().Format(time.RFC3339), ExpiresAt: now.Add(5 * time.Minute).UTC().Format(time.RFC3339), Facts: []Fact{}}
+	add := func(name string, value any) {
+		if value == nil || len(snapshot.Facts) >= 100 {
+			return
+		}
+		s := fmt.Sprint(value)
+		for _, secret := range []string{cred.APIKey, cred.AccessToken, cred.RefreshToken} {
+			if secret != "" {
+				s = strings.ReplaceAll(s, secret, "[redacted]")
+			}
+		}
+		if len(s) > 160 {
+			s = s[:160]
+		}
+		snapshot.Facts = append(snapshot.Facts, Fact{Name: name, Value: s})
+	}
+	data := object(raw)
+	if data == nil && !(id == "edastro" && kind == "gec") {
+		return nil, errors.New("Unsupported or oversized provider response")
+	}
+	if (id == "edsm" || id == "inara") && identity != "" && commander != "" && cred.Commander == commander {
+		snapshot.commanderHash = identity
+	}
+	if id == "frontier" && kind == "profile" {
+		if profile, ok := data["commander"].(map[string]any); ok && text(profile["name"]) == commander && commander != "" {
+			snapshot.commanderHash = identity
+		}
+	}
+	if id == "edsm" {
+		if a, ok := data["logs"].([]any); ok {
+			for _, x := range a {
+				if v, ok := x.(map[string]any); ok {
+					add(text(v["system"]), text(v["date"]))
+				}
+			}
+		}
+	}
+	if id == "inara" {
+		if a, ok := data["events"].([]any); ok && len(a) > 0 {
+			if v, ok := a[0].(map[string]any); ok {
+				if d, ok := v["eventData"].(map[string]any); ok {
+					add("Commander", text(d["commanderName"]))
+					add("Inara name", text(d["userName"]))
+					if ranks, ok := d["commanderRanksPilot"].([]any); ok {
+						for _, x := range ranks {
+							if r, ok := x.(map[string]any); ok {
+								add(text(r["rankName"]), r["rankValue"])
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	var layers *Layers
+	if id == "edastro" && kind == "gec" {
+		var a []map[string]any
+		dec := json.NewDecoder(strings.NewReader(string(raw)))
+		dec.UseNumber()
+		if dec.Decode(&a) != nil {
+			return nil, errors.New("Unsupported GEC response")
+		}
+		l := Layers{Source: "EDAstro Galactic Exploration Catalog API — data provided for application use; no imagery copied", FetchedAt: snapshot.FetchedAt, ExpiresAt: now.Add(24 * time.Hour).UTC().Format(time.RFC3339)}
+		for _, o := range a {
+			if len(l.Points) >= 2048 {
+				l.Truncated = true
+				break
+			}
+			coords, ok := o["coords"].(map[string]any)
+			if !ok {
+				continue
+			}
+			pos := []any{coords["x"], coords["y"], coords["z"]}
+			if !validPosition(pos) {
+				continue
+			}
+			var p Point
+			for i, x := range pos {
+				p.Coordinates[i], _ = x.(json.Number).Float64()
+			}
+			p.Name = text(o["name"])
+			if p.Name == "" {
+				p.Name = text(o["galMapSearch"])
+			}
+			if p.Name == "" {
+				continue
+			}
+			p.Category = "poi"
+			if strings.Contains(strings.ToLower(fmt.Sprint(o["type"])), "nebula") {
+				p.Category = "nebula"
+			}
+			p.Source = "EDAstro GEC"
+			l.Points = append(l.Points, p)
+		}
+		layers = &l
+		add("Cached GEC points", len(l.Points))
+		add("Truncated", l.Truncated)
+	} else if id == "edastro" {
+		for _, k := range []string{"name", "id64", "bodyCount"} {
+			add(k, data[k])
+		}
+	}
+	if id == "frontier" {
+		for _, key := range []string{"commander", "ship", "lastSystem", "lastStarport", "carrier"} {
+			if o, ok := data[key].(map[string]any); ok {
+				for _, field := range []string{"name", "id", "credits", "docked", "value", "cargo", "capacity", "health", "callsign", "currentStarSystem", "fuel", "balance"} {
+					v := o[field]
+					switch v.(type) {
+					case string, json.Number, bool:
+						add(key+" / "+field, v)
+					}
+				}
+			}
+		}
+		for _, key := range []string{"ships", "commodities", "modules"} {
+			switch a := data[key].(type) {
+			case []any:
+				add(key+" count", len(a))
+			case map[string]any:
+				add(key+" count", len(a))
+			}
+		}
+		add("Snapshot note", "Supplemental CAPI data may lag; never overwrites journal or republishes market data")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
+		return nil, errors.New("Read consent was revoked")
+	}
+	s.snapshot = snapshot
+	s.lastSuccess = now.UTC().Format(time.RFC3339)
+	s.lastError = ""
+	if layers != nil {
+		m.layers = *layers
+	}
+	copy := *snapshot
+	copy.Facts = slices.Clone(snapshot.Facts)
+	return &copy, nil
+}

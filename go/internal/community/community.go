@@ -31,6 +31,7 @@ type Station struct {
 	UpdatedAt  string   `json:"updatedAt"`
 }
 type View struct {
+	ReportedBodyCount *int                    `json:"reportedBodyCount"`
 	Coordinates       *[3]float64             `json:"coordinates,omitempty"`
 	Enabled           bool                    `json:"enabled"`
 	Status            string                  `json:"status"`
@@ -359,6 +360,10 @@ func (m *Manager) load(ctx context.Context, name, address string) (View, error) 
 	}
 	at := m.now().UTC()
 	v := View{Enabled: true, Status: "cached", SystemName: name, SystemAddress: address, FetchedAt: at.Format(time.RFC3339), ExpiresAt: at.Add(ttl).Format(time.RFC3339)}
+	if raw.BodyCount != nil && *raw.BodyCount >= 0 && *raw.BodyCount <= 100000 {
+		count := *raw.BodyCount
+		v.ReportedBodyCount = &count
+	}
 	if len(raw.Bodies) > 256 {
 		raw.Bodies = raw.Bodies[:256]
 		v.Truncated = true

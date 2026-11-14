@@ -1,0 +1,23 @@
+/* G2H orbital workspace: the legacy chart gets the full available rectangle. */
+.go-terminal .go-cartography{position:relative;gap:.35rem;min-height:0;overflow:hidden}
+.go-terminal .go-cartography .go-page__heading{min-height:2.4rem;flex:none;margin:0}
+.go-terminal .go-cartography>.go-toolbar{max-width:65%;min-height:2.7rem;gap:.5rem;margin:0;flex:none;font-size:.95rem}
+.go-terminal .go-cartography>.go-toolbar label{min-width:8rem}.go-terminal .go-cartography>.go-toolbar input,.go-terminal .go-cartography>.go-toolbar select{font-size:1rem;padding:.3rem}
+.go-terminal .go-cartography .go-workspace{grid-template-columns:minmax(0,65fr) minmax(20rem,35fr);flex:1;min-height:0;gap:1rem}
+.go-terminal .go-cartography .go-workspace__main{display:flex;min-height:0;overflow:hidden}
+.go-terminal .go-cartography .go-chart{width:100%;height:100%;max-width:none;max-height:none;aspect-ratio:auto;flex:1;align-self:stretch}
+.go-terminal .go-cartography .go-chart__viewport{inset:2.6rem .3rem 1.6rem}.go-terminal .go-cartography .go-chart__legend{font-size:.8rem;margin:.2rem}
+.go-terminal .go-cartography .go-inspector{height:100%;min-height:0;overflow:auto;font-size:1rem;padding:.5rem;box-sizing:border-box}
+.go-terminal .go-cartography .go-inspector h2{font-size:1.45rem;line-height:1.15}.go-terminal .go-cartography .go-inspector h3{font-size:1.05rem}.go-terminal .go-cartography .go-inspector h4{margin:.5rem 0;font-size:1rem}.go-terminal .go-cartography .go-inspector p{margin:.4rem 0;line-height:1.25}
+.go-terminal .go-cartography .navigation-panel__inspector-heading{min-height:0;padding:.3rem 0;display:block}.go-terminal .go-cartography .navigation-panel__inspector-heading>.icon{float:left;font-size:2.4rem;margin-right:.6rem}
+.go-terminal .go-cartography .go-fact-grid{grid-template-columns:1fr 1fr;gap:0}.go-terminal .go-cartography .go-fact-grid>div{padding:.4rem .2rem}.go-terminal .go-cartography .go-fact-grid small{font-size:.9rem}.go-terminal .go-cartography .go-fact-grid strong{font-size:1.05rem}.go-terminal .go-cartography .go-chip-row{margin:.4rem 0}
+.go-terminal .go-cartography .go-body-list{overflow:auto;flex:1;min-height:0}.go-terminal .go-system-stations{font-size:.9rem;flex:none;max-height:30%;overflow:auto}.go-terminal .go-system-stations[open]{border:1px solid #795114;padding:.4rem}
+.go-ship-statistics{overflow:auto;font-size:1.1rem}.go-stats-columns{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.go-stats-grid{display:grid;grid-template-columns:1fr 1fr}.go-stat-fact{display:flex;flex-direction:column;gap:.3rem;padding:.7rem;border-bottom:1px solid #49331d}.go-stat-fact strong{font-size:1.7rem;color:var(--color-info)}.go-stat-fact .go-badge{align-self:flex-start;font-size:.7rem}.go-stats-evidence{font-size:.95rem;color:var(--color-secondary)}.go-stats-advanced{margin-top:1rem}
+@media(max-width:1050px){.go-terminal .go-cartography{height:auto;overflow:visible}.go-terminal .go-cartography>.go-toolbar{max-width:none;flex-wrap:wrap}.go-terminal .go-cartography .go-workspace{display:flex;flex-direction:column;min-height:0}.go-terminal .go-cartography .go-workspace__main{height:32rem;flex:none}.go-terminal .go-cartography .go-inspector{height:auto;overflow:visible}.go-stats-columns{grid-template-columns:1fr}}
+
+.go-galaxy-controls{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;font-size:.95rem}.go-galaxy-controls input,.go-provider-settings input[type=checkbox]{appearance:auto;width:1.1rem;height:1.1rem}.go-galaxy-controls small{flex-basis:100%}.go-galaxy-plane svg{touch-action:none}
+.go-provider-card{padding:.9rem;margin:1rem 0;border:1px solid #81551f;font-size:1rem;line-height:1.4}.go-provider-card h3{display:flex;justify-content:space-between;gap:1rem}.go-provider-card small{overflow-wrap:anywhere}.go-provider-card label{display:inline-flex;gap:.5rem;align-items:center;margin:.4rem .8rem .4rem 0}.go-provider-card fieldset{border:1px solid #5f4526;padding:.5rem}.go-provider-card input:not([type=checkbox]){width:15rem;font-size:1rem;padding:.4rem}.go-provider-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}.go-provider-card button{padding:.4rem .6rem;font-size:1rem}.go-provider-card dl>div{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}.go-provider-card dd{margin:0;overflow-wrap:anywhere}.go-provider-consent{color:var(--color-primary)}
+
+.go-provider-reference{font-size:1rem;padding:.5rem;max-height:30vh;overflow:auto}.go-provider-reference dl>div{display:grid;grid-template-columns:1fr 1fr}.go-provider-reference dd{margin:0}
+
+.go-terminal .go-cartography .navigation-panel__inspector-heading>.icon{position:static;display:inline-block;float:left;width:2.2rem;height:2.2rem;line-height:2.2rem;font-size:2.2rem;margin:0 .7rem .2rem 0}

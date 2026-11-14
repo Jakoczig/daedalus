@@ -19,7 +19,14 @@ func (s *Service) NavigationContext() navcontext.View {
 	for _, p := range v.Points {
 		seen[p.Address] = true
 	}
-	for _, p := range s.views.navigation.VerifiedPositions(s.active) {
+	positions := s.views.navigation.VerifiedPositions(s.active)
+	// Reserve the coordinate-verified destination before filling the bounded route context.
+	for i := range positions {
+		index := i - 1
+		if i == 0 {
+			index = len(positions) - 1
+		}
+		p := positions[index]
 		if len(v.Points) >= 192 {
 			break
 		}
