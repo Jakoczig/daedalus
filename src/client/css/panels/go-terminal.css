@@ -38,7 +38,7 @@
 .go-terminal .go-chart__name{fill:var(--color-info);font-family:Jura,sans-serif;font-size:270px;font-weight:600}.go-terminal .go-chart__caption{fill:var(--color-primary);font-size:190px;font-family:Jura,sans-serif}.go-terminal .go-chart__bio{fill:var(--color-success);font-size:170px;font-family:Jura,sans-serif}
 .go-terminal .go-chart__selection{fill:none;stroke:var(--color-secondary);stroke-width:22;stroke-dasharray:120 45}.go-terminal .go-chart__body:focus{outline:none}.go-terminal .go-chart__body:focus .go-chart__selection{stroke-width:45}
 .go-terminal .go-body-strip{display:flex;gap:.3rem;flex-shrink:0;overflow:auto;max-height:4rem;padding:.15rem 0}.go-body-strip button{font-size:.7rem;padding:.4rem .7rem;white-space:nowrap;max-width:15rem;overflow:hidden;text-overflow:ellipsis;margin:0;flex-shrink:0}.go-body-strip button[aria-pressed='true']{background:var(--color-primary);color:var(--color-primary-dark)}
-.go-terminal .go-inspector.navigation-panel__inspector{position:relative;inset:auto;width:auto;height:100%;min-height:0;overflow-y:auto;padding:0 .9rem .9rem;background:linear-gradient(145deg,var(--color-background-panel),#05090b);border-top:.2rem solid var(--color-primary);transition:none}
+.go-terminal .go-inspector.navigation-panel__inspector{display:block;min-width:0;position:relative;inset:auto;width:auto;height:100%;min-height:0;overflow-y:auto;padding:0 .9rem .9rem;background:linear-gradient(145deg,var(--color-background-panel),#05090b);border-top:.2rem solid var(--color-primary);transition:none}
 .go-terminal .go-inspector .inspector__title{position:sticky;top:0;width:auto;margin:0 -.9rem .8rem;display:flex;align-items:center;height:2.2rem;padding:.2rem .5rem;background:var(--color-primary-dark);z-index:2;box-sizing:border-box}.go-inspector .inspector__title>button{padding:.1rem .4rem;height:1.8rem;background:transparent;color:var(--color-primary)}.go-inspector .inspector__title h3{font-size:.9rem;padding:0 .5rem;text-transform:uppercase;line-height:1.8rem}
 .go-terminal .go-inspector .navigation-panel__inspector-heading{padding-left:3.2rem;min-height:3rem}.go-terminal .go-inspector .navigation-panel__inspector-heading>.icon{font-size:2.5rem;width:2.7rem;top:.1rem}.go-terminal .go-inspector h2{font-size:1.35rem}.go-terminal .go-inspector h3{font-size:.9rem}.go-terminal .go-inspector p{font-size:.75rem;line-height:1.5;overflow-wrap:anywhere}.go-terminal .go-inspector hr{margin:.8rem 0}
 .go-terminal .go-fact-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.go-fact-grid>div{border-bottom:1px solid rgba(160,180,200,.15);padding-bottom:.4rem}.go-fact-grid small{display:block;color:var(--color-primary);font-size:.65rem;text-transform:uppercase}.go-fact-grid strong{font-size:.95rem;font-weight:500}
@@ -62,3 +62,7 @@
 @media(prefers-reduced-motion:reduce){.go-terminal *{animation:none!important;transition:none!important}}
 
 .go-terminal .go-chart .system-map__planetary-lander-icon{width:350px;height:350px;opacity:.65;pointer-events:none}
+
+/* The legacy portrait inspector uses a horizontal flex strip. G2D settings
+   and body facts need normal stacked document flow at every orientation. */
+.go-terminal .go-settings{display:block;min-width:0}
