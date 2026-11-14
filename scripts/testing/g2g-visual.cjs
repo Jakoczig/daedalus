@@ -1,7 +1,7 @@
 // One browser batch for launcher, map/catalogue, route, galaxy and FSD policy.
 const fs = require('node:fs/promises')
 const path = require('node:path')
-const { fixture, browser, waitFor, delay } = require('./g2d-visual.cjs')
+const { fixture, browser, waitFor, delay, pageTextReady } = require('./g2d-visual.cjs')
 const root = path.resolve(__dirname, '../..')
 async function main () {
   const focused = process.env.G2G_FOCUS === '1'
@@ -12,7 +12,7 @@ async function main () {
   c.on(event => { if (event.method === 'Runtime.exceptionThrown') report.errors.push(event.params.exceptionDetails.exception?.description || event.params.exceptionDetails.text); if (event.method === 'Fetch.requestPaused') { const p = event.params; const ok = p.request.url.startsWith(origin + '/') || p.request.url.startsWith('data:'); if (!ok) report.blockedRequests.push(p.request.url); c.call(ok ? 'Fetch.continueRequest' : 'Fetch.failRequest', ok ? { requestId: p.requestId } : { requestId: p.requestId, errorReason: 'BlockedByClient' }).catch(() => {}) }; if (event.method === 'Network.webSocketFrameSent') { try { rpcNames.push(JSON.parse(event.params.response.payloadData).name) } catch {} } })
   await c.call('Fetch.enable', { patterns: [{ urlPattern: '*' }] }); await c.call('Network.enable'); await c.call('Performance.enable')
   const screenshot = async name => { const r = await c.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, name + '.png'), Buffer.from(r.data, 'base64')) }
-  const navigate = async (url, text) => { await c.call('Page.navigate', { url: origin + url }); await waitFor(() => evaluate(`document.body.innerText.toUpperCase().includes(${JSON.stringify(text.toUpperCase())})`)); await evaluate('document.fonts.ready.then(()=>true)'); await delay(300) }
+  const navigate = async (url, text) => { await c.call('Page.navigate', { url: origin + url }); await waitFor(() => evaluate(pageTextReady(text))); await evaluate('document.fonts.ready.then(()=>true)'); await delay(300) }
   const sample = async () => { await c.call('HeapProfiler.collectGarbage'); const first = Object.fromEntries((await c.call('Performance.getMetrics')).metrics.map(m => [m.name, m.value])); if (!focused) await delay(1500); const metrics = Object.fromEntries((await c.call('Performance.getMetrics')).metrics.map(m => [m.name, m.value])); return { heapBytes: metrics.JSHeapUsedSize, nodes: (await c.call('Memory.getDOMCounters')).nodes, sampledMainThreadPercent: focused ? null : 100 * (metrics.TaskDuration - first.TaskDuration) / (metrics.Timestamp - first.Timestamp) } }
   try {
     host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2g'), true); origin = host.url

@@ -3,7 +3,7 @@ const fs = require('node:fs/promises')
 const sync = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
-const { fixture, browser, waitFor, delay } = require('./g2d-visual.cjs')
+const { fixture, browser, waitFor, delay, pageTextReady } = require('./g2d-visual.cjs')
 const root = path.resolve(__dirname, '../..')
 
 function backendSample (pid) {
@@ -42,7 +42,7 @@ async function main () {
   const screenshot = async name => { const value = await client.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, name + '.png'), Buffer.from(value.data, 'base64')) }
   const navigate = async (pathname, expected) => {
     await client.call('Page.navigate', { url: origin + pathname })
-    try { await waitFor(() => evaluate(`document.body.innerText.includes('SERVICE READY') && document.body.innerText.toUpperCase().includes(${JSON.stringify(expected.toUpperCase())})`)) } catch (error) { report.failedPage = { pathname, expected, text: await evaluate('document.body.innerText') }; await screenshot('failed-page'); throw error }
+    try { await waitFor(() => evaluate(pageTextReady(expected, true))) } catch (error) { report.failedPage = { pathname, expected, text: await evaluate('document.body?.innerText || \'\'') }; await screenshot('failed-page'); throw error }
     await evaluate('document.fonts.ready.then(()=>true)'); await delay(400)
     if (pathname === '/ship/status' && await evaluate("!!document.querySelector('.go-parity-ship')")) await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Ship lights: On"]\')'))
   }
