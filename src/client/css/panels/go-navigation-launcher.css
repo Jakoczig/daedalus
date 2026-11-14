@@ -8,3 +8,8 @@
 @media(max-width:1050px){.go-terminal .go-cartography{height:auto;overflow:visible}.go-terminal .go-cartography .go-workspace{display:flex;min-height:45rem}.go-terminal .go-cartography .go-chart{height:32rem;min-height:25rem;max-width:none}.go-terminal .go-cartography .go-body-list{max-height:35rem}.go-terminal .go-galaxy-projections,.go-terminal .go-fsd-columns{grid-template-columns:1fr}.go-terminal .go-galaxy-xz{min-height:28rem}.go-terminal .go-galaxy-sides{display:grid;grid-template-columns:1fr 1fr}.go-terminal .go-parity-ship .go-flight-power progress{height:.8rem}.go-terminal .go-parity-ship:has(.go-flight-deck){height:100%;overflow:visible}.go-terminal .go-parity-ship .go-flight-deck{flex:1}}
 
 body:has(.go-launcher)::before,body:has(.go-launcher)::after,.go-launcher *{animation:none!important}
+
+/* SVG intrinsic dimensions must not expand the bounded dashboard grid. */
+.go-terminal .go-cartography .go-chart{flex:0 1 auto;height:auto}
+.go-terminal .go-galaxy-projections{flex:1 1 0;grid-template-rows:minmax(0,1fr);overflow:hidden}.go-terminal .go-galaxy-plane{min-height:0}.go-terminal .go-galaxy-plane svg{height:0;flex:1 1 0}.go-terminal .go-galaxy-sides{min-height:0}.go-terminal .go-galaxy-sides .go-galaxy-plane{flex:1 1 0}
+@media(max-width:1050px){.go-terminal .go-galaxy-projections{flex:none;overflow:visible;grid-template-rows:32rem 10rem}.go-terminal .go-cartography .go-chart{height:32rem}}
