@@ -5,6 +5,7 @@ import PrimaryNavigation from './primary-navigation'
 import RemoteDisplays from './remote-displays'
 import GoJournalStatus from './go-journal-status'
 import GoTerminalSurvey from './go-terminal-survey'
+import GoCommunitySettings from './go-community'
 import GoTerminalRoute from './go-terminal-route'
 import GoTerminalShip from './go-terminal-ship'
 import GoParity, { parityPaths } from './go-parity'
@@ -13,6 +14,7 @@ import * as navigation from '../lib/navigation-items'
 import { Icon, Badge, Clock, show } from './go-terminal-widgets'
 export default function GoTerminal (props) {
   const [settings, setSettings] = useState(false)
+  const [communityVersion, setCommunityVersion] = useState(0)
   const path = props.path === '/' || props.path === '/nav' ? '/nav/map' : props.path === '/ship' ? '/ship/status' : props.path === '/exploration' ? '/exploration/system' : props.path === '/eng' ? '/eng/blueprints' : props.path === '/cmdr' ? '/cmdr/overview' : props.path === '/mining' ? '/mining/status' : props.path === '/missions' ? '/missions/overview' : props.path
   const group = path.split('/')[1]; const page = path.split('/')[2] || ''
   const menus = { nav: navigation.NavPanelNavItems, exploration: navigation.ExplorationPanelNavItems, ship: navigation.ShipPanelNavItems, eng: navigation.EngineeringPanelNavItems, cmdr: navigation.CmdrPanelNavItems, missions: navigation.MissionsPanelNavItems, mining: navigation.MiningPanelNavItems }
@@ -21,13 +23,13 @@ export default function GoTerminal (props) {
   const { value: ship } = useGoProjection(props, 'getGoShip', 'goShipChanged')
   let content
   if (props.stage === 'G2E' && parityPaths.includes(path)) content = <GoParity {...props} path={path} />
-  else if (['/nav/map', '/nav/list', '/exploration/system', '/exploration/biologicals'].includes(path)) content = <GoTerminalSurvey {...props} path={path} />
+  else if (['/nav/map', '/nav/list', '/exploration/system', '/exploration/biologicals'].includes(path)) content = <GoTerminalSurvey {...props} communityVersion={communityVersion} path={path} />
   else if (['/ship/status', '/ship/stats'].includes(path)) content = <GoTerminalShip {...props} />
   else if (['/nav/route', '/exploration/route'].includes(path)) {
     content = (
       <>
         <GoTerminalRoute {...props} />
-        {props.nativePreview && props.role === 'owner' && <div className='go-native-survey'><GoTerminalSurvey {...props} path='/exploration/system' />{props.stage === 'G2E' && <GoParity {...props} path='/ship/modules' />}</div>}
+        {props.nativePreview && props.role === 'owner' && <div className='go-native-survey'><GoTerminalSurvey {...props} communityVersion={communityVersion} path='/exploration/system' />{props.stage === 'G2E' && <GoParity {...props} path='/ship/modules' />}</div>}
       </>
     )
   } else {
@@ -60,12 +62,13 @@ export default function GoTerminal (props) {
       </header>
       <div className='go-terminal__telemetry'><span><Icon name='location-filled' /> {summary?.currentSystem || 'Awaiting local journal'}</span><span className='text-muted'>{props.stage || 'G2D'} · {summary?.sourceState || 'waiting'} · no provider uploads</span><span><Icon name='ship' /> {ship?.shipType || 'Ship unknown'} · Fuel {show(ship?.fuelMainT, 'T')}</span></div>
       <Layout connected={props.connected} ready={props.ready} className='go-terminal__layout'>
-        <Panel navigation={items} className='go-terminal__panel'><div className='go-content'>{content}</div></Panel>
+        <Panel temporaryLabels navigation={items} className='go-terminal__panel'><div className='go-content'>{content}</div></Panel>
       </Layout>
       {settings && (
         <aside className='go-settings inspector' aria-label='Display settings'>
-          <div className='go-page__heading'><h2>{props.role === 'owner' ? 'Owner settings' : 'Display status'}</h2><button aria-label='Close settings' onClick={() => setSettings(false)}>×</button></div>
+          <div className='go-page__heading'><h2>{props.role === 'owner' ? 'Owner settings' : 'Display status'}</h2><button aria-label='Close settings' onClick={() => setSettings(false)}>Ä‚—</button></div>
           <GoJournalStatus {...props} stage={props.stage || 'G2D'} />
+          {props.role === 'owner' && props.stage === 'G2E' && <GoCommunitySettings sendEvent={props.sendEvent} onChange={() => setCommunityVersion(v => v + 1)} />}
           {props.role === 'owner' && <RemoteDisplays />}
           {props.role !== 'owner' && <p className='text-muted'>Pairing, journal directories and device permissions are controlled by the local owner.</p>}
         </aside>

@@ -2,7 +2,7 @@ name: Go desktop foundation
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 
@@ -210,7 +210,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: g2e-synthetic-visual-${{ runner.os }}
+          name: g2f-synthetic-visual-${{ runner.os }}
           path: temp/g2e-visual
           if-no-files-found: error
           retention-days: 14
@@ -220,7 +220,7 @@ jobs:
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g2e-${{ runner.os }}-x64-experimental-unsigned-local-feature-parity-no-uploads
+          name: daedalus-g2f-${{ runner.os }}-x64-experimental-unsigned-ui-optional-edsm
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

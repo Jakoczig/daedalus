@@ -35,7 +35,7 @@ func parseModules(d map[string]any) ([]Module, string) {
 			mod.Reference = &ModuleReference{Source: ref.Source, Class: ref.Class, Rating: ref.Rating, MassT: ref.MassT, PowerMW: ref.PowerMW, Description: ref.Description}
 		}
 		if mod.Name == "" {
-			mod.Name = item
+			mod.Name = catalog.ModuleDisplayName(item)
 		}
 		if e, ok := v["Engineering"].(map[string]any); ok {
 			en := &Engineering{Blueprint: text(e["BlueprintName"]), Grade: integer(e["Level"], 5), Quality: number(e["Quality"], 0, 1), Experimental: text(e["ExperimentalEffect_Localised"]), Modifiers: []Modifier{}}

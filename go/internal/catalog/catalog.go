@@ -7,8 +7,10 @@ import (
 	"embed"
 	"encoding/csv"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 //go:embed *.csv modules.json
@@ -46,8 +48,8 @@ func initData() {
 			if len(row) <= nameCol || len(row) <= symbolCol {
 				continue
 			}
-			key := strings.ToLower(row[symbolCol])
-			labels[key] = row[nameCol]
+			key := moduleKey(row[symbolCol])
+			labels[strings.ToLower(row[symbolCol])] = row[nameCol]
 			if filename == "outfitting.csv" {
 				modules[key] = Module{Source: "bundled_edcd_coriolis_reference", Name: row[nameCol], Rating: row[cols["rating"]]}
 			}
@@ -63,7 +65,7 @@ func initData() {
 		return
 	}
 	for _, r := range rows {
-		key := strings.ToLower(r.Symbol)
+		key := moduleKey(r.Symbol)
 		v := modules[key]
 		v.Source = "bundled_edcd_coriolis_reference"
 		if v.Name == "" && r.Name != "" {
@@ -86,7 +88,11 @@ func copyPtr[T any](p *T) *T {
 }
 func ModuleBySymbol(symbol string) (Module, bool) {
 	once.Do(initData)
-	m, ok := modules[strings.ToLower(symbol)]
+	m, ok := modules[moduleKey(symbol)]
+	if !ok && moduleKey(symbol) == "intfighterbaymk2s" {
+		m = Module{Name: "Fighter Hangar Mk II", Source: "symbol_display_name_only", Description: "Display name only; class, rating and performance not verified."}
+		ok = true
+	}
 	m.Class = copyPtr(m.Class)
 	m.MassT = copyPtr(m.MassT)
 	m.PowerMW = copyPtr(m.PowerMW)
@@ -98,4 +104,40 @@ func Label(symbol string) string {
 		return label
 	}
 	return symbol
+}
+
+// Formatting aliases never map unknown variants to another module's statistics.
+func moduleKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return unicode.ToLower(r)
+		}
+		return -1
+	}, s)
+}
+
+var wordBreak = regexp.MustCompile(`([a-z])([A-Z0-9])`)
+
+func ModuleDisplayName(symbol string) string {
+	if m, ok := ModuleBySymbol(symbol); ok && m.Name != "" {
+		return m.Name
+	}
+	s := strings.Trim(strings.TrimSpace(symbol), "$;")
+	s = wordBreak.ReplaceAllString(s, "$1 $2")
+	s = strings.ReplaceAll(s, "_", " ")
+	parts := strings.Fields(strings.ToLower(s))
+	if len(parts) > 0 && (parts[0] == "int" || parts[0] == "hpt") {
+		parts = parts[1:]
+	}
+	for i, w := range parts {
+		r := []rune(w)
+		if len(r) > 0 {
+			r[0] = unicode.ToUpper(r[0])
+			parts[i] = string(r)
+		}
+	}
+	if len(parts) == 0 {
+		return "Unidentified module"
+	}
+	return strings.Join(parts, " ")
 }

@@ -39,6 +39,7 @@
 
 @import "overrides/safari.css";
 @import "overrides/firefox.css";
+@import './panels/go-usability.css';
 
 @font-face {
   font-family: 'Jura';

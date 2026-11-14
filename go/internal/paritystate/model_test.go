@@ -245,3 +245,27 @@ func TestLockerKnowledgeDoesNotDependOnBackpackSnapshot(t *testing.T) {
 		t.Fatal("separate inventory evidence lost", v)
 	}
 }
+
+func TestFighterModuleUsesDisplayAliasWithoutInventingClass(t *testing.T) {
+	modules, state := parseModules(map[string]any{"Modules": []any{map[string]any{"Slot": "Slot05_Size6", "Item": "INT_FIGHTERBAYMK2_S"}}})
+	if state != "journal_last_known" || len(modules) != 1 || modules[0].Name != "Fighter Hangar Mk II" || modules[0].Reference.Class != nil || modules[0].Reference.PowerMW != nil {
+		t.Fatal("fighter display or unverified facts", modules)
+	}
+}
+
+func TestStatusBeforeLoadGameRequiresFreshObservation(t *testing.T) {
+	m := NewModel()
+	observation := func(seq uint64) sidecar.Change {
+		stamp := event(t, seq, "Status", "").Timestamp
+		return sidecar.Change{Kind: "Status", Timestamp: stamp, Valid: true, Raw: []byte(fmt.Sprintf(`{"event":"Status","timestamp":%q,"Flags":16777216,"Fuel":{"FuelMain":5}}`, stamp.Format("2006-01-02T15:04:05Z")))}
+	}
+	m.ApplySidecar("a", observation(1))
+	m.ApplyEvent("a", event(t, 2, "LoadGame", `,"FID":"SYNTHETIC"`))
+	if m.View("a").Status.State == "known" {
+		t.Fatal("unattributed status was silently restored")
+	}
+	m.ApplySidecar("a", observation(3))
+	if m.View("a").Status.State != "known" {
+		t.Fatal("fresh attributable status not accepted")
+	}
+}

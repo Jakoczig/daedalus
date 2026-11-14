@@ -66,6 +66,40 @@ func g2eFixture(t *testing.T) (*Server, *http.Client, *http.Client, string, stri
 	}
 	s, o, v, u, d := startGameFixture(t, dir, true, "Fixture Alpha", true, true, true)
 	deadline := time.Now().Add(3 * time.Second)
+	replay, err := os.ReadFile(filepath.Join(dir, "Journal.20260101.01.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEvents := uint64(strings.Count(strings.TrimSpace(string(replay)), "\n") + 1)
+	// A pre-existing Status snapshot may be polled before LoadGame. Production
+	// deliberately rejects that unattributed observation. Simulate the game's
+	// next Status write only after this fixture's journal replay has finished.
+	for summary := s.game.Snapshot(); summary.ImportInProgress || summary.EventsRead < expectedEvents; summary = s.game.Snapshot() {
+		if time.Now().After(deadline) {
+			t.Fatal("fixture journal replay did not complete")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "Status.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status map[string]any
+	if err = json.Unmarshal(raw, &status); err != nil {
+		t.Fatal(err)
+	}
+	stamp, err := time.Parse(time.RFC3339, status["timestamp"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	status["timestamp"] = stamp.Add(time.Second).Format(time.RFC3339)
+	raw, err = json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, "Status.json"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
 	for s.game.Workspace().Parity.Status.State != "known" {
 		if time.Now().After(deadline) {
 			t.Fatal("workspace status not settled", s.game.Workspace().Parity.Status.State)

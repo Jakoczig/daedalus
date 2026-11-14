@@ -204,3 +204,13 @@ func TestGameRecoveredReaderClearsOwnerDiagnostic(t *testing.T) {
 	}
 	t.Fatal("recovered source retained obsolete owner error")
 }
+
+func TestCommunityIdentityRejectsRetainedCommanderWithoutArrival(t *testing.T) {
+	s, _ := NewService(Options{})
+	s.active = "SYNTHETIC"
+	s.summary = Summary{SourceState: "live"}
+	s.commanders[s.active] = commanderState{system: "Old system", systemAddress: "1"}
+	if name, _ := s.SystemIdentity(); name != "" {
+		t.Fatal("retained commander location was treated as current")
+	}
+}

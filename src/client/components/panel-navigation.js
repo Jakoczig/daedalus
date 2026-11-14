@@ -1,9 +1,17 @@
-
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 
 import { useRouter } from 'next/router'
 
-export default function PanelNavigation ({ items = [], search = () => {}, exit }) {
+export default function PanelNavigation ({ items = [], search = () => {}, exit, temporaryLabels = false }) {
+  const timer = useRef(null)
+  const [revealed, setRevealed] = useState(null)
+  const [keyboard, setKeyboard] = useState(null)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const reveal = index => {
+    if (!temporaryLabels) return
+    setKeyboard(false); setRevealed(index); clearTimeout(timer.current)
+    timer.current = setTimeout(() => setRevealed(null), 2000)
+  }
   const router = useRouter()
   const [searchValue, setSearchValue] = useState('')
   const [searchInputVisible, setSearchInputVisible] = useState(false)
@@ -21,7 +29,7 @@ export default function PanelNavigation ({ items = [], search = () => {}, exit }
   }, [])
 
   return (
-    <div id='secondaryNavigation' className='secondary-navigation'>
+    <div id='secondaryNavigation' className={`secondary-navigation ${temporaryLabels ? 'go-temporary-labels' : ''}`}>
       {searchItem &&
         <>
           <button
@@ -74,6 +82,14 @@ export default function PanelNavigation ({ items = [], search = () => {}, exit }
               <button
                 tabIndex='2'
                 data-secondary-navigation={i + (searchItem ? 2 : 1)}
+                aria-label={item.name}
+                data-label-visible={temporaryLabels && (revealed === i || keyboard === i) ? 'true' : undefined}
+                onPointerEnter={() => reveal(i)}
+                onPointerDown={() => reveal(i)}
+                onPointerLeave={() => { if (temporaryLabels) setRevealed(null) }}
+                onKeyDown={() => { if (temporaryLabels) { setKeyboard(i); setRevealed(null) } }}
+                onFocus={event => { if (temporaryLabels && event.target.matches(':focus-visible')) setKeyboard(i) }}
+                onBlur={() => { if (temporaryLabels) { setKeyboard(false); setRevealed(null) } }}
                 className={`button--icon secondary-navigation__has-label ${item.active ? 'button--active' : ''}`}
                 onClick={
                   item.onClick

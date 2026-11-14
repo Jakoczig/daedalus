@@ -27,3 +27,11 @@ test('ship switches do not claim current main-ship state while outside the main 
   assert.match(html, /Ship lights: Unknown/)
   assert.doesNotMatch(html, /Ship lights: On/)
 })
+
+test('unknown module class displays zero strictly as an unverified placeholder', () => {
+  const h = harness('go-parity-ship', undefined, 'Modules')
+  h.props.model = { modules: [{ slot: 'Slot05_Size6', item: 'INT_FIGHTERBAYMK2_S', name: 'Fighter Hangar Mk II' }] }
+  assert.match(h.html(), /go-module-class">0/)
+  h.elements('button').find(b => b.props['aria-label'] === 'Inspect Fighter Hangar Mk II').props.onClick()
+  assert.match(h.html(), /actual class unknown \/ not verified/)
+})
