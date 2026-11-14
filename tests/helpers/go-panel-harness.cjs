@@ -8,7 +8,7 @@ const { transformSync } = require('next/dist/compiled/babel/core')
 const navigation = { currentSystem: 'Fixture <Alpha>', targetSystem: 'Fixture Beta', destinationSystem: 'Fixture Gamma', routeState: 'verified', targetEvidence: 'journal_target', remainingJumps: 2, reportedRemainingJumps: 2, truncated: false, hops: [{ name: 'Fixture <Alpha>', starClass: 'G', distanceFromPreviousLY: null, isCurrent: true, isNext: false }, { name: 'Fixture Beta', starClass: 'M', distanceFromPreviousLY: 5, isCurrent: false, isNext: true }] }
 const exploration = { systemName: 'Fixture Alpha', surveyState: 'observed', reportedBodyCount: 12, fssProgress: 0.25, allBodiesFound: false, scannerBodyCount: null, truncated: false, bodies: [{ bodyId: '9007199254740997', name: 'Fixture Alpha 1', kind: 'Rocky body', landable: null, terraformable: null, gravityG: null, distanceLS: null, bioSignals: 3, geoSignals: 0, previouslyMapped: true, previouslyDiscovered: null, dssMapped: false, genuses: ['Bacterium'] }] }
 
-function harness (panel = 'go-navigation', initial = navigation) {
+function harness (panel = 'go-navigation', initial = navigation, exportName = 'default') {
   const states = []; const effects = []; const pending = new Map(); const calls = []; const listeners = new Map(); const copied = []
   let cursor = 0; let tree; let unsubscribed = 0
   const react = {
@@ -36,7 +36,7 @@ function harness (panel = 'go-navigation', initial = navigation) {
     mod._compile(`module.exports = function (navigator) { const document = { addEventListener () {}, removeEventListener () {} }; const sessionStorage = { setItem () {}, getItem () { return null } }; const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
     const result = mod.exports(browser); cache.set(filename, result); return result
   }
-  const loaded = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')); const component = loaded.default
+  const loaded = load(path.resolve(__dirname, '../../src/client/components/' + panel + '.js')); const component = loaded[exportName]
   const props = { connected: true, ready: true, role: 'viewer', sendEvent: async name => { calls.push(name); return typeof initial === 'function' ? initial(name) : initial }, eventListener: (name, callback) => { listeners.set(name, callback); return () => { listeners.delete(name); unsubscribed++ } } }
   const render = () => { cursor = 0; tree = component(props); return renderToStaticMarkup(tree) }
   return {
@@ -47,7 +47,7 @@ function harness (panel = 'go-navigation', initial = navigation) {
     copied,
     html: render,
     async flush () { for (const [i, e] of pending) { effects[i]?.cleanup?.(); effects[i] = { deps: e.deps, cleanup: e.callback() } } pending.clear(); await new Promise(resolve => setImmediate(resolve)); return render() },
-    broadcast (value) { for (const cb of listeners.values()) cb(value) },
+    broadcast (value, name) { for (const [key, cb] of listeners) if (!name || key === name) cb(value) },
     unmount () { for (const e of effects) e?.cleanup?.(); pending.clear() },
     get unsubscribed () { return unsubscribed },
     elements (type) { const found = []; const visit = node => { if (!React.isValidElement(node)) return; if (node.type === type) found.push(node); React.Children.forEach(node.props.children, visit) }; visit(tree); return found }

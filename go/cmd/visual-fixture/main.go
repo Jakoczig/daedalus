@@ -28,10 +28,10 @@ func (o overlay) Open(name string) (fs.File, error) {
 }
 func main() {
 	fixture := flag.String("fixture", "", "explicit fabricated fixture directory")
-	stage := flag.String("stage", "G2D", "G2C or G2D test stage")
+	stage := flag.String("stage", "G2D", "G2C, G2D or G2E test stage")
 	reference := flag.String("reference", "", "generated synthetic legacy reference HTML")
 	flag.Parse()
-	if *fixture == "" || (*stage != "G2D" && *stage != "G2C") {
+	if *fixture == "" || (*stage != "G2D" && *stage != "G2C" && *stage != "G2E") {
 		panic("explicit synthetic fixture/stage required")
 	}
 	root, err := os.MkdirTemp("", "daedalus-visual-synthetic-")
@@ -41,7 +41,11 @@ func main() {
 	defer os.RemoveAll(root)
 	journalDir := filepath.Join(root, "journals")
 	os.Mkdir(journalDir, 0700)
-	for _, pair := range [][2]string{{"replay.jsonl", "Journal.20260101.01.log"}, {"NavRoute.json", "NavRoute.json"}} {
+	pairs := [][2]string{{"replay.jsonl", "Journal.20260101.01.log"}, {"NavRoute.json", "NavRoute.json"}}
+	if *stage == "G2E" {
+		pairs = append(pairs, [2]string{"Status.json", "Status.json"}, [2]string{"Cargo.json", "Cargo.json"})
+	}
+	for _, pair := range pairs {
 		raw, err := os.ReadFile(filepath.Join(*fixture, pair[0]))
 		if err != nil {
 			panic(err)
@@ -58,7 +62,7 @@ func main() {
 	defer cancel()
 	ctx, deadline := context.WithTimeout(ctx, 5*time.Minute)
 	defer deadline()
-	server, err := webapp.StartLocalWithOptions(ctx, overlay{assets, *reference}, webapp.Options{StorageDir: filepath.Join(root, "profile"), EnableJournal: true, EnableNavigation: true, EnableExploration: true, EnableDashboard: *stage == "G2D", JournalDir: journalDir, PollInterval: 25 * time.Millisecond})
+	server, err := webapp.StartLocalWithOptions(ctx, overlay{assets, *reference}, webapp.Options{StorageDir: filepath.Join(root, "profile"), EnableJournal: true, EnableNavigation: true, EnableExploration: true, EnableDashboard: *stage == "G2D" || *stage == "G2E", EnableParity: *stage == "G2E", JournalDir: journalDir, PollInterval: 500 * time.Millisecond})
 	if err != nil {
 		panic(err)
 	}

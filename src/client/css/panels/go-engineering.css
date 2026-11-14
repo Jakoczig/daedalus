@@ -1,0 +1,20 @@
+/* Engineering reference browser: scoped to the Go shell only. */
+.go-terminal .go-engineering__workspace{flex:1;min-height:22rem;grid-template-columns:minmax(15rem,1fr) minmax(23rem,1.15fr)}
+.go-terminal .go-engineering .go-inspector.go-engineering__inspector{box-sizing:border-box;padding:1rem;overflow:auto;display:flex;flex-direction:column;gap:.6rem;border-left:1px solid var(--color-primary);background:rgba(0,0,0,.4)}
+.go-terminal .go-engineering__inspector>h3{font-size:.75rem;text-transform:uppercase;color:var(--color-primary)}
+.go-terminal .go-engineering__inspector p,.go-terminal .go-engineering__inspector li{font-size:.85rem;line-height:1.5}
+.go-terminal .go-engineering__inspector ul{padding-left:1.2rem;margin:0}
+.go-terminal .go-engineering__recipe-controls{display:flex;flex-wrap:wrap;gap:1rem}
+.go-terminal .go-engineering__recipe-controls label{display:flex;align-items:center;gap:.5rem;font-size:.85rem}
+.go-terminal .go-engineering__recipe-controls input{width:4.5rem}
+.go-terminal .go-engineering__recipe{width:100%;font-size:.85rem;border-collapse:collapse}
+.go-terminal .go-engineering__recipe th{text-transform:uppercase;font-size:.7rem;color:var(--color-primary);text-align:right;padding:.4rem}
+.go-terminal .go-engineering__recipe td{padding:.5rem .4rem;text-align:right;border-bottom:1px solid rgba(160,180,200,.2)}
+.go-terminal .go-engineering__recipe th:first-child,.go-terminal .go-engineering__recipe td:first-child{text-align:left}
+.go-terminal .go-engineering__recipe small{display:block;font-size:.65rem;color:var(--color-primary)}
+.go-terminal .go-engineering__module{border-left:.2rem solid var(--color-primary);padding:.6rem;background:var(--color-background-panel-translucent)}
+.go-terminal .go-engineering__module dl{margin:.4rem 0;font-size:.8rem}
+.go-terminal .go-engineering__module dd{margin:0 0 .4rem;color:var(--color-primary)}
+.go-terminal .go-engineering__text-button{padding:0;margin:0;background:none;color:var(--color-info);text-align:left;white-space:normal;font-size:inherit;text-decoration:underline}
+@media(max-width:850px){.go-terminal .go-engineering__workspace{display:flex;flex-direction:column}.go-terminal .go-engineering .go-body-list{max-height:24rem;min-height:10rem}.go-terminal .go-engineering .go-inspector.go-engineering__inspector{box-sizing:border-box;border-left:0;border-top:1px solid var(--color-primary);min-height:20rem}}
+

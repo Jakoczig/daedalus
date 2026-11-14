@@ -34,6 +34,8 @@
 @import "panels/mining-panel.css";
 
 @import "panels/go-terminal.css";
+@import "panels/go-parity.css";
+@import "panels/go-engineering.css";
 
 @import "overrides/safari.css";
 @import "overrides/firefox.css";

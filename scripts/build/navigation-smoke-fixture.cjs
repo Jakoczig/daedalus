@@ -4,13 +4,13 @@ const os = require('node:os')
 
 async function createNavigationFixture ({ sourceDir, outputParent }) {
   const directory = await fs.mkdtemp(path.join(outputParent, 'daedalus-g2b-synthetic-navigation-'))
-  for (const [source, destination] of [['replay.jsonl', 'Journal.20260101.01.log'], ['NavRoute.json', 'NavRoute.json']]) {
+  for (const [source, destination] of [['replay.jsonl', 'Journal.20260101.01.log'], ['NavRoute.json', 'NavRoute.json'], ...(path.basename(sourceDir) === 'g2e' ? [['Status.json', 'Status.json'], ['Cargo.json', 'Cargo.json']] : [])]) {
     await fs.writeFile(path.join(directory, destination), await fs.readFile(path.join(sourceDir, source)), { mode: 0o600 })
   }
   return directory
 }
 async function main () {
-  const directory = await createNavigationFixture({ sourceDir: path.resolve(__dirname, process.argv.includes('--g2d') ? '../../tests/testdata/g2d' : process.argv.includes('--g2c') ? '../../tests/testdata/g2c' : '../../tests/testdata/g2b'), outputParent: process.env.RUNNER_TEMP || os.tmpdir() })
+  const directory = await createNavigationFixture({ sourceDir: path.resolve(__dirname, process.argv.includes('--g2e') ? '../../tests/testdata/g2e' : process.argv.includes('--g2d') ? '../../tests/testdata/g2d' : process.argv.includes('--g2c') ? '../../tests/testdata/g2c' : '../../tests/testdata/g2b'), outputParent: process.env.RUNNER_TEMP || os.tmpdir() })
   if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`)
   console.log('Prepared fabricated local route/exploration fixture; no game profile is read')
 }

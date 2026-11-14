@@ -2,9 +2,11 @@ package gamestate
 
 import (
 	"context"
+	"github.com/Jakoczig/daedalus/go/internal/activitystate"
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
+	"github.com/Jakoczig/daedalus/go/internal/paritystate"
 	"github.com/Jakoczig/daedalus/go/internal/shipstate"
 	"github.com/Jakoczig/daedalus/go/internal/sidecar"
 	"reflect"
@@ -14,12 +16,20 @@ import (
 // Projections is an internal, immutable, coalesced notification. Transport sends
 // only the separately typed allowlisted DTOs, never this service container.
 type Projections struct {
+	Workspace   *WorkspaceView
 	Ship        shipstate.View
 	Source      Summary
 	Navigation  navstate.NavigationView
 	Exploration explorestate.ExplorationView
 }
+type WorkspaceView struct {
+	Parity   paritystate.View   `json:"parity"`
+	Activity activitystate.View `json:"activity"`
+}
+
 type projectionState struct {
+	parity      *paritystate.Model
+	activity    *activitystate.Model
 	ship        *shipstate.Model
 	navigation  *navstate.Model
 	exploration *explorestate.Model
@@ -30,7 +40,7 @@ type projectionState struct {
 }
 
 func newProjectionState() projectionState {
-	return projectionState{ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
+	return projectionState{parity: paritystate.NewModel(), activity: activitystate.NewModel(), ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
 }
 func (s *Service) projectionLocked() Projections {
 	p := Projections{Ship: s.views.ship.View(s.active), Source: s.summary, Navigation: s.views.navigation.View(s.active)}
@@ -39,6 +49,17 @@ func (s *Service) projectionLocked() Projections {
 		address = s.commanders[s.active].systemAddress
 	}
 	p.Exploration = s.views.exploration.View(s.active, address)
+	if s.opts.EnableParity {
+		w := WorkspaceView{Parity: s.views.parity.View(s.active), Activity: s.views.activity.View(s.active)}
+		if s.summary.ImportInProgress {
+			w = WorkspaceView{Parity: paritystate.View{Evidence: "replaying"}, Activity: activitystate.View{Evidence: "replaying"}}
+		} else if s.summary.SourceState != "live" && s.summary.SourceState != "partial" && s.summary.SourceState != "parse_warning" {
+			w.Parity.Evidence = "stale_source"
+			w.Parity.Status = paritystate.StatusView{State: "stale_source"}
+			w.Activity.Evidence = "stale_source"
+		}
+		p.Workspace = &w
+	}
 	if s.summary.ImportInProgress {
 		p.Ship = shipstate.View{Evidence: "replaying"}
 		p.Navigation = navstate.NavigationView{RouteState: "replaying", TargetEvidence: "unknown", Hops: []navstate.Hop{}}
@@ -72,11 +93,19 @@ func (s *Service) Exploration() explorestate.ExplorationView {
 }
 func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
 	s.views.ship.ApplyEvent(s.active, e)
+	if s.opts.EnableParity {
+		s.views.parity.ApplyEvent(s.active, e)
+		s.views.activity.ApplyEvent(s.active, e)
+	}
 	s.views.navigation.ApplyEventPhase(s.active, e, phase)
 	s.views.exploration.ApplyEvent(s.active, e)
 	s.views.dirty = true
 }
 func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
+	if s.opts.EnableParity {
+		s.views.parity.ApplySidecar(s.active, c)
+		s.views.dirty = true
+	}
 	if c.Kind == "NavRoute" {
 		s.views.navigation.ApplySidecar(c)
 		s.views.dirty = true
@@ -84,6 +113,8 @@ func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
 }
 func (s *Service) resetProjectionsLocked() {
 	s.views.ship.ResetSource()
+	s.views.parity.ResetSource()
+	s.views.activity.ResetSource()
 	s.views.navigation.ResetSource()
 	s.views.exploration.ResetSource()
 	s.views.hasLast = false
@@ -95,7 +126,7 @@ func (s *Service) publishProjectionsLocked() {
 	}
 	p := s.projectionLocked()
 	s.views.dirty = false
-	if s.views.hasLast && reflect.DeepEqual(p.Ship, s.views.last.Ship) && reflect.DeepEqual(p.Navigation, s.views.last.Navigation) && reflect.DeepEqual(p.Exploration, s.views.last.Exploration) && p.Source.SourceState == s.views.last.Source.SourceState && p.Source.ImportInProgress == s.views.last.Source.ImportInProgress {
+	if s.views.hasLast && reflect.DeepEqual(p.Workspace, s.views.last.Workspace) && reflect.DeepEqual(p.Ship, s.views.last.Ship) && reflect.DeepEqual(p.Navigation, s.views.last.Navigation) && reflect.DeepEqual(p.Exploration, s.views.last.Exploration) && p.Source.SourceState == s.views.last.Source.SourceState && p.Source.ImportInProgress == s.views.last.Source.ImportInProgress {
 		return
 	}
 	s.views.last = p
@@ -166,6 +197,12 @@ func scalarCopy[T any](p *T) *T {
 }
 func cloneProjection(p Projections) Projections {
 	q := p
+	if p.Workspace != nil {
+		w := *p.Workspace
+		w.Parity = paritystate.Clone(w.Parity)
+		w.Activity = activitystate.Clone(w.Activity)
+		q.Workspace = &w
+	}
 	q.Ship = shipstate.Clone(p.Ship)
 	q.Navigation.RemainingJumps = scalarCopy(p.Navigation.RemainingJumps)
 	q.Navigation.ReportedRemainingJumps = scalarCopy(p.Navigation.ReportedRemainingJumps)
@@ -187,4 +224,14 @@ func (s *Service) Ship() shipstate.View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.projectionLocked().Ship
+}
+
+func (s *Service) Workspace() WorkspaceView {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.projectionLocked()
+	if p.Workspace == nil {
+		return WorkspaceView{}
+	}
+	return *p.Workspace
 }

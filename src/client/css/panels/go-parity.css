@@ -1,0 +1,90 @@
+/* Native G2E adapters retain the original Ship/Engineering visual vocabulary.
+   Keep every selector inside the Go terminal; the legacy application is intact. */
+.go-terminal .go-parity-ship { height:auto; min-height:100%; }
+.go-terminal .go-flight-switches { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1rem; padding:1rem 0; }
+.go-terminal .go-flight-switches .checkbox { display:flex; flex-direction:column; gap:.6rem; align-items:center; text-align:center; font-size:1rem; }
+.go-terminal .go-flight-switches .checkbox__control { position:relative; inset:auto; margin:0; width:3rem; height:1.5rem; }
+.go-terminal .go-flight-switches .checkbox small { font-size:.7rem; color:var(--color-info); }
+.go-terminal .go-flight-switches input { position:absolute; opacity:0; pointer-events:none; }
+.go-terminal .go-flight-deck { display:grid; grid-template-columns:minmax(12rem,1fr) minmax(24rem,2fr) minmax(9rem,1fr); align-items:center; gap:1.5rem; flex:1; padding:1.5rem 0; }
+.go-terminal .go-flight-dial { text-align:center; }
+.go-terminal .go-flight-dial .dial-background { width:12rem; height:12rem; border:.3rem double var(--color-info); border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:auto auto 1rem; position:relative; }
+.go-terminal .go-flight-dial .icon { font-size:3rem; color:var(--color-primary); }
+.go-terminal .go-flight-dial strong { font-size:1.6rem; }
+.go-terminal .go-flight-dial small { font-size:.7rem; opacity:.65; }
+.go-terminal .go-flight-facts { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.go-terminal .go-flight-facts .go-metric { background:none; border:none; text-align:center; }
+.go-terminal .go-flight-facts .go-metric strong { font-size:1.3rem; }
+.go-terminal .go-flight-meter { display:flex; flex-direction:column; gap:.5rem; min-width:0; padding:.5rem; font-size:.85rem; }
+.go-terminal .go-flight-meter b { color:var(--color-info); font-weight:500; }
+.go-terminal .go-flight-meter progress { width:100%; height:1rem; }
+.go-terminal .go-flight-power { text-align:center; border-left:1px solid var(--color-primary); padding-left:1rem; }
+.go-terminal .go-flight-power h3 { text-transform:uppercase; font-size:.9rem; }
+.go-terminal .go-flight-power>div { display:flex; justify-content:center; gap:.7rem; padding:1rem 0; }
+.go-terminal .go-flight-power>div>div { display:flex; flex-direction:column; gap:.4rem; align-items:center; font-size:.8rem; }
+.go-terminal .go-flight-power progress { height:7rem; width:1.7rem; writing-mode:vertical-lr; direction:rtl; }
+.go-terminal .go-flight-power small { font-size:.65rem; opacity:.65; }
+.go-terminal .go-flight-indicators { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1rem; padding:1rem .5rem; }
+.go-terminal .go-flight-indicators>div { display:grid; grid-template-columns:1.4rem 1fr; gap:.3rem; align-items:center; font-size:.85rem; text-transform:uppercase; }
+.go-terminal .go-flight-indicators i { border:2px solid currentColor; width:1.1rem; height:1.1rem; border-radius:50%; grid-row:span 2; }
+.go-terminal .go-flight-indicators small { font-size:.6rem; opacity:.6; }
+.go-terminal .go-flight-indicators .is-on { color:var(--color-secondary); }
+.go-terminal .go-flight-indicators .is-off { color:var(--color-primary); opacity:.5; }
+.go-terminal .go-flight-indicators .is-unknown { color:var(--color-info); opacity:.4; }
+.go-terminal .go-module-workspace { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; min-height:20rem; }
+.go-terminal .go-module-workspace.has-inspector { grid-template-columns:minmax(0,1fr) 23rem; }
+.go-terminal .go-module-groups { min-width:0; }
+.go-terminal .go-module-groups .section-heading { margin:1rem 0 .5rem; border-bottom:1px solid var(--color-primary); padding-bottom:.4rem; }
+.go-terminal .go-module-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(14rem,1fr)); gap:.4rem; }
+.go-terminal .go-module-card { text-align:left; display:flex; gap:.65rem; padding:.7rem; margin:0; width:100%; min-width:0; white-space:normal; color:var(--color-primary); background:linear-gradient(120deg,var(--color-background-panel),transparent); border:1px solid transparent; }
+.go-terminal .go-module-card.is-selected { color:var(--color-primary-dark); background:var(--color-primary); border-color:var(--color-secondary); }
+.go-terminal .go-module-class { font-size:2.4rem; line-height:1.2; min-width:3.8rem; text-align:center; }
+.go-terminal .go-module-class small { display:block; font-size:.65rem; overflow-wrap:anywhere; }
+.go-terminal .go-module-card strong { font-size:.95rem; text-transform:uppercase; }
+.go-terminal .go-module-card>div { min-width:0; }
+.go-terminal .go-module-card small { display:block; font-size:.65rem; padding:.4rem 0; }
+.go-terminal .go-module-card>div>span { font-size:.7rem; }
+.go-terminal .go-module-inspector { display:block; min-width:0; align-self:start; padding:1rem; position:sticky; top:0; border-top:2px solid var(--color-primary); max-height:70vh; overflow:auto; }
+.go-terminal .go-module-inspector h2 { margin:.8rem 0; font-size:1.4rem; }
+.go-terminal .go-module-inspector p,.go-terminal .go-module-inspector small { font-size:.75rem; line-height:1.6; overflow-wrap:anywhere; }
+.go-terminal .go-module-inspector details { margin:1rem 0; font-size:.8rem; }
+.go-terminal .go-module-inspector .go-metric { padding:.4rem; }
+.go-terminal .go-table-scroll { min-width:0; overflow:auto; }
+.go-terminal .go-manifest tr { border-bottom:1px solid rgba(250,150,0,.2); }
+.go-terminal .go-manifest td { padding:.8rem .7rem; font-size:1rem; }
+.go-terminal .go-rank-grid,.go-terminal .go-mission-grid,.go-terminal .go-prospect-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); gap:.8rem; }
+.go-terminal .go-rank-card,.go-terminal .go-mission-card,.go-terminal .go-prospect { padding:1rem; border-top:1px solid var(--color-primary); background:linear-gradient(130deg,var(--color-background-panel),#030608); min-width:0; }
+.go-terminal .go-rank-card>.icon { float:left; font-size:3rem; color:var(--color-primary); margin-right:.8rem; }
+.go-terminal .go-rank-card progress { width:100%; margin-top:.6rem; }
+.go-terminal .go-rank-card p,.go-terminal .go-mission-card p,.go-terminal .go-prospect p { font-size:.8rem; padding:.4rem 0; }
+.go-terminal .go-mission-card h3 { padding:.6rem 0; }
+.go-terminal .go-mission-card small { font-size:.7rem; overflow-wrap:anywhere; }
+.go-terminal .go-prospect-material { display:grid; grid-template-columns:1fr auto; gap:.5rem; padding:.5rem 0; font-size:.85rem; }
+.go-terminal .go-prospect-material meter { grid-column:span 2; width:100%; height:.3rem; }
+@media(max-width:1050px) {
+  .go-terminal .go-flight-deck { grid-template-columns:minmax(10rem,1fr) minmax(18rem,2fr); }
+  .go-terminal .go-flight-power { grid-column:span 2; border-left:none; border-top:1px solid var(--color-primary); }
+  .go-terminal .go-flight-power progress { writing-mode:horizontal-tb; height:.8rem; width:5rem; direction:ltr; }
+  .go-terminal .go-flight-indicators { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .go-terminal .go-module-workspace.has-inspector { grid-template-columns:1fr; }
+  .go-terminal .go-module-inspector { position:relative; max-height:none; }
+}
+@media(max-width:600px) {
+  .go-terminal .go-flight-switches { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .go-terminal .go-flight-switches .checkbox { font-size:.7rem; }
+  .go-terminal .go-flight-deck { grid-template-columns:1fr; }
+  .go-terminal .go-flight-power { grid-column:auto; }
+  .go-terminal .go-flight-indicators { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+.go-terminal .go-flight-switches .checkbox { font-size:1.2rem; }
+.go-terminal .go-flight-facts .go-metric__label { font-size:1rem; }
+.go-terminal .go-flight-facts .go-metric strong { font-size:1.6rem; }
+.go-terminal .go-flight-meter { font-size:1rem; }
+.go-terminal .go-flight-indicators>div { font-size:1.05rem; }
+.go-terminal .go-flight-indicators small { font-size:.7rem; }
+
+.go-terminal .go-module-inspector table { table-layout:fixed; width:100%; }
+.go-terminal .go-module-inspector th,.go-terminal .go-module-inspector td { padding:.5rem .25rem; font-size:.75rem; white-space:normal; overflow-wrap:anywhere; }
+.go-terminal .go-module-card strong { font-size:1.15rem; }
+.go-terminal .go-module-cards { grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); }

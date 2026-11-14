@@ -30,6 +30,7 @@ type Server struct {
 	g2b                       bool
 	g2c                       bool
 	g2d                       bool
+	g2e                       bool
 	game                      *gamestate.Service
 	gameCancel                context.CancelFunc
 	gameDone                  chan struct{}

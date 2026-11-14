@@ -60,8 +60,8 @@ func TestNormalRuntimeProvidesOwnerRemoteSettings(t *testing.T) {
 		}
 		defer res.Body.Close()
 		body, _ := io.ReadAll(res.Body)
-		if !strings.Contains(string(body), `"stage":"G2D"`) {
-			t.Fatal("normal runtime has no G2D exploration stage", string(body))
+		if !strings.Contains(string(body), `"stage":"G2E"`) {
+			t.Fatal("normal runtime has no G2E exploration stage", string(body))
 		}
 		return nil
 	}
@@ -163,6 +163,31 @@ func TestTerminalSmokeExplicitFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "G2D synthetic terminal and ship smoke passed") {
+		t.Fatal(out.String())
+	}
+}
+
+func TestParitySmokeRequiresExplicitSyntheticSource(t *testing.T) {
+	assets := fstest.MapFS{"index.html": {Data: []byte("index")}, "exploration/system.html": {Data: []byte("system")}}
+	var out bytes.Buffer
+	launch := func(context.Context, string, func()) error { t.Fatal("headless opened window"); return nil }
+	if err := run(context.Background(), []string{"--parity-smoke-test"}, assets, launch, &out); err == nil {
+		t.Fatal("personal journals discovered")
+	}
+	dir := t.TempDir()
+	for _, p := range [][2]string{{"replay.jsonl", "Journal.20260101.01.log"}, {"NavRoute.json", "NavRoute.json"}, {"Status.json", "Status.json"}, {"Cargo.json", "Cargo.json"}} {
+		raw, err := os.ReadFile(filepath.Join("../../../tests/testdata/g2e", p[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(dir, p[1]), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := run(context.Background(), []string{"--parity-smoke-test", "--journal-dir", dir}, assets, launch, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "G2E synthetic parity smoke passed") {
 		t.Fatal(out.String())
 	}
 }
