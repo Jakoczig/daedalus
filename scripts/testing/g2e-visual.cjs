@@ -122,11 +122,11 @@ async function main () {
     for (const [viewport, width, height] of (focused ? [['laptop', 1366, 768]] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['tablet', 820, 1180]])) {
       await client.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
       await navigate('/nav/map', 'SYSTEM CARTOGRAPHY')
-      await waitFor(() => evaluate('document.body.innerText.includes(\'Fixture Community Planet\')'))
+      await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Inspect Fixture Community Planet"]\')'))
       await evaluate('Array.from(document.querySelectorAll(\'.go-chart__body\')).find(b=>b.getAttribute(\'aria-label\')===\'Inspect Fixture Community Planet\').dispatchEvent(new MouseEvent(\'click\',{bubbles:true}))')
       await waitFor(() => evaluate('document.querySelector(\'.go-inspector\')?.innerText.includes(\'personal scan state unknown\')'))
       const mergeCheck = await evaluate('({inspector:document.querySelector(\'.go-inspector\').innerText,privateLeak:document.body.innerText.includes(\'PRIVATE_PROVIDER\'),bodies:document.querySelectorAll(\'.go-chart__body\').length})')
-      if (!mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
+      if (!mergeCheck.inspector.toUpperCase().includes('FIXTURE COMMUNITY PLANET') || !mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
       await evaluate('Array.from(document.querySelectorAll(\'.go-community-stations summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
       if (!await evaluate('document.body.innerText.includes(\'Fixture Community Station\')&&document.body.innerText.includes(\'2026-01-01\')')) throw new Error('Station source freshness missing')
       await screenshot('community-map-' + viewport)
