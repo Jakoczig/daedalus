@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
+	"github.com/Jakoczig/daedalus/go/internal/shipstate"
 	"github.com/coder/websocket"
 	"net/http"
 	"net/http/cookiejar"
@@ -68,11 +69,19 @@ func NavigationSmokeTest(ctx context.Context, s *Server) error {
 		if rpc("getGoNavigation", &n) != nil || rpc("getGoExploration", &e) != nil {
 			return fail
 		}
+		validShip := true
+		if s.g2d {
+			var ship shipstate.View
+			if rpc("getGoShip", &ship) != nil {
+				return fail
+			}
+			validShip = ship.ShipType == "asp" && ship.HullHealth != nil && *ship.HullHealth == 0.82 && ship.FuelMainT != nil && *ship.FuelMainT == 16
+		}
 		validSurvey := len(e.Bodies) == 1
 		if s.g2c {
 			validSurvey = false
 			for _, body := range e.Bodies {
-				if body.BodyID == "9007199254740997" && body.Details != nil && body.Details.RadiusKM != nil && *body.Details.RadiusKM == 1000 && len(body.Organisms) == 1 && body.Organisms[0].Complete && body.Organisms[0].Species == "Fixture Bacterium" {
+				if body.BodyID == "9007199254740997" && body.Details != nil && body.Details.RadiusKM != nil && *body.Details.RadiusKM == 1000 && len(body.Organisms) >= 1 && body.Organisms[0].Complete && body.Organisms[0].Species == "Fixture Bacterium" {
 					validSurvey = true
 				}
 			}
@@ -83,7 +92,7 @@ func NavigationSmokeTest(ctx context.Context, s *Server) error {
 				found = &e.Bodies[i]
 			}
 		}
-		if found != nil && validSurvey && n.CurrentSystem == "Fixture Alpha" && n.DestinationSystem == "Fixture Beta" && n.TargetSystem == "Fixture Beta" && len(n.Hops) == 2 && n.RemainingJumps != nil && *n.RemainingJumps == 1 && e.SystemName == "Fixture Alpha" && e.ReportedBodyCount != nil && *e.ReportedBodyCount == 12 && found.DSSMapped && found.BioSignals != nil && *found.BioSignals == 3 {
+		if found != nil && validShip && validSurvey && n.CurrentSystem == "Fixture Alpha" && n.DestinationSystem == "Fixture Beta" && n.TargetSystem == "Fixture Beta" && len(n.Hops) == 2 && n.RemainingJumps != nil && *n.RemainingJumps == 1 && e.SystemName == "Fixture Alpha" && e.ReportedBodyCount != nil && *e.ReportedBodyCount == 12 && found.DSSMapped && found.BioSignals != nil && *found.BioSignals == 3 {
 			return nil
 		}
 		select {

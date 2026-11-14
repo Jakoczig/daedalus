@@ -10,7 +10,7 @@ async function regularBytes (filename) {
 }
 
 async function packagePreview ({ binaryPath, readmePath, outputParent, platform, milestone = 'g2b' }) {
-  if (!['g2b', 'g2c'].includes(milestone)) throw new Error('Unsupported preview milestone')
+  if (!['g2b', 'g2c', 'g2d'].includes(milestone)) throw new Error('Unsupported preview milestone')
   if (!['Windows', 'Linux'].includes(platform)) throw new Error('Unsupported preview platform')
   // Read explicit inputs only. Never enumerate/copy a build directory or profile.
   const binary = await regularBytes(binaryPath)
@@ -31,10 +31,10 @@ async function main () {
   const platform = process.env.RUNNER_OS || (process.platform === 'win32' ? 'Windows' : 'Linux')
   const directory = await packagePreview({
     binaryPath: path.join(root, 'go/bin', platform === 'Windows' ? 'daedalus.exe' : 'daedalus'),
-    readmePath: path.join(root, 'docs/testing/g2c-exploration-preview.md'),
+    readmePath: path.join(root, 'docs/testing/g2d-original-ui-preview.md'),
     outputParent: process.env.RUNNER_TEMP || os.tmpdir(),
     platform,
-    milestone: 'g2c'
+    milestone: 'g2d'
   })
   if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`)
   console.log(`Packaged experimental, unsigned, local exploration and biology preview (no provider uploads) (${platform}); executable, README and hashes only`)

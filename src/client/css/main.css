@@ -33,6 +33,8 @@
 @import "panels/galnet-panel.css";
 @import "panels/mining-panel.css";
 
+@import "panels/go-terminal.css";
+
 @import "overrides/safari.css";
 @import "overrides/firefox.css";
 

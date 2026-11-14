@@ -5,6 +5,7 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
+	"github.com/Jakoczig/daedalus/go/internal/shipstate"
 	"github.com/Jakoczig/daedalus/go/internal/sidecar"
 	"reflect"
 	"sync"
@@ -13,11 +14,13 @@ import (
 // Projections is an internal, immutable, coalesced notification. Transport sends
 // only the separately typed allowlisted DTOs, never this service container.
 type Projections struct {
+	Ship        shipstate.View
 	Source      Summary
 	Navigation  navstate.NavigationView
 	Exploration explorestate.ExplorationView
 }
 type projectionState struct {
+	ship        *shipstate.Model
 	navigation  *navstate.Model
 	exploration *explorestate.Model
 	subscribers map[chan Projections]struct{}
@@ -27,19 +30,21 @@ type projectionState struct {
 }
 
 func newProjectionState() projectionState {
-	return projectionState{navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
+	return projectionState{ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
 }
 func (s *Service) projectionLocked() Projections {
-	p := Projections{Source: s.summary, Navigation: s.views.navigation.View(s.active)}
+	p := Projections{Ship: s.views.ship.View(s.active), Source: s.summary, Navigation: s.views.navigation.View(s.active)}
 	address := s.unknown.systemAddress
 	if s.active != "" {
 		address = s.commanders[s.active].systemAddress
 	}
 	p.Exploration = s.views.exploration.View(s.active, address)
 	if s.summary.ImportInProgress {
+		p.Ship = shipstate.View{Evidence: "replaying"}
 		p.Navigation = navstate.NavigationView{RouteState: "replaying", TargetEvidence: "unknown", Hops: []navstate.Hop{}}
 		p.Exploration = explorestate.ExplorationView{SurveyState: "replaying", Bodies: []explorestate.BodyView{}}
 	} else if s.summary.SourceState != "live" && s.summary.SourceState != "replaying" && s.summary.SourceState != "partial" && s.summary.SourceState != "parse_warning" {
+		p.Ship.Evidence = "stale_source"
 		if len(p.Navigation.Hops) > 0 || p.Navigation.TargetSystem != "" {
 			p.Navigation.Hops = []navstate.Hop{}
 			p.Navigation.DestinationSystem = ""
@@ -66,6 +71,7 @@ func (s *Service) Exploration() explorestate.ExplorationView {
 	return s.projectionLocked().Exploration
 }
 func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
+	s.views.ship.ApplyEvent(s.active, e)
 	s.views.navigation.ApplyEventPhase(s.active, e, phase)
 	s.views.exploration.ApplyEvent(s.active, e)
 	s.views.dirty = true
@@ -77,6 +83,7 @@ func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
 	}
 }
 func (s *Service) resetProjectionsLocked() {
+	s.views.ship.ResetSource()
 	s.views.navigation.ResetSource()
 	s.views.exploration.ResetSource()
 	s.views.hasLast = false
@@ -88,7 +95,7 @@ func (s *Service) publishProjectionsLocked() {
 	}
 	p := s.projectionLocked()
 	s.views.dirty = false
-	if s.views.hasLast && reflect.DeepEqual(p.Navigation, s.views.last.Navigation) && reflect.DeepEqual(p.Exploration, s.views.last.Exploration) && p.Source.SourceState == s.views.last.Source.SourceState && p.Source.ImportInProgress == s.views.last.Source.ImportInProgress {
+	if s.views.hasLast && reflect.DeepEqual(p.Ship, s.views.last.Ship) && reflect.DeepEqual(p.Navigation, s.views.last.Navigation) && reflect.DeepEqual(p.Exploration, s.views.last.Exploration) && p.Source.SourceState == s.views.last.Source.SourceState && p.Source.ImportInProgress == s.views.last.Source.ImportInProgress {
 		return
 	}
 	s.views.last = p
@@ -159,6 +166,7 @@ func scalarCopy[T any](p *T) *T {
 }
 func cloneProjection(p Projections) Projections {
 	q := p
+	q.Ship = shipstate.Clone(p.Ship)
 	q.Navigation.RemainingJumps = scalarCopy(p.Navigation.RemainingJumps)
 	q.Navigation.ReportedRemainingJumps = scalarCopy(p.Navigation.ReportedRemainingJumps)
 	q.Navigation.Hops = append([]navstate.Hop{}, p.Navigation.Hops...)
@@ -173,4 +181,10 @@ func cloneProjection(p Projections) Projections {
 		q.Exploration.Bodies[i] = explorestate.CloneBody(p.Exploration.Bodies[i])
 	}
 	return q
+}
+
+func (s *Service) Ship() shipstate.View {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.projectionLocked().Ship
 }

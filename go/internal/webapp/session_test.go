@@ -42,6 +42,9 @@ func ownerClient(t *testing.T, s *Server) *http.Client {
 			expectedStage = "G2B"
 			if s.g2c {
 				expectedStage = "G2C"
+				if s.g2d {
+					expectedStage = "G2D"
+				}
 			}
 		}
 	}

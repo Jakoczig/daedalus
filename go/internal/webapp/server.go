@@ -29,6 +29,7 @@ type Server struct {
 	pingInterval, pongTimeout time.Duration
 	g2b                       bool
 	g2c                       bool
+	g2d                       bool
 	game                      *gamestate.Service
 	gameCancel                context.CancelFunc
 	gameDone                  chan struct{}
