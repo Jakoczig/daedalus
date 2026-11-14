@@ -19,6 +19,15 @@ func TestG2EWorkspaceOptInAndViewerAllowlist(t *testing.T) {
 		t.Fatal(err)
 	}
 	s, _, v, u, _ := startGameFixture(t, dir, true, "Fixture Alpha", true, true, true)
+	// Location becomes visible before replay completes. Wait for the actual
+	// loadout projection, rather than racing a legitimate replaying response.
+	deadline := time.Now().Add(3 * time.Second)
+	for len(s.game.Workspace().Parity.Modules) != 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("loadout projection did not finish replaying")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	c := pairedSocket(t, v, u)
 	defer c.CloseNow()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
