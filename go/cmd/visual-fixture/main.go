@@ -40,7 +40,11 @@ func (f fixtureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("unexpected fixture request")
 	}
 	var data map[string]any
-	_ = json.Unmarshal(f, &data)
+	decoder := json.NewDecoder(bytes.NewReader(f))
+	decoder.UseNumber()
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
 	data["id"] = 77
 	name := r.URL.Query().Get("systemName")
 	if name != "Fixture Alpha" {
