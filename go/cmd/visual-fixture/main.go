@@ -2,8 +2,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/Jakoczig/daedalus/go/internal/frontend"
@@ -37,7 +39,27 @@ func (f fixtureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.URL.Host != "www.edsm.net" || r.Method != "GET" {
 		return nil, fmt.Errorf("unexpected fixture request")
 	}
-	return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(bytes.NewReader(f))}, nil
+	var data map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(f))
+	decoder.UseNumber()
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
+	data["id"] = 77
+	name := r.URL.Query().Get("systemName")
+	if name != "Fixture Alpha" {
+		data["name"] = name
+		data["id64"] = uint64(9007199254740994)
+		data["bodies"] = []any{map[string]any{"bodyId": 0, "name": name, "type": "Star", "subType": "M star"}}
+	}
+	if strings.HasSuffix(r.URL.Path, "/system") {
+		data["coords"] = map[string]float64{"x": 3, "y": 4, "z": 0}
+	}
+	if strings.HasSuffix(r.URL.Path, "/stations") {
+		delete(data, "id64")
+	}
+	raw, _ := json.Marshal(data)
+	return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(bytes.NewReader(raw))}, nil
 }
 func main() {
 	fixture := flag.String("fixture", "", "explicit fabricated fixture directory")
@@ -78,7 +100,7 @@ func main() {
 	defer deadline()
 	var communityClient *http.Client
 	if *communityFixture {
-		if *stage != "G2E" || !strings.HasSuffix(filepath.Clean(*fixture), "g2f") {
+		if *stage != "G2E" || !(strings.HasSuffix(filepath.Clean(*fixture), "g2f") || strings.HasSuffix(filepath.Clean(*fixture), "g2g")) {
 			panic("community fixture requires explicit G2F synthetic directory")
 		}
 		raw, err := os.ReadFile(filepath.Join(*fixture, "EDSM.json"))
@@ -94,7 +116,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	go func() { _, _ = io.Copy(io.Discard, os.Stdin); cancel() }()
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			if filepath.Base(*fixture) != "g2g" {
+				continue
+			}
+			kind := scanner.Text()
+			at := time.Now().UTC().Format(time.RFC3339Nano)
+			var e any
+			if kind == "jump" {
+				e = map[string]any{"event": "StartJump", "JumpType": "Hyperspace", "timestamp": at, "StarSystem": "Fixture Beta", "SystemAddress": uint64(9007199254740994)}
+			} else if kind == "arrival" {
+				e = map[string]any{"event": "FSDJump", "timestamp": at, "StarSystem": "Fixture Alpha", "SystemAddress": uint64(9007199254740993), "StarPos": []int{3, 4, 5}}
+			}
+			if e != nil {
+				raw, _ := json.Marshal(e)
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_WRONLY|os.O_APPEND, 0600)
+				if err == nil {
+					_, _ = f.Write(append(raw, '\n'))
+					_ = f.Close()
+				}
+			}
+		}
+		cancel()
+	}()
 	fmt.Println("VISUAL_FIXTURE_URL=" + server.URL())
 	<-ctx.Done()
 	closeCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)

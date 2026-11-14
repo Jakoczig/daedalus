@@ -144,3 +144,51 @@ func TestMalformedPreferencesStayOfflineAndPersistExplicitChoice(t *testing.T) {
 		t.Fatal("explicit choice not restored")
 	}
 }
+
+func TestDocumentedStationShapeBindsProviderIDNotGameAddress(t *testing.T) {
+	for _, id := range []int{77, 78} {
+		m := New("", &http.Client{Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			raw := `{"name":"Fixture Alpha","id":77,"id64":9007199254740993,"bodies":[]}`
+			if strings.HasSuffix(r.URL.Path, "/stations") {
+				raw = fmt.Sprintf(`{"name":"Fixture Alpha","id":%d,"stations":[{"name":"Documented station","type":"Coriolis Starport"}]}`, id)
+			}
+			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(raw))}, nil
+		})})
+		m.SetEnabled(true)
+		v := m.Refresh(context.Background(), "Fixture Alpha", "9007199254740993")
+		if (len(v.Stations) == 1) != (id == 77) {
+			t.Fatal("documented provider ID binding", id, v)
+		}
+	}
+}
+
+func TestOwnerNamedLookupIsBoundedAndKeepsExactCoordinates(t *testing.T) {
+	calls := 0
+	m := New("", &http.Client{Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+		calls++
+		raw := `{"id":77,"id64":9007199254740993,"name":"Fixture","bodies":[],"stations":[]}`
+		if r.URL.Path == "/api-v1/system" {
+			raw = `{"id":77,"id64":9007199254740993,"name":"Fixture","coords":{"x":3,"y":4,"z":5}}`
+		}
+		if r.URL.Path == "/api-system-v1/stations" {
+			raw = `{"id":77,"name":"Fixture","stations":[{"name":"Port"}]}`
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(raw))}, nil
+	})})
+	if m.Lookup(context.Background(), "Fixture").Enabled || calls != 0 {
+		t.Fatal("lookup before opt-in")
+	}
+	m.SetEnabled(true)
+	v := m.Lookup(context.Background(), "Fixture")
+	if v.SystemAddress != "9007199254740993" || v.Coordinates == nil || (*v.Coordinates)[1] != 4 || len(v.Stations) != 1 || calls != 3 {
+		t.Fatal(v, calls)
+	}
+	m.Named("Fixture")
+	m.Lookup(context.Background(), "Fixture")
+	if calls != 3 {
+		t.Fatal("cached lookup repeated network")
+	}
+	if m.Lookup(context.Background(), "Other").Status == "cached" || calls != 3 {
+		t.Fatal("global cooldown bypass")
+	}
+}

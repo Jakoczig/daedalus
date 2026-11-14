@@ -447,3 +447,26 @@ func parseRoute(c sidecar.Change) (*route, bool, error) {
 	}
 	return r, false, nil
 }
+
+// VerifiedPositions reuses the exact same route-provenance gate as View.
+func (m *Model) VerifiedPositions(key string) []struct {
+	Name, Address string
+	Coordinates   [3]float64
+} {
+	v := m.View(key)
+	s := m.sessions[key]
+	if len(v.Hops) == 0 || s == nil || s.route == nil {
+		return nil
+	}
+	out := []struct {
+		Name, Address string
+		Coordinates   [3]float64
+	}{}
+	for _, p := range s.route.hops {
+		out = append(out, struct {
+			Name, Address string
+			Coordinates   [3]float64
+		}{p.name, p.address, p.pos})
+	}
+	return out
+}

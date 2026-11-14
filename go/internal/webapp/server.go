@@ -15,6 +15,9 @@ import (
 )
 
 type Server struct {
+	companion                 *companionState
+	launcherReady             chan struct{}
+	launcherOnce              sync.Once
 	community                 *community.Manager
 	http                      *http.Server
 	url                       string
@@ -74,6 +77,7 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 	}
 	server := &Server{url: "http://" + listener.Addr().String(), done: make(chan struct{}), clientReady: make(chan struct{}), pingInterval: 20 * time.Second, pongTimeout: 10 * time.Second}
 	server.journalReady = make(chan struct{})
+	server.launcherReady = make(chan struct{})
 	server.navigationReady = make(chan struct{})
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	server.sessions = newSessionStore(port, time.Now)
@@ -89,6 +93,7 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 		server.startGame(ctx, opts)
 		if server.g2e {
 			server.community = community.New(dir, opts.CommunityClient)
+			server.initCompanion(opts)
 		}
 		manager.mu.Lock()
 		if manager.state.Enabled {

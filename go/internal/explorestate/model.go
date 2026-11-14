@@ -472,3 +472,15 @@ func text(s string) bool {
 	}
 	return true
 }
+
+// CachedSystem returns only the active commander's already retained public
+// survey. A lookup never changes the current commander/system or scan state.
+func (m *Model) CachedSystem(key, address string) ExplorationView {
+	state := m.systems[systemKey{key, address}]
+	if state == nil {
+		return ExplorationView{SurveyState: "unavailable", Bodies: []BodyView{}}
+	}
+	copy := *m
+	copy.sessions = map[string]*contextState{key: {verified: true, arrived: true, continuous: true, name: state.name, address: address}}
+	return copy.buildView(key, address)
+}

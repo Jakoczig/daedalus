@@ -127,12 +127,13 @@ async function main () {
       await waitFor(() => evaluate('document.querySelector(\'.go-inspector\')?.innerText.includes(\'personal scan state unknown\')'))
       const mergeCheck = await evaluate('({inspector:document.querySelector(\'.go-inspector\').innerText,privateLeak:document.body.innerText.includes(\'PRIVATE_PROVIDER\'),bodies:document.querySelectorAll(\'.go-chart__body\').length})')
       if (!mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
-      await evaluate('Array.from(document.querySelectorAll(\'.go-community summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
+      await evaluate('Array.from(document.querySelectorAll(\'.go-community-stations summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
       if (!await evaluate('document.body.innerText.includes(\'Fixture Community Station\')&&document.body.innerText.includes(\'2026-01-01\')')) throw new Error('Station source freshness missing')
       await screenshot('community-map-' + viewport)
       report.pages.push({ viewport, page: 'community-map', provenance: true, stations: true })
     }
     await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()')
+    await evaluate('document.querySelector(\'.go-data-providers\').open=true')
     await waitFor(() => evaluate('document.querySelector(\'[aria-label="Optional EDSM enrichment"]\')?.textContent.includes(\'Disable EDSM lookups\')'))
     await evaluate('Array.from(document.querySelectorAll(\'[aria-label="Optional EDSM enrichment"] button\')).find(b=>b.textContent===\'Disable EDSM lookups\').click()')
     await waitFor(() => evaluate('!document.body.innerText.includes(\'Fixture Community Planet\')'))

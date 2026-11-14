@@ -61,6 +61,7 @@ function harness (initialState, options = {}) {
         useEffect: callback => { effect ??= callback }
       }
     }
+    if (name === 'next/dynamic') return loader => loader.toString().includes('go-terminal') ? () => React.createElement('div', { 'data-g2d-terminal': true }, 'G2D terminal') : () => React.createElement('div', { 'data-go-companion': true }, 'Companion launcher')
     if (name === 'next/router') return { __esModule: true, default: {}, useRouter: () => ({ pathname: options.pathname || '/exploration/system' }) }
     if (name.includes('go-terminal')) return { __esModule: true, default: () => React.createElement('div', { 'data-g2d-terminal': true }, 'G2D terminal') }
     if (name === 'lib/notification') return () => {}
@@ -104,6 +105,7 @@ test('viewer manual pairing accepts six visible uppercase characters and submits
   const browser = { window: { fetch: async (url, options) => { submitted = { url, options }; return { ok: true } }, location: { reload: () => { reloaded = true } } } }
   const mod = loadClientModule('lib/socket.js', name => {
     if (name === 'react') return { ...React, useState: initial => { const index = cursor++; values[index] ??= initial; return [values[index], value => { values[index] = value }] } }
+    if (name === 'next/dynamic') return loader => loader.toString().includes('go-terminal') ? () => React.createElement('div', { 'data-g2d-terminal': true }, 'G2D terminal') : () => React.createElement('div', { 'data-go-companion': true }, 'Companion launcher')
     if (name === 'next/router') return { __esModule: true, default: {} }
     if (name === 'lib/navigation-items') return require('../../src/client/lib/navigation-items')
     if (name.startsWith('components/') || name === 'lib/notification') return () => null

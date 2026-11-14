@@ -10,8 +10,10 @@ import GoJournalStatus from 'components/go-journal-status'
 import GoNavigation from 'components/go-navigation'
 import GoExplorationSystem from 'components/go-exploration-system'
 import GoExplorationWorkspace from 'components/go-exploration-workspace'
-import GoTerminal from 'components/go-terminal'
+import dynamic from 'next/dynamic'
 import * as navigation from 'lib/navigation-items'
+const GoTerminal = dynamic(() => import('components/go-terminal'), { ssr: false })
+const GoCompanion = dynamic(() => import('components/go-companion'), { ssr: false })
 
 let connecting = false
 let socket = null// Store socket connection (defaults to null)
@@ -420,7 +422,8 @@ function PrototypeShell () {
   const { connected, ready, role, prototype } = useSocket()
   const stage = prototype?.stage || 'G1A'
   const router = useRouter()
-  if (['G2D', 'G2E'].includes(stage)) return <GoTerminal stage={stage} path={router.pathname} connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} nativePreview={prototype?.navigationSmoke === true} />
+  if (stage === 'G2E' && router.pathname === '/launcher' && role === 'owner') return <GoCompanion connected={connected} ready={ready} role={role} stage={stage} sendEvent={sendEvent} eventListener={eventListener} />
+  if (['G2D', 'G2E'].includes(stage)) return <GoTerminal stage={stage} path={router.pathname} system={router.query?.system} connected={connected} ready={ready} role={role} sendEvent={sendEvent} eventListener={eventListener} nativePreview={prototype?.navigationSmoke === true} />
   const status = !connected
     ? 'Disconnected. Waiting to reconnect to the local Go service.'
     : !ready
