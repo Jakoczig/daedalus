@@ -11,3 +11,5 @@ CREATE INDEX bio_position_scope ON bio_positions(commander_fid,system_address,bo
 CREATE TABLE builtin_modules(id TEXT PRIMARY KEY,enabled INTEGER NOT NULL);
 
 CREATE INDEX body_commander_current ON body_observations(commander_fid,system_address,body_id,source_event_id DESC);
+
+CREATE INDEX bio_sample_scope ON bio_samples(commander_fid,system_address,entity_id,source_event_id DESC);
