@@ -1,8 +1,11 @@
 package paritystate
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
-const StatisticsFormula = "effective-fitted-power-sum-v1"
+const StatisticsFormula = "effective-fitted-power-sum-v2"
 
 type EffectiveAttribute struct {
 	Label    string   `json:"label"`
@@ -17,18 +20,28 @@ type EffectiveModule struct {
 	Notice     string               `json:"notice"`
 }
 type EngineeredStatistics struct {
-	Formula         string            `json:"formula"`
-	CapacityMW      *float64          `json:"capacityMW"`
-	RatedPowerMW    *float64          `json:"ratedPowerMW"`
-	KnownPriorityMW [5]float64        `json:"knownPriorityMW"`
-	UnknownPower    int               `json:"unknownPower"`
-	Modules         []EffectiveModule `json:"modules"`
-	Unavailable     []string          `json:"unavailable"`
+	ObservedHardpointsDeployed *bool             `json:"observedHardpointsDeployed"`
+	ObservedDeploymentRatedMW  *float64          `json:"observedDeploymentRatedMW"`
+	KnownRatedMW               float64           `json:"knownRatedMW"`
+	StowedMW                   *float64          `json:"stowedMW"`
+	DeployedMW                 *float64          `json:"deployedMW"`
+	DeployedPercent            *float64          `json:"deployedPercent"`
+	Formula                    string            `json:"formula"`
+	CapacityMW                 *float64          `json:"capacityMW"`
+	RatedPowerMW               *float64          `json:"ratedPowerMW"`
+	KnownPriorityMW            [5]float64        `json:"knownPriorityMW"`
+	UnknownPower               int               `json:"unknownPower"`
+	Modules                    []EffectiveModule `json:"modules"`
+	Unavailable                []string          `json:"unavailable"`
 }
 
 func Statistics(modules []Module) EngineeredStatistics {
 	out := EngineeredStatistics{Formula: StatisticsFormula, Modules: []EffectiveModule{}, Unavailable: []string{"Laden jump range: missing permission-cleared reference curves and gold fixtures", "Shield/hull effective strengths and resistance stacking: validated complete model unavailable", "Thruster speed, boost, acceleration and turn curves: validated model unavailable", "Weapon DPS/energy/ammunition endurance: complete effective attributes and validated firing model unavailable"}}
 	total := 0.0
+	stowed := 0.0
+	if len(modules) == 0 {
+		out.UnknownPower = 1
+	}
 	for _, m := range modules {
 		row := EffectiveModule{Slot: m.Slot, Item: m.Item, Attributes: []EffectiveAttribute{}}
 		var power *float64
@@ -49,6 +62,11 @@ func Statistics(modules []Module) EngineeredStatistics {
 			}
 		} else {
 			row.Notice = "No complete witnessed engineering modifier set; values unavailable"
+			if m.Engineering == nil && m.Reference != nil && m.Reference.PowerMW != nil && !math.IsNaN(*m.Reference.PowerMW) && !math.IsInf(*m.Reference.PowerMW, 0) && *m.Reference.PowerMW >= 0 {
+				v := *m.Reference.PowerMW
+				power = &v
+				row.Notice = "Unengineered module rated draw: bundled reference, not game-reported"
+			}
 		}
 		out.Modules = append(out.Modules, row)
 		if m.Slot == "PowerPlant" || (m.On != nil && !*m.On) {
@@ -59,12 +77,28 @@ func Statistics(modules []Module) EngineeredStatistics {
 			continue
 		}
 		total += *power
+		weapon := false
+		for _, prefix := range []string{"HugeHardpoint", "LargeHardpoint", "MediumHardpoint", "SmallHardpoint"} {
+			if strings.HasPrefix(m.Slot, prefix) {
+				weapon = true
+			}
+		}
+		if !weapon {
+			stowed += *power
+		}
 		if m.Priority != nil && *m.Priority >= 0 && *m.Priority < 5 {
 			out.KnownPriorityMW[*m.Priority] += *power
 		}
 	}
+	out.KnownRatedMW = total
 	if len(modules) > 0 && out.UnknownPower == 0 {
 		out.RatedPowerMW = &total
+		out.StowedMW = &stowed
+		out.DeployedMW = &total
+		if out.CapacityMW != nil && *out.CapacityMW > 0 {
+			p := total / *out.CapacityMW * 100
+			out.DeployedPercent = &p
+		}
 	}
 	return out
 }
