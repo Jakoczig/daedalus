@@ -1,3 +1,4 @@
+import { ImportedItinerary } from './go-field-operations'
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { scoopability } from '../lib/go-display-controller'
@@ -14,7 +15,7 @@ export default function GoTerminalRoute (props) {
   return (
     <div className='go-page go-route' aria-label='Route terminal'>
       <div className='go-page__heading'><div><span className='text-primary'>NAVIGATION</span><h2>Route Plan</h2></div><Evidence state={value?.routeState} /></div>
-      <div className='go-route__endpoints'><div><h3><Icon name='location-filled' /> Location</h3><button onClick={() => value?.currentSystem && copy(value.currentSystem)}>{value?.currentSystem || 'Unknown system'}</button></div><Icon name='route' /><div><h3>Plotted destination</h3><button onClick={() => value?.destinationSystem && copy(value.destinationSystem)}>{value?.destinationSystem || 'No verified destination'}</button></div></div>
+      {props.stage === 'G2E' && <ImportedItinerary {...props} />}<div className='go-route__endpoints'><div><h3><Icon name='location-filled' /> Location</h3><button onClick={() => value?.currentSystem && copy(value.currentSystem)}>{value?.currentSystem || 'Unknown system'}</button></div><Icon name='route' /><div><h3>Plotted destination</h3><button onClick={() => value?.destinationSystem && copy(value.destinationSystem)}>{value?.destinationSystem || 'No verified destination'}</button></div></div>
       <div className='go-metrics'><Metric label='Next target' value={value?.targetSystem} icon='star' /><Metric label='Plotted jumps remaining' value={value?.remainingJumps} icon='route' /><Metric label='Game-reported jumps' value={value?.reportedRemainingJumps} icon='scan' /><Metric label='Matched route progress' value={current < 0 ? 'Unknown' : `${current} / ${Math.max(0, hops.length - 1)}`} /></div>
       <div className='go-route__progress' role='progressbar' aria-label='Matched plotted route progress' aria-valuenow={current < 0 ? undefined : current} aria-valuemin={0} aria-valuemax={Math.max(1, hops.length - 1)}><span style={{ width: current < 0 ? '0%' : `${100 * current / Math.max(1, hops.length - 1)}%` }} /></div>
       {error && <p role='alert'>{error}</p>}{value?.targetEvidence === 'route_conflict' && <p className='go-warning' role='alert'>Selected target and plotted next hop disagree. Neither is changed by this display.</p>}{value?.truncated && <p className='go-warning' role='alert'>Incomplete route. Do not infer a final destination.</p>}
