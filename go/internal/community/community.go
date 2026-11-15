@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Jakoczig/daedalus/go/internal/explorestate"
+	"github.com/Jakoczig/daedalus/go/internal/history"
 	"github.com/Jakoczig/daedalus/go/internal/privatefs"
 	"io"
 	"math"
@@ -50,19 +51,21 @@ type entry struct {
 	expires time.Time
 }
 type Manager struct {
-	positions  map[string]View
-	mu         sync.Mutex
-	profile    string
-	client     *http.Client
-	enabled    bool
-	notice     string
-	cache      map[string]entry
-	order      []string
-	next       time.Time
-	busy       bool
-	generation uint64
-	cancel     context.CancelFunc
-	now        func() time.Time
+	history        *history.Store
+	requireHistory bool
+	positions      map[string]View
+	mu             sync.Mutex
+	profile        string
+	client         *http.Client
+	enabled        bool
+	notice         string
+	cache          map[string]entry
+	order          []string
+	next           time.Time
+	busy           bool
+	generation     uint64
+	cancel         context.CancelFunc
+	now            func() time.Time
 }
 
 func New(profile string, client *http.Client) *Manager {
@@ -94,8 +97,16 @@ func (m *Manager) SetEnabled(enabled bool) error {
 		raw, _ := json.Marshal(struct {
 			Enabled bool `json:"enabled"`
 		}{enabled})
-		if err := privatefs.Write(m.profile, "community.json", raw); err != nil {
-			return errors.New("EDSM preference could not be saved; check private profile permissions")
+		var err error
+		if m.history != nil {
+			err = m.history.SetSingleConsent("edsm-map", raw)
+		} else if m.requireHistory {
+			err = errors.New("Database not ready")
+		} else {
+			err = privatefs.Write(m.profile, "community.json", raw)
+		}
+		if err != nil {
+			return errors.New("EDSM preference could not be saved in private storage")
 		}
 	}
 	m.generation++
@@ -427,4 +438,36 @@ func (m *Manager) load(ctx context.Context, name, address string) (View, error) 
 		v.Notice = "Community stations unavailable; body lookup succeeded."
 	}
 	return v, nil
+}
+
+func (m *Manager) RequireHistory() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.requireHistory = true
+	m.enabled = false
+}
+func (m *Manager) AttachHistory(db *history.Store) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var initial struct {
+		Enabled bool `json:"enabled"`
+	}
+	raw, err := privatefs.Read(m.profile, "community.json")
+	if err == nil {
+		_ = json.Unmarshal(raw, &initial)
+	}
+	raw, _ = json.Marshal(initial)
+	raw, err = db.SingleConsent("edsm-map", raw)
+	if err != nil {
+		m.enabled = false
+		m.notice = "Database EDSM consent unavailable"
+		return err
+	}
+	if json.Unmarshal(raw, &initial) != nil {
+		m.enabled = false
+		return errors.New("Invalid database EDSM consent")
+	}
+	m.history = db
+	m.enabled = initial.Enabled
+	return nil
 }

@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,6 +26,7 @@ const (
 )
 
 type ReaderOptions struct {
+	Durable        Durable
 	PollInterval   time.Duration
 	MaxRecordBytes int
 }
@@ -43,14 +46,16 @@ type cursor struct {
 	discard, pending    bool
 }
 type Reader struct {
-	dir     string
-	opts    ReaderOptions
-	mu      sync.RWMutex
-	stats   ReaderStats
-	cursors map[string]*cursor
-	serial  uint64
-	started bool
-	running atomic.Bool
+	currentFile string
+	dir         string
+	opts        ReaderOptions
+	mu          sync.RWMutex
+	stats       ReaderStats
+	cursors     map[string]*cursor
+	serial      uint64
+	started     bool
+	startedAt   time.Time
+	running     atomic.Bool
 }
 
 func NewReader(dir string, opts ReaderOptions) (*Reader, error) {
@@ -66,7 +71,7 @@ func NewReader(dir string, opts ReaderOptions) (*Reader, error) {
 	if opts.MaxRecordBytes < 1 || opts.MaxRecordBytes > MaxRecordBytes {
 		return nil, errors.New("invalid journal record limit")
 	}
-	return &Reader{dir: dir, opts: opts, cursors: map[string]*cursor{}, stats: ReaderStats{SourceState: "waiting", ImportInProgress: true}}, nil
+	return &Reader{dir: dir, opts: opts, cursors: map[string]*cursor{}, startedAt: time.Now(), stats: ReaderStats{SourceState: "waiting", ImportInProgress: true}}, nil
 }
 func (r *Reader) Stats() ReaderStats          { r.mu.RLock(); defer r.mu.RUnlock(); return r.stats }
 func (r *Reader) change(f func(*ReaderStats)) { r.mu.Lock(); defer r.mu.Unlock(); f(&r.stats) }
@@ -149,6 +154,9 @@ func (r *Reader) poll(ctx context.Context, emit func(Event, Phase) error) error 
 			s.SourceState = "replaying"
 		}
 	})
+	if len(names) > 0 {
+		r.currentFile = names[len(names)-1]
+	}
 	current := map[string]bool{}
 	for _, name := range names {
 		if ctx.Err() != nil {
@@ -201,7 +209,7 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 		return nil
 	}
 	c := r.cursors[name]
-	if c != nil && os.SameFile(c.info, info) && c.info.Size() == info.Size() && c.info.ModTime() == info.ModTime() {
+	if (r.opts.Durable == nil || name != r.currentFile) && c != nil && os.SameFile(c.info, info) && c.info.Size() == info.Size() && c.info.ModTime() == info.ModTime() {
 		if c.pending {
 			r.change(func(s *ReaderStats) { s.Pending = true })
 		}
@@ -227,6 +235,56 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			reset = !bytes.Equal(anchor, c.anchor)
 		}
 	}
+	var source Source
+	if r.opts.Durable != nil {
+		identity, err := durableIdentity(f)
+		if err != nil {
+			return err
+		}
+		source = Source{ID: fmt.Sprintf("%x", sha256.Sum256([]byte(identity))), Identity: identity, Path: path, Size: info.Size()}
+		if c == nil {
+			saved, err := r.opts.Durable.Resume(source)
+			if err != nil {
+				return err
+			}
+			source.ID = saved.Source.ID
+			if saved.Offset == 0 && saved.Sequence == 0 {
+				if resolver, ok := r.opts.Durable.(interface {
+					ResolveCopy(Source, []byte, []byte, *os.File) (Checkpoint, bool, error)
+				}); ok {
+					resolved, match, err := resolver.ResolveCopy(source, prefix, sample(f, max(0, info.Size()-128), int(min(info.Size(), 128))), f)
+					if err != nil {
+						return err
+					}
+					if match {
+						saved = resolved
+					}
+				}
+			}
+			if saved.Offset > info.Size() || len(prefix) < len(saved.Head) || !bytes.Equal(prefix[:min(len(prefix), len(saved.Head))], saved.Head) || !bytes.Equal(sample(f, saved.Offset-int64(len(saved.Anchor)), len(saved.Anchor)), saved.Anchor) {
+				if q, ok := r.opts.Durable.(interface{ RejectSource(Source) error }); ok {
+					_ = q.RejectSource(source)
+				}
+				return errors.New("journal source changed; private history retained for recovery")
+			}
+			source.ID = saved.Source.ID
+			c = &cursor{id: source.ID, offset: saved.Offset, sequence: saved.Sequence, discard: saved.Discard, replayUntil: info.Size()}
+			if r.started && saved.Offset == 0 {
+				c.replayUntil = 0
+			}
+			r.cursors[name] = c
+			reset = false
+		} else if reset {
+			source.ID = c.id
+			if q, ok := r.opts.Durable.(interface{ RejectSource(Source) error }); ok {
+				_ = q.RejectSource(source)
+			}
+			return errors.New("journal source changed; private history retained for recovery")
+		}
+	}
+	if r.opts.Durable != nil && c != nil {
+		source.ID = c.id
+	}
 	if reset {
 		r.serial++
 		c = &cursor{id: strconv.FormatUint(r.serial, 10)}
@@ -248,6 +306,23 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 	position := c.offset
 	start := c.offset
 	var line []byte
+	var batch []Record
+	checkpointOffset := c.offset
+	commit := func() error {
+		if r.opts.Durable == nil {
+			return nil
+		}
+		if c.offset == checkpointOffset && len(batch) == 0 {
+			return nil
+		}
+		cp := Checkpoint{Source: source, Offset: c.offset, Sequence: c.sequence, Head: sample(f, 0, int(min(c.offset, 128))), Anchor: sample(f, max(0, c.offset-128), int(min(c.offset, 128))), Discard: c.discard}
+		if err := r.opts.Durable.CommitRecords(batch, cp); err != nil {
+			return err
+		}
+		batch = nil
+		checkpointOffset = c.offset
+		return nil
+	}
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -268,15 +343,17 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 		if complete {
 			c.sequence++
 			if !c.discard {
-				e, eventErr := ParseLine(bytes.TrimSuffix(line, []byte("\n")), SourcePosition{Path: path, FileID: c.id, Offset: start, Sequence: c.sequence})
+				e, eventErr := ParseLine(bytes.TrimSuffix(line, []byte("\n")), SourcePosition{Path: path, FileID: c.id, Offset: start, Sequence: c.sequence, Length: position - start})
 				if eventErr != nil {
 					r.change(func(s *ReaderStats) { s.MalformedLines++ })
 				} else {
 					phase := Live
-					if position <= c.replayUntil {
+					if position <= c.replayUntil || (r.opts.Durable != nil && !e.Timestamp.IsZero() && e.Timestamp.Before(r.startedAt)) {
 						phase = Replay
 					}
-					if err := emit(e, phase); err != nil {
+					if r.opts.Durable != nil {
+						batch = append(batch, Record{Event: e, Phase: phase})
+					} else if err := emit(e, phase); err != nil {
 						return err
 					}
 					r.change(func(s *ReaderStats) { s.EventsRead++ })
@@ -286,6 +363,11 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			start = position
 			c.discard = false
 			line = nil
+			if len(batch) >= 256 {
+				if err := commit(); err != nil {
+					return err
+				}
+			}
 		} else if c.discard {
 			c.offset = position
 		}
@@ -302,6 +384,9 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			}
 			break
 		}
+	}
+	if err := commit(); err != nil {
+		return err
 	}
 	c.info = info
 	c.anchor = sample(f, max(0, c.offset-128), int(min(c.offset, 128)))

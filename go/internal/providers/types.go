@@ -12,7 +12,7 @@ var FrontierClientID string     // set only after Frontier developer approval
 const software = "DAEDALUS"
 const version = "2.2.0"
 
-var ids = []string{"edsm", "inara", "edastro", "eddn", "frontier"}
+var ids = []string{"edsm", "inara", "edastro", "eddn", "frontier", "spansh", "elitebgs", "raven", "canonn", "edsm-reference"}
 
 type Credential struct {
 	APIKey       string    `json:"apiKey,omitempty"`
@@ -26,6 +26,7 @@ type Vault interface {
 	Save(map[string]Credential) error
 }
 type Options struct {
+	RequireHistory                 bool
 	Client                         *http.Client
 	Vault                          Vault
 	Now                            func() time.Time
@@ -33,18 +34,20 @@ type Options struct {
 	InaraAppName, FrontierClientID string
 }
 type Config struct {
-	Read          bool     `json:"read"`
-	Upload        bool     `json:"upload"`
-	Subscribe     bool     `json:"subscribe"`
-	Paused        bool     `json:"paused"`
-	Categories    []string `json:"categories"`
-	CommanderHash string   `json:"-"`
+	CommunityGoals bool     `json:"communityGoals"`
+	Read           bool     `json:"read"`
+	Upload         bool     `json:"upload"`
+	Subscribe      bool     `json:"subscribe"`
+	Paused         bool     `json:"paused"`
+	Categories     []string `json:"categories"`
+	CommanderHash  string   `json:"-"`
 }
 type storedConfig struct {
 	Config
 	Identity string `json:"identity,omitempty"`
 }
 type Capability struct {
+	Evidence        string   `json:"evidence"`
 	Protocol        string   `json:"protocol"`
 	EventTypes      []string `json:"eventTypes"`
 	ID              string   `json:"id"`
@@ -99,6 +102,7 @@ type Snapshot struct {
 	Facts           []Fact `json:"facts"`
 }
 type queued struct {
+	candidateID           string
 	key, category         string
 	body                  []byte
 	endpoint, contentType string
@@ -124,10 +128,15 @@ type providerState struct {
 
 func capabilities() []Capability {
 	return []Capability{
+		{ID: "edsm-reference", Protocol: "Public sphere/station reference GETs", Endpoint: "https://www.edsm.net", Documentation: "https://www.edsm.net/en/api-system-v1", Read: []string{"nearby", "stations", "market", "shipyard", "outfitting"}, IntervalSeconds: 60, Scopes: []string{"Owner-selected system; verified locked-coordinate candidates; no fan-out; separate account/map consent"}},
+		{ID: "elitebgs", Protocol: "V5 bounded named GET pages", Endpoint: "https://elitebgs.app/api/ebgs/v5", Documentation: "https://elitebgs.app/ebgs/docs/V5/paths/systems", Read: []string{"systems", "factions", "stations", "ticks"}, IntervalSeconds: 60, Scopes: []string{"Community observations; no causal attribution; no uploads"}},
+		{ID: "raven", Protocol: "Documented project GET only", Endpoint: "https://ravencolonial100-awcbdvabgze4c5cq.canadacentral-01.azurewebsites.net", Documentation: "https://ravencolonial100-awcbdvabgze4c5cq.canadacentral-01.azurewebsites.net/About", Read: []string{"system", "project", "last", "stats"}, IntervalSeconds: 60, Scopes: []string{"Optional read; writes unavailable pending canonical-host/authentication approval"}},
+		{ID: "canonn", Protocol: "CAPIv2 filtered site collections", Endpoint: "https://api.canonn.tech", Documentation: "https://docs.canonn.tech/home/about.html", Read: []string{"guardian", "thargoid", "biology", "generation"}, IntervalSeconds: 60, Scopes: []string{"Exact system.id64 filter; 32 sites/page; public science reference; no uploads"}},
+		{ID: "spansh", Protocol: "OpenAPI 3.3.0 GET lookups only", Endpoint: "https://spansh.co.uk/api", Documentation: "https://docs.spansh.co.uk/", Read: []string{"system", "body", "station", "dump"}, IntervalSeconds: 60, Scopes: []string{"Public reference only; owner requested exact ID; no route job API"}},
 		{ID: "edsm", Protocol: "journal-v1 / logs-v1", EventTypes: []string{"FSDJump", "Location", "Docked", "CarrierJump", "Scan", "SAASignalsFound", "FSSDiscoveryScan", "Loadout", "Materials", "Rank", "Progress"}, Endpoint: "https://www.edsm.net/api-journal-v1", Documentation: "https://www.edsm.net/en/api-journal-v1", Read: []string{"flightlog"}, Upload: []string{"travel", "exploration", "loadout", "materials", "ranks"}, IntervalSeconds: 60, Scopes: []string{"personal API key; commander-bound"}},
-		{ID: "inara", Protocol: "inapi/v1", EventTypes: []string{"getCommanderProfile", "addCommanderTravelFSDJump", "setCommanderShipLoadout", "setCommanderInventoryMaterials", "setCommanderRankPilot", "setCommanderCredits"}, Endpoint: "https://inara.cz/inapi/v1/", Documentation: "https://inara.cz/elite/inara-api-docs/", Read: []string{"profile"}, Upload: []string{"travel", "loadout", "materials", "ranks", "credits"}, IntervalSeconds: 60, Gate: "application approval required", Scopes: []string{"personal API key; whitelisted application"}},
+		{ID: "inara", Protocol: "inapi/v1", EventTypes: []string{"getCommanderProfile", "addCommanderTravelFSDJump", "setCommanderShipLoadout", "setCommanderInventoryMaterials", "setCommanderRankPilot", "setCommanderCredits"}, Endpoint: "https://inara.cz/inapi/v1/", Documentation: "https://inara.cz/elite/inara-api-docs/", Read: []string{"profile", "communitygoals"}, Upload: []string{"travel", "loadout", "materials", "ranks", "credits"}, IntervalSeconds: 60, Gate: "application approval required", Scopes: []string{"personal API key; whitelisted application"}},
 		{ID: "edastro", Protocol: "documented unversioned journal / GEC API", EventTypes: []string{"ScanOrganic", "CarrierStats", "CarrierJumpRequest"}, Endpoint: "https://edastro.com/api/journal", Documentation: "https://edastro.com/api-details.html", Read: []string{"system", "gec"}, Upload: []string{"biology", "carrier", "carrier_destination"}, IntervalSeconds: 5, Scopes: []string{"selected public events; carrier categories independently opt in"}},
-		{ID: "eddn", Protocol: "journal/1 (live schema)", EventTypes: []string{"FSDJump", "Location", "CarrierJump", "Scan", "SAASignalsFound"}, Endpoint: "https://eddn.edcd.io:4430/upload/", Documentation: "https://github.com/EDCD/EDDN/tree/live", Upload: []string{"travel", "exploration"}, IntervalSeconds: 2, Scopes: []string{"journal/1 live public observations; anonymous installation uploader"}},
+		{ID: "eddn", Protocol: "journal/1 (live schema)", EventTypes: []string{"FSDJump", "Location", "CarrierJump", "Scan", "SAASignalsFound"}, Endpoint: "https://eddn.edcd.io:4430/upload/", Documentation: "https://github.com/EDCD/EDDN/tree/live", Upload: []string{"travel", "exploration", "commodities", "shipyard", "outfitting"}, IntervalSeconds: 2, Scopes: []string{"journal/1 live public observations; anonymous installation uploader"}},
 		{ID: "frontier", Protocol: "OAuth2 PKCE / read-only CAPI", EventTypes: []string{"profile", "market", "shipyard", "fleetcarrier"}, Endpoint: "https://companion.orerve.net", Documentation: "https://github.com/EDCD/FDevIDs/tree/master/Frontier%20API", Read: []string{"profile", "market", "shipyard", "fleetcarrier"}, IntervalSeconds: 60, Gate: "Frontier developer approval required", Scopes: []string{"auth", "capi"}},
 	}
 }

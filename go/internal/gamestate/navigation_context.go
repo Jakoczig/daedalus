@@ -11,7 +11,7 @@ func (s *Service) NavigationContext() navcontext.View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v := s.navigationContext.View(s.active, time.Now())
-	if s.summary.ImportInProgress || s.summary.SourceState != "live" {
+	if s.summary.ImportInProgress || s.summary.Cached || s.summary.SourceState != "live" {
 		v.Fresh = false
 		v.Mode = "idle"
 	}

@@ -64,3 +64,12 @@ Earlier implementation evidence is in [Phase 1A](handoffs/phase-1a-security-and-
 ## G2H gameplay feedback follow-up
 
 The maintainer's `2bea5d8` UI correction was retained and finalized: intentional journal waiting state, separate known-empty/filter-empty states, stable selectable nonspatial EDSM station markers with cache provenance, and scrollable/focusable native launcher settings. Historical lookup results cannot leak from a previously requested system into the next request. Browser fixtures include live startup transitions, binary/local/community bodies, 64 stations and small/scaled launcher layouts. The actual Windows Wails window was inspected through Data Providers to its lower settings with all integrations disabled. See the [G2H preview notes](testing/g2h-orbital-integrations-preview.md) and PR #13 for final-commit verification/downloads; physical gameplay and additional DPI/Linux device acceptance remain manual.
+
+
+## G2J — persistent history and controlled integrations
+
+The new G2J branch starts at G2H `d7c5cd93e16ee0480fa11ef53d2ea9d9d0d4cb58` and leaves PR #13 and the legacy application unchanged. A private native SQLite WAL database now retains normalized relevant journal history, verified durable source checkpoints and cached reducers. It supports incremental restart catch-up, whole-file verified copy aliases, backups before migrations, manual export/restore and conservative recovery without deleting damaged originals.
+
+Owner-only Data/History exposes indexed per-commander pages, provenance/conflicts, construction depot resources and explicit historical-publication review. Persistent Never/Live/After sale policies, independently consented recipient/category live exceptions and durable outcomes apply before provider queues. Paired displays retain bounded read-only public projections. New reference adapters cover published Spansh lookups, bounded Elite BGS, Raven read-only projects and filtered Canonn science collections; credentials remain outside SQLite. Native engineered statistics preserve final fitted modifiers and withhold unvalidated performance models.
+
+The [G2J preview matrix and acceptance checklist](testing/g2j-persistent-history-preview.md) distinguishes fixture implementation from approval-dependent or unverified live capabilities. Exact final-head CI/artifact evidence belongs to the new G2J draft PR; earlier milestones' green checks do not verify G2J. No production upload, release, merge, deployment or legacy replacement is authorized by this work.

@@ -11,6 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/Jakoczig/daedalus/go/internal/history"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"github.com/Jakoczig/daedalus/go/internal/navcontext"
 	"github.com/Jakoczig/daedalus/go/internal/sidecar"
@@ -19,6 +20,9 @@ import (
 // Summary is the entire public transport projection. Never add paths, identity,
 // raw records, inventories or free-form diagnostic messages to this type.
 type Summary struct {
+	Stage            string `json:"stage,omitempty"`
+	Cached           bool   `json:"cached,omitempty"`
+	CachedAt         string `json:"cachedAt,omitempty"`
 	SourceState      string `json:"sourceState"`
 	CurrentSystem    string `json:"currentSystem"`
 	LastEventType    string `json:"lastEventType"`
@@ -27,14 +31,19 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
-	ProviderEvent func(journal.Event, journal.Phase)
-	EnableParity  bool
-	Directory     string
-	Discovery     journal.DiscoveryOptions
-	PollInterval  time.Duration
-	ConfigError   string
+	ProviderSidecar func(sidecar.Change)
+	OnHistoryReady  func(*history.Store, history.ProviderSeed)
+	StorageDir      string
+	ProviderRestore func(string, string)
+	ProviderEvent   func(journal.Event, journal.Phase)
+	EnableParity    bool
+	Directory       string
+	Discovery       journal.DiscoveryOptions
+	PollInterval    time.Duration
+	ConfigError     string
 }
 type SourceDetails struct {
+	ReaderBytes                uint64
 	Directory, Override, Error string
 	ReaderStarts               uint64
 	ActiveReaders              int
@@ -45,30 +54,46 @@ type selection struct {
 	directory string
 	reply     chan error
 }
+type maintenanceRequest struct {
+	kind, source string
+	reply        chan error
+}
 type Service struct {
-	navigationContext *navcontext.Model
-	mu                sync.Mutex
-	views             projectionState
-	opts              Options
-	summary           Summary
-	details           SourceDetails
-	commanders        map[string]commanderState
-	order             []string
-	unknown           commanderState
-	active            string
-	stopped           bool
-	subscribers       map[chan Summary]struct{}
-	selectSource      chan selection
-	done              chan struct{}
-	closed            bool
-	running           atomic.Bool
+	maintenance        chan maintenanceRequest
+	hasFreshLive       bool
+	activeSource       string
+	store              *history.Store
+	databaseError      string
+	lastPersistPublish time.Time
+	restored           bool
+	cachedProjection   *Projections
+	navigationContext  *navcontext.Model
+	mu                 sync.Mutex
+	views              projectionState
+	opts               Options
+	summary            Summary
+	details            SourceDetails
+	commanders         map[string]commanderState
+	order              []string
+	unknown            commanderState
+	active             string
+	stopped            bool
+	subscribers        map[chan Summary]struct{}
+	selectSource       chan selection
+	done               chan struct{}
+	closed             bool
+	running            atomic.Bool
 }
 
 func NewService(opts Options) (*Service, error) {
 	if opts.PollInterval <= 0 {
 		opts.PollInterval = 500 * time.Millisecond
 	}
-	return &Service{navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
+	initialStage := ""
+	if opts.StorageDir != "" {
+		initialStage = "RESTORING_CACHE"
+	}
+	return &Service{maintenance: make(chan maintenanceRequest), navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{Stage: initialStage, SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
 }
 func (s *Service) Snapshot() Summary { s.mu.Lock(); defer s.mu.Unlock(); return s.summary }
 func (s *Service) Details() SourceDetails {
@@ -160,6 +185,18 @@ func (s *Service) Run(ctx context.Context) error {
 	if !s.running.CompareAndSwap(false, true) {
 		return errors.New("journal service already running")
 	}
+	defer func() {
+		s.mu.Lock()
+		s.closed = true
+		s.closeProjectionsLocked()
+		s.summary.SourceState = "stopped"
+		for ch := range s.subscribers {
+			delete(s.subscribers, ch)
+			close(ch)
+		}
+		s.mu.Unlock()
+		close(s.done)
+	}()
 	var reader *journal.Reader
 	var snapshots *sidecar.Reader
 	var stop context.CancelFunc
@@ -175,18 +212,73 @@ func (s *Service) Run(ctx context.Context) error {
 		s.mu.Unlock()
 	}
 	defer func() {
-		stopReader()
-		s.mu.Lock()
-		s.closed = true
-		s.closeProjectionsLocked()
-		s.summary.SourceState = "stopped"
-		for ch := range s.subscribers {
-			delete(s.subscribers, ch)
-			close(ch)
+		if s.store != nil {
+			_ = s.store.Close()
 		}
-		s.mu.Unlock()
-		close(s.done)
 	}()
+	defer stopReader()
+
+	if s.opts.StorageDir != "" {
+		db, err := history.Open(s.opts.StorageDir)
+		if err == nil {
+			s.mu.Lock()
+			s.store = db
+			s.summary.Stage = "RESTORING_CACHE"
+			s.mu.Unlock()
+			raw, e := db.Cache()
+			if e == nil && len(raw) > 0 {
+				s.mu.Lock()
+				e = s.restoreCacheLocked(raw)
+				if e == nil {
+					s.restored = true
+					s.summary.Cached = true
+					s.summary.Stage = "CATCHING_UP"
+					savedSummary := s.summary
+					s.summary.ImportInProgress = false
+					s.summary.SourceState = "live"
+					v := s.projectionLocked()
+					s.summary = savedSummary
+					v.Source = savedSummary
+					s.cachedProjection = &v
+				}
+				s.mu.Unlock()
+			}
+			err = e
+		}
+		if err != nil {
+
+			s.mu.Lock()
+			s.databaseError = "Database could not be verified. Original files retained; use Data/History recovery."
+			s.details.Error = s.databaseError
+			s.summary.Stage = "DB_ERROR"
+			s.summary.SourceState = "db_error"
+			s.summary.ImportInProgress = false
+			s.publishLocked()
+			s.mu.Unlock()
+			for err != nil {
+				select {
+				case request := <-s.maintenance:
+					if s.store == nil {
+						request.reply <- errors.New("A verified database is required; restore a backup and restart")
+						continue
+					}
+					err = s.rebuildDerived(ctx)
+					request.reply <- err
+				case <-ctx.Done():
+					return nil
+				case request := <-s.selectSource:
+					request.reply <- errors.New("database recovery required")
+				}
+			}
+		}
+		if s.opts.OnHistoryReady != nil {
+			seed, e := db.ProviderSeed(s.activeSource)
+			if e == nil {
+				s.opts.OnHistoryReady(db, seed)
+			}
+		}
+	}
+
 	opts := s.opts
 	directory := ""
 	found := false
@@ -205,21 +297,35 @@ func (s *Service) Run(ctx context.Context) error {
 			reader = nil
 			snapshots = nil
 			s.mu.Lock()
-			s.resetProjectionsLocked()
-			s.commanders = map[string]commanderState{}
-			s.order = nil
-			s.unknown = commanderState{}
-			s.active = ""
-			s.stopped = false
-			s.summary = Summary{SourceState: "waiting", ImportInProgress: directory != ""}
+			if s.store == nil {
+				s.resetProjectionsLocked()
+				s.commanders = map[string]commanderState{}
+				s.order = nil
+				s.unknown = commanderState{}
+				s.active = ""
+				s.stopped = false
+				s.summary = Summary{SourceState: "waiting", ImportInProgress: directory != ""}
+			} else {
+				s.summary.ImportInProgress = directory != ""
+				s.summary.Cached = s.restored
+				if s.restored {
+					s.summary.Stage = "CATCHING_UP"
+				} else {
+					s.summary.Stage = "INITIAL_IMPORT"
+				}
+			}
 			s.details.Directory = directory
 			s.details.Override = opts.Directory
 			s.details.Sidecars = map[string]string{}
 			s.publishLocked()
 			s.mu.Unlock()
 			if directory != "" && opts.ConfigError == "" {
-				reader, _ = journal.NewReader(directory, journal.ReaderOptions{PollInterval: opts.PollInterval})
-				snapshots, _ = sidecar.NewReader(directory, sidecar.Options{})
+				var durable journal.Durable
+				if s.store != nil {
+					durable = s
+				}
+				reader, _ = journal.NewReader(directory, journal.ReaderOptions{PollInterval: opts.PollInterval, Durable: durable})
+				snapshots, _ = sidecar.NewReader(directory, sidecar.Options{StationData: s.store != nil})
 				if reader != nil {
 					readerCtx, cancel := context.WithCancel(ctx)
 					stop = cancel
@@ -230,7 +336,17 @@ func (s *Service) Run(ctx context.Context) error {
 					s.details.ReaderStarts++
 					s.details.ActiveReaders = 1
 					s.mu.Unlock()
-					go func() { defer close(completed); _ = activeReader.Run(readerCtx, s.apply) }()
+					go func() {
+						defer close(completed)
+						if err := activeReader.Run(readerCtx, s.apply); err != nil {
+							s.mu.Lock()
+							s.databaseError = "Source/database commit failed; committed history retained. Review Data/History."
+							s.summary.Stage = "DB_ERROR"
+							s.summary.Cached = true
+							s.publishLocked()
+							s.mu.Unlock()
+						}
+					}()
 				}
 			}
 		}
@@ -254,6 +370,23 @@ func (s *Service) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case request := <-s.maintenance:
+			if s.store == nil {
+				request.reply <- errors.New("Database unavailable")
+				continue
+			}
+			stopReader()
+			var err error
+			if request.kind == "reimport" {
+				err = s.store.ReimportSource(request.source)
+			}
+			if err == nil {
+				err = s.rebuildDerived(ctx)
+			}
+			if err == nil {
+				configure(true)
+			}
+			request.reply <- err
 		case cmd := <-s.selectSource:
 			opts.Directory = cmd.directory
 			opts.ConfigError = ""
@@ -263,12 +396,36 @@ func (s *Service) Run(ctx context.Context) error {
 			if opts.ConfigError == "" && (!found || reader == nil || reader.Stats().SourceState == "waiting") {
 				configure(false)
 			}
-			if snapshots != nil {
+			if snapshots != nil && found {
 				changes, _ := snapshots.Poll(ctx)
 				s.mu.Lock()
-				for _, change := range changes {
-					s.details.Sidecars[change.Kind] = change.State
-					s.sidecarProjectionLocked(change)
+				var beforeSidecars []byte
+				var cacheErr error
+				if s.store != nil && len(changes) > 0 && s.databaseError == "" {
+					beforeSidecars, cacheErr = s.cacheLocked()
+				}
+				if cacheErr == nil && s.databaseError == "" {
+					for _, change := range changes {
+						s.details.Sidecars[change.Kind] = change.State
+						s.sidecarProjectionLocked(change)
+					}
+					if s.store != nil && len(changes) > 0 && ctx.Err() == nil {
+						var raw []byte
+						raw, cacheErr = s.cacheLocked()
+						if cacheErr == nil {
+							cacheErr = s.store.SaveCache(ctx, raw)
+						}
+						if cacheErr != nil {
+							_ = s.restoreCacheLocked(beforeSidecars)
+							s.databaseError = "Sidecar cache could not be committed; previous verified cache retained. Review Data/History."
+							s.summary.Stage = "DB_ERROR"
+						}
+					}
+					if cacheErr == nil && s.opts.ProviderSidecar != nil {
+						for _, change := range changes {
+							s.opts.ProviderSidecar(change)
+						}
+					}
 				}
 				s.mu.Unlock()
 			}
@@ -276,6 +433,7 @@ func (s *Service) Run(ctx context.Context) error {
 			before := s.summary
 			if reader != nil {
 				stats := reader.Stats()
+				s.details.ReaderBytes = stats.BytesRead
 				s.summary.SourceState = stats.SourceState
 				s.summary.ImportInProgress = stats.ImportInProgress
 				if stats.SourceState == "live" || stats.SourceState == "replaying" {
@@ -287,9 +445,32 @@ func (s *Service) Run(ctx context.Context) error {
 						s.summary.SourceState = "waiting_game"
 					}
 				}
-				s.details.Error = stats.LastError
+				if s.databaseError != "" {
+					s.summary.Stage = "DB_ERROR"
+					s.details.Error = s.databaseError
+				} else {
+					s.details.Error = stats.LastError
+				}
 			} else {
 				s.summary.ImportInProgress = false
+			}
+			if s.store != nil && s.databaseError == "" {
+				if s.summary.ImportInProgress {
+					if s.restored {
+						s.summary.Stage = "CATCHING_UP"
+					} else {
+						s.summary.Stage = "INITIAL_IMPORT"
+					}
+				} else if s.summary.SourceState == "source_error" || s.summary.SourceState == "permission_error" {
+					s.summary.Stage = "SOURCE_UNAVAILABLE"
+				} else if s.summary.Cached || s.stopped || reader == nil || reader.Stats().SourceState == "waiting" {
+					s.summary.Stage = "WAITING_FOR_GAME"
+				} else {
+					s.summary.Stage = "LIVE"
+				}
+				if !s.summary.ImportInProgress {
+					s.cachedProjection = nil
+				}
 			}
 			s.publishProjectionsLocked()
 			if s.summary != before {
@@ -313,6 +494,16 @@ func safeText(text string) bool {
 func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.applyEventLocked(event, phase)
+	if s.opts.ProviderEvent != nil {
+		s.opts.ProviderEvent(event, phase)
+	}
+	if phase == journal.Live {
+		s.publishLocked()
+	}
+	return nil
+}
+func (s *Service) applyEventLocked(event journal.Event, phase journal.Phase) {
 	s.summary.EventsRead++
 	switch event.Type {
 	case "Fileheader":
@@ -349,9 +540,6 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 		s.stopped = true
 	}
 	s.applyProjectionsLocked(event, phase)
-	if s.opts.ProviderEvent != nil {
-		s.opts.ProviderEvent(event, phase)
-	}
 	state := s.unknown
 	if s.active != "" {
 		state = s.commanders[s.active]
@@ -365,10 +553,6 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 			s.summary.LastEventAt = event.Timestamp.UTC().Format(time.RFC3339Nano)
 		}
 	}
-	if phase == journal.Live {
-		s.publishLocked()
-	}
-	return nil
 }
 
 // SystemIdentity is used only by the fixed-host opt-in community lookup.

@@ -273,7 +273,18 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			} else {
 				response["message"] = s.providers.Layers()
 			}
-		case "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier":
+		case "getGoConstruction", "getGoSaleLinks", "confirmGoOrganicSale", "getGoNearest", "getGoSourceFacts", "getGoDataStatus", "queryGoHistory", "backupGoHistory", "exportGoHistory", "stageGoRestore", "rebuildGoHistory", "reimportGoSource", "getGoPublicationPolicy", "setGoPublicationPolicy", "setGoPublicationException":
+			if principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			value, err := s.historyRPC(readCtx, request.Name, request.Message)
+			if err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
+		case "previewGoHistorical", "confirmGoHistorical", "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier":
 			if principal.role != "owner" {
 				response["error"] = "Owner permission required"
 				break
@@ -377,6 +388,12 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				response["message"] = s.community.Refresh(readCtx, name, address)
 			} else {
 				response["message"] = s.community.View(name, address)
+			}
+		case "getGoEngineeredStatistics":
+			if !s.g2e || s.game == nil {
+				response["error"] = "Native statistics unavailable"
+			} else {
+				response["message"] = s.game.EngineeredStatistics()
 			}
 		case "getGoWorkspace":
 			if !s.g2e || s.game == nil {

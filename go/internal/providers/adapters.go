@@ -15,8 +15,12 @@ func allowedEndpoint(u *url.URL) bool {
 		return false
 	}
 	switch u.Host {
+	case "elitebgs.app", "api.canonn.tech", ravenHost:
+		return communityPath(u)
+	case "spansh.co.uk":
+		return u.RawQuery == "" && spanshPath(u.Path)
 	case "www.edsm.net":
-		return u.Path == "/api-journal-v1" || u.Path == "/api-logs-v1/get-logs"
+		return u.Path == "/api-journal-v1" || u.Path == "/api-logs-v1/get-logs" || u.Path == "/api-v1/sphere-systems" || u.Path == "/api-system-v1/stations" || u.Path == "/api-system-v1/stations/market" || u.Path == "/api-system-v1/stations/shipyard" || u.Path == "/api-system-v1/stations/outfitting"
 	case "inara.cz":
 		return u.Path == "/inapi/v1/"
 	case "edastro.com":
@@ -26,7 +30,7 @@ func allowedEndpoint(u *url.URL) bool {
 	case "auth.frontierstore.net":
 		return u.Path == "/token"
 	case "companion.orerve.net":
-		return u.Path == "/profile" || u.Path == "/market" || u.Path == "/shipyard" || u.Path == "/fleetcarrier"
+		return u.Path == "/profile" || u.Path == "/market" || u.Path == "/shipyard" || u.Path == "/fleetcarrier" || u.Path == "/communitygoals"
 	}
 	return false
 }

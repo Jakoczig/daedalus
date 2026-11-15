@@ -44,6 +44,19 @@ func newProjectionState() projectionState {
 	return projectionState{parity: paritystate.NewModel(), activity: activitystate.NewModel(), ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
 }
 func (s *Service) projectionLocked() Projections {
+	if s.cachedProjection != nil && s.summary.ImportInProgress {
+		p := cloneProjection(*s.cachedProjection)
+		p.Source = s.summary
+		p.Ship.Evidence = "cached"
+		p.Navigation.RouteState = "cached"
+		p.Exploration.SurveyState = "cached"
+		if p.Workspace != nil {
+			p.Workspace.Parity.Evidence = "cached"
+			p.Workspace.Parity.Status.State = "stale_source"
+		}
+		return p
+	}
+
 	p := Projections{Ship: s.views.ship.View(s.active), Source: s.summary, Navigation: s.views.navigation.View(s.active)}
 	address := s.unknown.systemAddress
 	if s.active != "" {
@@ -67,7 +80,7 @@ func (s *Service) projectionLocked() Projections {
 		p.Exploration = explorestate.ExplorationView{SurveyState: "replaying", Bodies: []explorestate.BodyView{}}
 	} else if s.summary.SourceState != "live" && s.summary.SourceState != "replaying" && s.summary.SourceState != "partial" && s.summary.SourceState != "parse_warning" {
 		p.Ship.Evidence = "stale_source"
-		if len(p.Navigation.Hops) > 0 || p.Navigation.TargetSystem != "" {
+		if !s.summary.Cached && (len(p.Navigation.Hops) > 0 || p.Navigation.TargetSystem != "") {
 			p.Navigation.Hops = []navstate.Hop{}
 			p.Navigation.DestinationSystem = ""
 			p.Navigation.TargetSystem = ""
@@ -78,6 +91,20 @@ func (s *Service) projectionLocked() Projections {
 		}
 		if len(p.Exploration.Bodies) > 0 {
 			p.Exploration.SurveyState = "stale_source"
+		}
+	}
+	if s.summary.Cached {
+		if p.Navigation.RouteState == "verified_last_known" || p.Navigation.RouteState == "verified" {
+			p.Navigation.RouteState = "cached"
+			p.Navigation.TargetEvidence = "cached"
+		}
+		p.Ship.Evidence = "cached"
+		if p.Workspace != nil {
+			p.Workspace.Parity.Evidence = "cached"
+			p.Workspace.Activity.Evidence = "cached"
+		}
+		if p.Exploration.SystemName != "" {
+			p.Exploration.SurveyState = "cached"
 		}
 	}
 	return p
