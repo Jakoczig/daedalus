@@ -38,7 +38,7 @@ async function main () {
     }
     await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
     await navigate('/ship/stats', 'Witnessed final engineering')
-    await waitFor(() => evaluate('document.body.textContent.includes("effective-fitted-power-sum-v1")')).catch(async err => { report.failedStatistics = await evaluate('document.body.textContent'); throw err })
+    await waitFor(() => evaluate('document.body.textContent.includes("effective-fitted-power-sum-v2")')).catch(async err => { report.failedStatistics = await evaluate('document.body.textContent'); throw err })
     if (await evaluate('document.body.innerText.includes("NaN")')) throw new Error('Native statistics contains NaN')
     await screenshot('native-effective-statistics')
     await c.call('HeapProfiler.collectGarbage')
