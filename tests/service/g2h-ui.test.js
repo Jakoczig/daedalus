@@ -21,16 +21,14 @@ test('G2H Navigation removes body strip, organism details and unknown facts whil
   h.props.path = '/exploration/system'; assert.match(h.html(), /Biological observations|Fixture species/)
 })
 
-test('G2H statistics never substitute base power for unknown engineered values', () => {
+test('G2K statistics only presents canonical native power, never recomputes module data', () => {
   const { powerStatistics } = harness('go-ship-statistics').exports
-  const n = value => ({ label: 'PowerDraw', value })
-  const modules = [{ slot: 'PowerPlant', item: 'plant', on: true, engineering: { modifiers: [{ label: 'PowerCapacity', value: 20 }] } }, { slot: 'MainEngines', on: true, priority: 0, reference: { powerMW: 5 }, engineering: { modifiers: [] } }]
-  assert.equal(powerStatistics(modules).deployed, null)
-  modules[1].engineering.modifiers = [n(6)]
-  let v = powerStatistics(modules); assert.equal(v.deployed, 6); assert.equal(v.percent, 30)
-  modules.push({ slot: 'LargeHardpoint1', on: true, priority: 2, reference: { powerMW: 3 } })
-  v = powerStatistics(modules); assert.equal(v.stowed, 6); assert.equal(v.deployed, 9); assert.equal(v.priorities[2], 3)
-  modules[1].engineering.modifiers = [n(NaN)]; assert.equal(powerStatistics(modules).deployed, null)
+  assert.equal(powerStatistics().deployed, null)
+  assert.equal(powerStatistics({ modules: [{ reference: { powerMW: 3 } }] }).deployed, null)
+  const native = { capacityMW: 20, stowedMW: 6, deployedMW: 9, deployedPercent: 45, unknownPower: 0, knownPriorityMW: [6, 0, 3, 0, 0] }
+  const v = powerStatistics(native)
+  assert.equal(v.stowed, 6); assert.equal(v.deployed, 9); assert.equal(v.percent, 45); assert.equal(v.priorities[2], 3)
+  assert.equal(powerStatistics({ unknownPower: 1 }).deployed, null)
 })
 
 test('G2H Galaxy route framing handles short/coincident routes and missing destination without NaNs', () => {
