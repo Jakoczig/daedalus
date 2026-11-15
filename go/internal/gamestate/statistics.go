@@ -12,9 +12,10 @@ func (s *Service) EngineeredStatistics() paritystate.EngineeredStatistics {
 	defer s.mu.Unlock()
 	p := s.projectionLocked().Workspace.Parity
 	raw, _ := json.Marshal(struct {
-		FID  string
-		View paritystate.View
-	}{s.active, p})
+		FID    string
+		ShipID string
+		View   paritystate.View
+	}{s.active, s.views.ship.Identity(s.active), p})
 	sum := sha256.Sum256(raw)
 	key := hex.EncodeToString(sum[:])
 	var v paritystate.EngineeredStatistics
@@ -24,6 +25,15 @@ func (s *Service) EngineeredStatistics() paritystate.EngineeredStatistics {
 		}
 	}
 	v = paritystate.Statistics(p.Modules)
+	if p.Status.State == "known" && p.Status.Flags != nil {
+		deployed := p.Status.Flags.HardpointsDeployed
+		v.ObservedHardpointsDeployed = &deployed
+		if deployed {
+			v.ObservedDeploymentRatedMW = v.DeployedMW
+		} else {
+			v.ObservedDeploymentRatedMW = v.StowedMW
+		}
+	}
 	if s.store != nil {
 		raw, _ = json.Marshal(v)
 		_ = s.store.SaveStatistics(key, paritystate.StatisticsFormula, raw)
