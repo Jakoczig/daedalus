@@ -74,6 +74,9 @@ var domain = map[string]string{
 }
 
 func relevant(kind string) bool {
+	if kind == "Bounty" || kind == "FactionKillBond" || kind == "JetConeBoost" || kind == "JetConeDamage" || kind == "CodexEntry" {
+		return true
+	}
 	if domain[kind] != "" {
 		return true
 	}
@@ -168,6 +171,12 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record, c
 		eventID, _ := res.LastInsertId()
 		if !fid.Valid {
 			continue
+		}
+		if err = fieldTally(tx, eventID, fid.String, address, e.Type, stamp, v); err != nil {
+			return err
+		}
+		if err = advanceItinerary(tx, fid.String, eventID, e.Type, e.SystemName, e.SystemAddress, stamp); err != nil {
+			return err
 		}
 		if _, err = tx.Exec("INSERT OR IGNORE INTO publication_policy VALUES(?,'Never',?)", fid.String, utc()); err != nil {
 			return err
