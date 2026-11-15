@@ -20,7 +20,7 @@ func allowedEndpoint(u *url.URL) bool {
 	case "inara.cz":
 		return u.Path == "/inapi/v1/"
 	case "edastro.com":
-		return u.Path == "/api/journal" || u.Path == "/api/starsystem" || u.Path == "/gec/json/all"
+		return u.Path == "/api/journal" || u.Path == "/api/starsystem" || u.Path == "/gec/json/rare"
 	case "eddn.edcd.io:4430":
 		return u.Path == "/upload/"
 	case "auth.frontierstore.net":

@@ -276,3 +276,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       defend, and hold each Contributor harmless for any liability
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
+## EDAstro review correction (2026-11-15)
+
+GEC uses the documented `/gec/json/rare` subset, numeric `coordinates` arrays and both string category fields. The full feed measured 2,274,159 bytes, above the unchanged 2 MiB response budget; the rare feed measured 429,722 bytes. Only normalized public points are retained (maximum 2,048), cached in memory for 24 hours and explicitly owner-fetched. No full-feed fallback, bundled imagery or automatic viewer/startup request. Labels identify subset coverage; selected points use their actual `galMapSearch` system. Restart clears the cache.
+
+A successful HTTP response containing EDAstro JSON status 401 is displayed as `no new observations`, without incrementing confirmed uploads; HTTP 401 remains a failure. Live uploads remain untested and disabled by default. See [project summary](../PROJECT_SUMMARY.md) for the consolidated migration history.

@@ -1,0 +1,1 @@
+Sanitized structural example from https://edastro.com/gec/json/rare, retrieved 2026-11-15. Only public POI name, type/type2, galMapSearch and coordinates retained. Descriptions, HTML, images, attribution identities and unrelated fields are omitted. Other regression records are synthetic. Raw live feeds are not committed.

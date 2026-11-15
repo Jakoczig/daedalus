@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"slices"
 
@@ -26,6 +27,14 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 	if m.closed || s == nil || !s.config.Read || s.config.Paused || cap.Gate != "" || !slices.Contains(cap.Read, kind) {
 		m.mu.Unlock()
 		return nil, errors.New("Provider read consent/approval required")
+	}
+	if id == "edastro" && kind == "gec" && m.layers.FetchedAt != "" {
+		expires, err := time.Parse(time.RFC3339, m.layers.ExpiresAt)
+		if err == nil && m.opts.Now().Before(expires) {
+			cached := &Snapshot{Source: "edastro / gec (rare subset)", FetchedAt: m.layers.FetchedAt, ExpiresAt: m.layers.ExpiresAt, Facts: []Fact{{Name: "Cached GEC points", Value: fmt.Sprint(len(m.layers.Points))}, {Name: "Truncated", Value: fmt.Sprint(m.layers.Truncated)}}}
+			m.mu.Unlock()
+			return cached, nil
+		}
 	}
 	if s.busy || m.opts.Now().Before(s.next) {
 		m.mu.Unlock()
@@ -71,7 +80,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 		body, _ = json.Marshal(map[string]any{"header": map[string]any{"appName": app, "appVersion": version, "isBeingDeveloped": true, "APIkey": cred.APIKey}, "events": []any{map[string]any{"eventName": "getCommanderProfile", "eventTimestamp": now.UTC().Format(time.RFC3339), "eventData": map[string]any{}}}})
 	case "edastro":
 		if kind == "gec" {
-			endpoint = "https://edastro.com/gec/json/all"
+			endpoint = "https://edastro.com/gec/json/rare"
 		} else {
 			if len(query) < 1 || len(query) > 128 || strings.ContainsAny(query, "\r\n\x00,") {
 				return nil, errors.New("Enter one bounded system name")
@@ -166,20 +175,19 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 		var a []map[string]any
 		dec := json.NewDecoder(strings.NewReader(string(raw)))
 		dec.UseNumber()
-		if dec.Decode(&a) != nil {
+		if dec.Decode(&a) != nil || dec.Decode(new(any)) != io.EOF {
 			return nil, errors.New("Unsupported GEC response")
 		}
-		l := Layers{Source: "EDAstro Galactic Exploration Catalog API — data provided for application use; no imagery copied", FetchedAt: snapshot.FetchedAt, ExpiresAt: now.Add(24 * time.Hour).UTC().Format(time.RFC3339)}
+		l := Layers{Source: "EDAstro GEC rare-POI subset — data provided for application use; no imagery copied", FetchedAt: snapshot.FetchedAt, ExpiresAt: now.Add(24 * time.Hour).UTC().Format(time.RFC3339)}
 		for _, o := range a {
 			if len(l.Points) >= 2048 {
 				l.Truncated = true
 				break
 			}
-			coords, ok := o["coords"].(map[string]any)
+			pos, ok := o["coordinates"].([]any)
 			if !ok {
 				continue
 			}
-			pos := []any{coords["x"], coords["y"], coords["z"]}
 			if !validPosition(pos) {
 				continue
 			}
@@ -187,6 +195,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 			for i, x := range pos {
 				p.Coordinates[i], _ = x.(json.Number).Float64()
 			}
+			p.SystemName = text(o["galMapSearch"])
 			p.Name = text(o["name"])
 			if p.Name == "" {
 				p.Name = text(o["galMapSearch"])
@@ -195,12 +204,14 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 				continue
 			}
 			p.Category = "poi"
-			if strings.Contains(strings.ToLower(fmt.Sprint(o["type"])), "nebula") {
+			if strings.Contains(strings.ToLower(text(o["type"])+" "+text(o["type2"])), "nebula") {
 				p.Category = "nebula"
 			}
-			p.Source = "EDAstro GEC"
+			p.Source = "EDAstro GEC rare subset"
 			l.Points = append(l.Points, p)
 		}
+		snapshot.Source = "edastro / gec (rare subset)"
+		snapshot.ExpiresAt = l.ExpiresAt
 		layers = &l
 		add("Cached GEC points", len(l.Points))
 		add("Truncated", l.Truncated)
@@ -239,6 +250,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 	s.snapshot = snapshot
 	s.lastSuccess = now.UTC().Format(time.RFC3339)
 	s.lastError = ""
+	s.noNewLast = false
 	if layers != nil {
 		m.layers = *layers
 	}

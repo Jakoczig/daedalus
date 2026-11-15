@@ -196,8 +196,8 @@ func TestG2HOAuthPKCEStateRedirectExpiryAndOneUse(t *testing.T) {
 func TestG2HReadSnapshotsAndGECRemainSupplemental(t *testing.T) {
 	m, _ := testManager(t, func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
-		case "/gec/json/all":
-			return reply(`[{"name":"Fixture Nebula","type":["nebula"],"coords":{"x":1,"y":2,"z":3},"secret":"PRIVATE"},{"name":"Invalid","coords":{"x":"1","y":2,"z":3}}]`, 200), nil
+		case "/gec/json/rare":
+			return reply(`[{"name":"Fixture Nebula","type":"Nebulae","coordinates":[1,2,3],"secret":"PRIVATE"},{"name":"Invalid","coordinates":["1",2,3]}]`, 200), nil
 		case "/api-logs-v1/get-logs":
 			return reply(`{"msgnum":100,"logs":[{"system":"Fixture","date":"2026-11-14 12:00:00","secret":"PRIVATE"}]}`, 200), nil
 		}
@@ -209,7 +209,7 @@ func TestG2HReadSnapshotsAndGECRemainSupplemental(t *testing.T) {
 	}
 	m.Configure("edastro", Config{Read: true})
 	v, err := m.Read(context.Background(), "edastro", "gec", "")
-	if err != nil || v.Source != "edastro / gec" {
+	if err != nil || v.Source != "edastro / gec (rare subset)" {
 		t.Fatal(err)
 	}
 	l := m.Layers()

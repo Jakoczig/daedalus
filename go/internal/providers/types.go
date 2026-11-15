@@ -58,20 +58,22 @@ type Capability struct {
 	Scopes          []string `json:"scopes"`
 }
 type Status struct {
-	Capability       Capability        `json:"capability"`
-	Config           Config            `json:"config"`
-	State            string            `json:"state"`
-	CredentialStored bool              `json:"credentialStored"`
-	Queue            int               `json:"queue"`
-	Sent             uint64            `json:"sent"`
-	Dropped          uint64            `json:"dropped"`
-	LastSuccess      string            `json:"lastSuccess"`
-	LastError        string            `json:"lastError"`
-	RetryAt          string            `json:"retryAt"`
-	Counts           map[string]uint64 `json:"counts"`
-	Snapshot         *Snapshot         `json:"snapshot,omitempty"`
+	NoNewObservations uint64            `json:"noNewObservations"`
+	Capability        Capability        `json:"capability"`
+	Config            Config            `json:"config"`
+	State             string            `json:"state"`
+	CredentialStored  bool              `json:"credentialStored"`
+	Queue             int               `json:"queue"`
+	Sent              uint64            `json:"sent"`
+	Dropped           uint64            `json:"dropped"`
+	LastSuccess       string            `json:"lastSuccess"`
+	LastError         string            `json:"lastError"`
+	RetryAt           string            `json:"retryAt"`
+	Counts            map[string]uint64 `json:"counts"`
+	Snapshot          *Snapshot         `json:"snapshot,omitempty"`
 }
 type Point struct {
+	SystemName  string     `json:"systemName,omitempty"`
 	Name        string     `json:"name"`
 	Coordinates [3]float64 `json:"coordinates"`
 	Category    string     `json:"category"`
@@ -112,6 +114,8 @@ type providerState struct {
 	cancel                 context.CancelFunc
 	next                   time.Time
 	sent, dropped          uint64
+	noNewObservations      uint64
+	noNewLast              bool
 	lastSuccess, lastError string
 	counts                 map[string]uint64
 	snapshot               *Snapshot

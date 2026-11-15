@@ -284,6 +284,9 @@ func (m *Manager) Status() []Status {
 		if s.lastSuccess != "" && (s.config.Read || s.config.Upload) && !s.config.Paused && m.cap(id).Gate == "" {
 			state = "last_request_succeeded"
 		}
+		if s.noNewLast && s.config.Upload && !s.config.Paused && m.cap(id).Gate == "" {
+			state = "no_new_observations"
+		}
 		if m.notice != "" {
 			state = "storage_warning"
 		}
@@ -304,7 +307,7 @@ func (m *Manager) Status() []Status {
 		if s.next.After(m.opts.Now()) {
 			retry = s.next.UTC().Format(time.RFC3339)
 		}
-		out = append(out, Status{Capability: m.cap(id), Config: cfg, State: state, CredentialStored: m.secrets[id].APIKey != "" || m.secrets[id].RefreshToken != "", Queue: len(s.queue), Sent: s.sent, Dropped: s.dropped, LastSuccess: s.lastSuccess, LastError: strings.TrimSpace(m.notice + " " + s.lastError), RetryAt: retry, Counts: counts, Snapshot: snapshot})
+		out = append(out, Status{Capability: m.cap(id), Config: cfg, State: state, CredentialStored: m.secrets[id].APIKey != "" || m.secrets[id].RefreshToken != "", Queue: len(s.queue), Sent: s.sent, NoNewObservations: s.noNewObservations, Dropped: s.dropped, LastSuccess: s.lastSuccess, LastError: strings.TrimSpace(m.notice + " " + s.lastError), RetryAt: retry, Counts: counts, Snapshot: snapshot})
 	}
 	return out
 }
@@ -508,6 +511,14 @@ func (m *Manager) dispatch(id string) {
 	if len(s.queue) > 0 && s.queue[0].key == q.key {
 		s.queue = s.queue[len(batch):]
 	}
+	// EDAstro's JSON status 401 means no new observations, not HTTP authentication failure.
+	if err == nil && status >= 200 && status < 300 && id == "edastro" && fmt.Sprint(object(raw)["status"]) == "401" {
+		s.noNewObservations += uint64(len(batch))
+		s.noNewLast = true
+		s.lastError = ""
+		return
+	}
+	s.noNewLast = false
 	if err == nil && status >= 200 && status < 300 && accepted(id, raw) {
 		for _, item := range batch {
 			s.sent++
