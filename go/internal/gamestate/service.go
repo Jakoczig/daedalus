@@ -59,6 +59,7 @@ type maintenanceRequest struct {
 	reply        chan error
 }
 type Service struct {
+	bioStatus          []byte
 	maintenance        chan maintenanceRequest
 	hasFreshLive       bool
 	activeSource       string
@@ -504,6 +505,9 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 	return nil
 }
 func (s *Service) applyEventLocked(event journal.Event, phase journal.Phase) {
+	if event.Type == "LoadGame" || event.Type == "Fileheader" || event.Type == "Shutdown" || event.Type == "FSDJump" || event.Type == "LeaveBody" {
+		s.bioStatus = nil
+	}
 	s.summary.EventsRead++
 	switch event.Type {
 	case "Fileheader":
