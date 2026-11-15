@@ -21,6 +21,8 @@ CREATE INDEX requests_provider_time ON provider_requests(provider,id DESC);
 CREATE INDEX station_coordinates ON station_reference(x,y,z);
 CREATE INDEX external_type_entity ON external_snapshots(provider,entity_type,entity_id,id DESC);`}
 
+func init() { migrations = append(migrations, fieldSchema) }
+
 func migrate(db *sql.DB, dir string) error {
 	var count int
 	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='schema_migrations'").Scan(&count); err != nil {
@@ -73,6 +75,11 @@ func migrate(db *sql.DB, dir string) error {
 			return err
 		}
 		if _, err = tx.Exec(migrations[version]); err == nil {
+			if version == 4 {
+				err = backfillFieldTally(tx)
+			}
+		}
+		if err == nil {
 			_, err = tx.Exec("INSERT INTO schema_migrations VALUES(?,?,?)", version+1, digest([]byte(migrations[version])), utc())
 		}
 		if err != nil {
