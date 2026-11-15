@@ -374,6 +374,11 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			return nil, err
 		}
 	}
+	if m.history != nil && id == "elitebgs" && kind == "ticks" {
+		if err := m.history.SaveFieldTicks(requestCtx, raw, now); err != nil {
+			return nil, err
+		}
+	}
 	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
 		encoded, _ := json.Marshal(snapshot)
 		expires, _ := time.Parse(time.RFC3339, snapshot.ExpiresAt)
