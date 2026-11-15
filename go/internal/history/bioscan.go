@@ -9,6 +9,8 @@ import (
 )
 
 type BioSample struct {
+	Event      int64              `json:"-"`
+	Session    string             `json:"-"`
 	Stage      string             `json:"stage"`
 	Genus      string             `json:"genus"`
 	Species    string             `json:"species"`
@@ -63,7 +65,7 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 		return out, e
 	}
 	scan := object([]byte(raw))
-	rows, e := s.reader.QueryContext(ctx, `SELECT e.raw_relevant_json,coalesce(e.event_utc,''),p.latitude,p.longitude,p.radius,p.status_at FROM journal_events e LEFT JOIN bio_positions p ON p.source_event=e.event_id WHERE e.commander_fid=? AND e.system_address=? AND e.type='ScanOrganic' AND cast(json_extract(e.raw_relevant_json,'$.Body') AS TEXT)=? ORDER BY e.event_id DESC LIMIT 24`, fid, system, body)
+	rows, e := s.reader.QueryContext(ctx, `SELECT e.raw_relevant_json,coalesce(e.event_utc,''),p.latitude,p.longitude,p.radius,p.status_at,coalesce(e.session_id,''),e.event_id FROM bio_samples b JOIN journal_events e ON e.event_id=b.source_event_id LEFT JOIN bio_positions p ON p.source_event=e.event_id WHERE b.commander_fid=? AND b.system_address=? AND b.entity_id=? ORDER BY b.source_event_id DESC LIMIT 24`, fid, system, body)
 	if e != nil {
 		return out, e
 	}
@@ -75,7 +77,7 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 		var raw string
 		var lat, lon, radius sql.NullFloat64
 		var at sql.NullString
-		if e = rows.Scan(&raw, &v.At, &lat, &lon, &radius, &at); e != nil {
+		if e = rows.Scan(&raw, &v.At, &lat, &lon, &radius, &at, &v.Session, &v.Event); e != nil {
 			return out, e
 		}
 		x := object([]byte(raw))
@@ -137,4 +139,17 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 	out["genera"] = genera
 	out["environment"] = scan
 	return out, nil
+}
+func (s *Store) ActiveOrganicEvent(fid, source string) int64 {
+	var event int64
+	var kind string
+	if e := s.reader.QueryRow("SELECT event_id,type FROM journal_events WHERE commander_fid=? AND source_id=? AND type IN ('ScanOrganic','ApproachBody','LeaveBody','FSDJump','LoadGame','Shutdown') ORDER BY event_id DESC LIMIT 1", fid, source).Scan(&event, &kind); e != nil || kind != "ScanOrganic" {
+		return 0
+	}
+	return event
+}
+func (s *Store) BioSession(fid, source string) string {
+	var session string
+	_ = s.reader.QueryRow("SELECT coalesce(context_session,'') FROM journal_sources WHERE source_id=? AND context_fid=? AND state='verified'", source, fid).Scan(&session)
+	return session
 }
