@@ -428,7 +428,7 @@ func fieldTally(tx *sql.Tx, id int64, fid, system, kind, stamp string, v map[str
 func backfillFieldTally(tx *sql.Tx) error {
 	var cursor int64
 	for {
-		rows, e := tx.Query("SELECT event_id,commander_fid,coalesce(system_address,''),type,coalesce(event_utc,''),raw_relevant_json FROM journal_events WHERE event_id>? AND commander_fid IS NOT NULL AND (type IN ('MissionCompleted','MissionFailed','MissionAbandoned','MarketBuy','MarketSell','Bounty','RedeemVoucher','FactionKillBond','ColonisationContribution') OR type LIKE 'Powerplay%') ORDER BY event_id LIMIT 256", cursor)
+		rows, e := tx.Query("SELECT event_id,commander_fid,coalesce(system_address,''),type,coalesce(event_utc,''),raw_relevant_json FROM journal_events WHERE event_id>? AND commander_fid IS NOT NULL AND (type IN ('MissionCompleted','MissionFailed','MissionAbandoned','MarketBuy','MarketSell','Bounty','RedeemVoucher','FactionKillBond','ColonisationContribution','ScanOrganic') OR type LIKE 'Powerplay%') ORDER BY event_id LIMIT 256", cursor)
 		if e != nil {
 			return e
 		}
@@ -454,6 +454,12 @@ func backfillFieldTally(tx *sql.Tx) error {
 			return nil
 		}
 		for _, x := range batch {
+			if x.kind == "ScanOrganic" {
+				if _, e = tx.Exec("UPDATE bio_samples SET entity_id=? WHERE source_event_id=? AND (entity_id IS NULL OR entity_id='')", identifier(object([]byte(x.raw))["Body"]), x.id); e != nil {
+					return e
+				}
+			}
+
 			if e = fieldTally(tx, x.id, x.fid, x.sys, x.kind, x.at, object([]byte(x.raw))); e != nil {
 				return e
 			}
