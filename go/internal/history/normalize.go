@@ -81,7 +81,7 @@ func relevant(kind string) bool {
 		return true
 	}
 	switch kind {
-	case "Fileheader", "LoadGame", "Commander", "Shutdown", "Location", "FSDJump", "CarrierJump", "Docked", "Undocked", "StartJump", "Loadout", "SetUserShipName", "ShipyardBuy", "ShipyardSell", "ShipyardSwap", "ShipyardTransfer", "ModuleBuy", "ModuleSell", "ModuleSwap", "NavRoute", "NavRouteClear", "FSDTarget", "Rank", "Progress", "Reputation", "EngineerProgress", "Died", "SupercruiseEntry", "SupercruiseExit", "ApproachBody", "LeaveBody", "Touchdown", "Liftoff", "FuelScoop", "ReservoirReplenished", "HullDamage", "HeatDamage", "ReceiveText", "CarrierStats", "CarrierJumpRequest":
+	case "Market", "Shipyard", "Outfitting", "Fileheader", "LoadGame", "Commander", "Shutdown", "Location", "FSDJump", "CarrierJump", "Docked", "Undocked", "StartJump", "Loadout", "SetUserShipName", "ShipyardBuy", "ShipyardSell", "ShipyardSwap", "ShipyardTransfer", "ModuleBuy", "ModuleSell", "ModuleSwap", "NavRoute", "NavRouteClear", "FSDTarget", "Rank", "Progress", "Reputation", "EngineerProgress", "Died", "SupercruiseEntry", "SupercruiseExit", "ApproachBody", "LeaveBody", "Touchdown", "Liftoff", "FuelScoop", "ReservoirReplenished", "HullDamage", "HeatDamage", "ReceiveText", "CarrierStats", "CarrierJumpRequest":
 		return kind != "ReceiveText"
 	}
 	return false
@@ -114,7 +114,7 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) e
 			fid = sql.NullString{String: e.FID, Valid: true}
 			session = sql.NullString{String: fmt.Sprintf("%s:%d", source, e.Position.Offset), Valid: true}
 			system = sql.NullString{}
-			if _, err := tx.Exec("INSERT INTO commander VALUES(?,?,?) ON CONFLICT(fid) DO UPDATE SET latest_name=excluded.latest_name,updated_at=excluded.updated_at", e.FID, text(v["Commander"]), stamp); err != nil {
+			if _, err := tx.Exec("INSERT INTO commander VALUES(?,?,?) ON CONFLICT(fid) DO UPDATE SET latest_name=excluded.latest_name,updated_at=excluded.updated_at WHERE excluded.updated_at>=coalesce(commander.updated_at,'')", e.FID, text(v["Commander"]), stamp); err != nil {
 				return err
 			}
 			if _, err := tx.Exec("INSERT OR IGNORE INTO commander_names VALUES(?,?,?,NULL)", e.FID, text(v["Commander"]), stamp); err != nil {
@@ -177,6 +177,31 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) e
 				return err
 			}
 		}
+		facts := map[string]any{}
+		switch e.Type {
+		case "LoadGame":
+			facts["name"] = text(v["Commander"])
+			if n, ok := v["Credits"].(json.Number); ok {
+				facts["credits"] = string(n)
+			}
+		case "Rank", "Progress":
+			facts["ranks"] = v
+		case "SquadronStartup", "JoinedSquadron":
+			facts["squadron"] = v
+		case "CommunityGoal":
+			facts["communityGoals"] = v
+		}
+		for field, value := range facts {
+			raw, _ := json.Marshal(value)
+			if _, err = tx.Exec("INSERT INTO field_provenance(entity,field,commander_fid,source,source_ref,observed_at,fetched_at,confidence,stale,value_json) VALUES('commander',?,?,'journal',?,?,?,'witnessed local event',0,?)", field, fid.String, strconv.FormatInt(eventID, 10), stamp, utc(), string(raw)); err != nil {
+				return err
+			}
+		}
+		if e.Type == "SellExplorationData" || e.Type == "MultiSellExplorationData" || e.Type == "SellOrganicData" {
+			if err = linkSale(tx, fid.String, eventID, e.Type, stamp, v); err != nil {
+				return err
+			}
+		}
 		if e.Type == "Shutdown" && session.Valid {
 			if _, err = tx.Exec("UPDATE game_sessions SET end_utc=? WHERE session_id=?", stamp, session.String); err != nil {
 				return err
@@ -233,7 +258,7 @@ func normalizeLoadout(tx *sql.Tx, fid string, eventID int64, stamp string, v map
 	if ship == "" {
 		return nil
 	}
-	_, err := tx.Exec("INSERT INTO ship_instances VALUES(?,?,?,?,?,?,?) ON CONFLICT(commander_fid,ship_id) DO UPDATE SET model=excluded.model,custom_name=excluded.custom_name,last_seen=excluded.last_seen", fid, ship, text(v["Ship"]), text(v["ShipName"]), "witnessed", nil, stamp)
+	_, err := tx.Exec("INSERT INTO ship_instances VALUES(?,?,?,?,?,?,?) ON CONFLICT(commander_fid,ship_id) DO UPDATE SET model=excluded.model,custom_name=excluded.custom_name,last_seen=excluded.last_seen WHERE excluded.last_seen>=coalesce(ship_instances.last_seen,'')", fid, ship, text(v["Ship"]), text(v["ShipName"]), "witnessed", nil, stamp)
 	if err != nil {
 		return err
 	}

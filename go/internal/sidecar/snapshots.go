@@ -16,7 +16,10 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 )
 
-type Options struct{ MaxBytes int }
+type Options struct {
+	MaxBytes    int
+	StationData bool
+}
 type Change struct {
 	Kind      string
 	Timestamp time.Time
@@ -25,12 +28,13 @@ type Change struct {
 	State     string
 }
 type Reader struct {
-	dir    string
-	limit  int
-	mu     sync.Mutex
-	good   map[string]Change
-	hashes map[string][32]byte
-	states map[string]string
+	stationData bool
+	dir         string
+	limit       int
+	mu          sync.Mutex
+	good        map[string]Change
+	hashes      map[string][32]byte
+	states      map[string]string
 }
 
 func NewReader(dir string, opts Options) (*Reader, error) {
@@ -43,7 +47,7 @@ func NewReader(dir string, opts Options) (*Reader, error) {
 	if opts.MaxBytes < 1 || opts.MaxBytes > 4<<20 {
 		return nil, errors.New("invalid sidecar limit")
 	}
-	return &Reader{dir: dir, limit: opts.MaxBytes, good: map[string]Change{}, hashes: map[string][32]byte{}, states: map[string]string{}}, nil
+	return &Reader{stationData: opts.StationData, dir: dir, limit: opts.MaxBytes, good: map[string]Change{}, hashes: map[string][32]byte{}, states: map[string]string{}}, nil
 }
 func clone(c Change) Change { c.Raw = append(json.RawMessage(nil), c.Raw...); return c }
 func (r *Reader) LastGood(kind string) Change {
@@ -55,7 +59,11 @@ func (r *Reader) Poll(ctx context.Context) ([]Change, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var changes []Change
-	for _, kind := range []string{"Status", "Cargo", "Materials", "NavRoute"} {
+	kinds := []string{"Status", "Cargo", "Materials", "NavRoute"}
+	if r.stationData {
+		kinds = append(kinds, "Market", "Shipyard", "Outfitting")
+	}
+	for _, kind := range kinds {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}

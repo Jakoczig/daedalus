@@ -31,6 +31,8 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
+	ProviderSidecar func(sidecar.Change)
+	OnHistoryReady  func(*history.Store, history.ProviderSeed)
 	StorageDir      string
 	ProviderRestore func(string, string)
 	ProviderEvent   func(journal.Event, journal.Phase)
@@ -52,7 +54,12 @@ type selection struct {
 	directory string
 	reply     chan error
 }
+type maintenanceRequest struct {
+	kind, source string
+	reply        chan error
+}
 type Service struct {
+	maintenance        chan maintenanceRequest
 	hasFreshLive       bool
 	activeSource       string
 	store              *history.Store
@@ -86,7 +93,7 @@ func NewService(opts Options) (*Service, error) {
 	if opts.StorageDir != "" {
 		initialStage = "RESTORING_CACHE"
 	}
-	return &Service{navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{Stage: initialStage, SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
+	return &Service{maintenance: make(chan maintenanceRequest), navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{Stage: initialStage, SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
 }
 func (s *Service) Snapshot() Summary { s.mu.Lock(); defer s.mu.Unlock(); return s.summary }
 func (s *Service) Details() SourceDetails {
@@ -178,6 +185,18 @@ func (s *Service) Run(ctx context.Context) error {
 	if !s.running.CompareAndSwap(false, true) {
 		return errors.New("journal service already running")
 	}
+	defer func() {
+		s.mu.Lock()
+		s.closed = true
+		s.closeProjectionsLocked()
+		s.summary.SourceState = "stopped"
+		for ch := range s.subscribers {
+			delete(s.subscribers, ch)
+			close(ch)
+		}
+		s.mu.Unlock()
+		close(s.done)
+	}()
 	var reader *journal.Reader
 	var snapshots *sidecar.Reader
 	var stop context.CancelFunc
@@ -192,6 +211,13 @@ func (s *Service) Run(ctx context.Context) error {
 		s.details.ActiveReaders = 0
 		s.mu.Unlock()
 	}
+	defer func() {
+		if s.store != nil {
+			_ = s.store.Close()
+		}
+	}()
+	defer stopReader()
+
 	if s.opts.StorageDir != "" {
 		db, err := history.Open(s.opts.StorageDir)
 		if err == nil {
@@ -207,7 +233,12 @@ func (s *Service) Run(ctx context.Context) error {
 					s.restored = true
 					s.summary.Cached = true
 					s.summary.Stage = "CATCHING_UP"
+					savedSummary := s.summary
+					s.summary.ImportInProgress = false
+					s.summary.SourceState = "live"
 					v := s.projectionLocked()
+					s.summary = savedSummary
+					v.Source = savedSummary
 					s.cachedProjection = &v
 				}
 				s.mu.Unlock()
@@ -215,9 +246,7 @@ func (s *Service) Run(ctx context.Context) error {
 			err = e
 		}
 		if err != nil {
-			if db != nil {
-				defer db.Close()
-			}
+
 			s.mu.Lock()
 			s.databaseError = "Database could not be verified. Original files retained; use Data/History recovery."
 			s.details.Error = s.databaseError
@@ -226,8 +255,15 @@ func (s *Service) Run(ctx context.Context) error {
 			s.summary.ImportInProgress = false
 			s.publishLocked()
 			s.mu.Unlock()
-			for {
+			for err != nil {
 				select {
+				case request := <-s.maintenance:
+					if s.store == nil {
+						request.reply <- errors.New("A verified database is required; restore a backup and restart")
+						continue
+					}
+					err = s.rebuildDerived(ctx)
+					request.reply <- err
 				case <-ctx.Done():
 					return nil
 				case request := <-s.selectSource:
@@ -235,22 +271,14 @@ func (s *Service) Run(ctx context.Context) error {
 				}
 			}
 		}
-		defer db.Close()
+		if s.opts.OnHistoryReady != nil {
+			seed, e := db.ProviderSeed(s.activeSource)
+			if e == nil {
+				s.opts.OnHistoryReady(db, seed)
+			}
+		}
 	}
 
-	defer func() {
-		stopReader()
-		s.mu.Lock()
-		s.closed = true
-		s.closeProjectionsLocked()
-		s.summary.SourceState = "stopped"
-		for ch := range s.subscribers {
-			delete(s.subscribers, ch)
-			close(ch)
-		}
-		s.mu.Unlock()
-		close(s.done)
-	}()
 	opts := s.opts
 	directory := ""
 	found := false
@@ -297,7 +325,7 @@ func (s *Service) Run(ctx context.Context) error {
 					durable = s
 				}
 				reader, _ = journal.NewReader(directory, journal.ReaderOptions{PollInterval: opts.PollInterval, Durable: durable})
-				snapshots, _ = sidecar.NewReader(directory, sidecar.Options{})
+				snapshots, _ = sidecar.NewReader(directory, sidecar.Options{StationData: s.store != nil})
 				if reader != nil {
 					readerCtx, cancel := context.WithCancel(ctx)
 					stop = cancel
@@ -342,6 +370,23 @@ func (s *Service) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case request := <-s.maintenance:
+			if s.store == nil {
+				request.reply <- errors.New("Database unavailable")
+				continue
+			}
+			stopReader()
+			var err error
+			if request.kind == "reimport" {
+				err = s.store.ReimportSource(request.source)
+			}
+			if err == nil {
+				err = s.rebuildDerived(ctx)
+			}
+			if err == nil {
+				configure(true)
+			}
+			request.reply <- err
 		case cmd := <-s.selectSource:
 			opts.Directory = cmd.directory
 			opts.ConfigError = ""
@@ -357,6 +402,9 @@ func (s *Service) Run(ctx context.Context) error {
 				for _, change := range changes {
 					s.details.Sidecars[change.Kind] = change.State
 					s.sidecarProjectionLocked(change)
+					if s.opts.ProviderSidecar != nil {
+						s.opts.ProviderSidecar(change)
+					}
 				}
 				s.mu.Unlock()
 			}

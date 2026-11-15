@@ -48,7 +48,7 @@ export default function GoJournalStatus ({ stage, connected, ready, role, sendEv
   return (
     <section aria-label='Journal status' style={{ padding: '1rem', border: '1px solid currentColor', position: 'relative', zIndex: 20, background: 'var(--color-background, #100d12)' }}>
       <h2>Current system — local journal preview</h2>
-      <p role='status'>{status}</p>
+      <p role='status'>{summary?.stage ? `${summary.stage.replaceAll('_', ' ')} · ${summary.cached ? 'Last-known cached observations; awaiting fresh journal evidence.' : status}` : status}</p>
       {connected && ready && summary?.currentSystem && <p>Current / last known system: <strong>{summary.currentSystem}</strong></p>}
       {connected && ready && summary && <p>Events read: {summary.eventsRead || 0}. Last safe event: {summary.lastEventType || 'none'} {summary.lastEventAt && <time dateTime={summary.lastEventAt}>{summary.lastEventAt}</time>}</p>}
       <p>{stage === 'G2C' ? 'No provider uploads. Local routes, system maps, body details and confirmed biology are supported. Other ship, engineering and provider features remain unfinished.' : stage === 'G2B' ? 'No provider uploads. The navigation route and current-system survey are journal-only. Other ship, engineering and exploration features remain unfinished.' : ['G2D', 'G2E', 'G2F', 'G2G', 'G2H', 'G2I'].includes(stage) ? 'Native navigation, exploration, ship and engineering views use the local journal. New provider uploads are OFF by default and require separate consent; some advanced calculations remain unavailable.' : 'No provider uploads. Exploration, ship and engineering features remain unimplemented; keep the separate legacy app for those workflows.'}</p>

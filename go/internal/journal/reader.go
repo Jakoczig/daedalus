@@ -249,7 +249,9 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 				}
 				return errors.New("journal source changed; private history retained for recovery")
 			}
+			source.ID = saved.Source.ID
 			c = &cursor{id: source.ID, offset: saved.Offset, sequence: saved.Sequence, discard: saved.Discard, replayUntil: info.Size()}
+			if r.started && saved.Offset==0 {c.replayUntil=0}
 			r.cursors[name] = c
 			reset = false
 		} else if reset {
@@ -258,6 +260,9 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			}
 			return errors.New("journal source changed; private history retained for recovery")
 		}
+	}
+	if r.opts.Durable != nil && c != nil {
+		source.ID = c.id
 	}
 	if reset {
 		r.serial++

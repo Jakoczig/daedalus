@@ -136,7 +136,7 @@ func TestMigrationBacksUpBeforeChangingSchema(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer s.Close()
-	if s.Stats().Schema != 2 {
+	if s.Stats().Schema != schemaVersion {
 		t.Fatal("migration not applied")
 	}
 	paths, _ := filepath.Glob(filepath.Join(dir, "backups", "pre-migration-v1-*.sqlite"))

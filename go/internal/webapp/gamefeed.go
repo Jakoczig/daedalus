@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/Jakoczig/daedalus/go/internal/gamestate"
+	"github.com/Jakoczig/daedalus/go/internal/history"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"github.com/Jakoczig/daedalus/go/internal/providers"
+	"github.com/Jakoczig/daedalus/go/internal/sidecar"
 )
 
 type Options struct {
@@ -49,7 +51,22 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	s.g2d = opts.EnableDashboard && s.g2c
 	s.g2e = opts.EnableParity && s.g2d
 	s.navigationSmoke = opts.NavigationSmoke && s.g2b
-	s.game, _ = gamestate.NewService(gamestate.Options{ProviderEvent: func(e journal.Event, p journal.Phase) {
+	persistentDir := ""
+	if s.g2e {
+		persistentDir = opts.StorageDir
+	}
+	s.game, _ = gamestate.NewService(gamestate.Options{StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
+		if s.providers != nil {
+			_ = s.providers.AttachHistory(db, seed)
+		}
+		if s.community != nil {
+			_ = s.community.AttachHistory(db)
+		}
+	}, ProviderSidecar: func(c sidecar.Change) {
+		if s.providers != nil {
+			s.providers.ObserveSidecar(c)
+		}
+	}, ProviderEvent: func(e journal.Event, p journal.Phase) {
 		if s.providers != nil {
 			s.providers.Observe(e, p)
 		}

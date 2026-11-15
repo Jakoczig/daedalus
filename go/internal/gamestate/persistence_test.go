@@ -6,6 +6,7 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"os"
 	"path/filepath"
+ "runtime"
 	"testing"
 	"time"
 )
@@ -30,6 +31,18 @@ func durableService(t *testing.T, profile, dir string) (*Service, func()) {
 			t.Fatal("persistent service did not stop")
 		}
 	}
+}
+func TestG2JGameLaunchAfterEmptyStartupBecomesFreshLive(t *testing.T) {
+	dir, profile := t.TempDir(), t.TempDir()
+	s, stop := durableService(t, profile, dir)
+	defer stop()
+	waitState(t, s, func(v Summary) bool { return !v.ImportInProgress && v.Stage == "WAITING_FOR_GAME" })
+	stamp := time.Now().UTC().Add(time.Millisecond).Format(time.RFC3339Nano)
+	raw := fmt.Sprintf("{\"event\":\"Fileheader\",\"timestamp\":%q,\"gameversion\":\"4.0\"}\n{\"event\":\"LoadGame\",\"timestamp\":%q,\"FID\":\"SYNTHETIC\"}\n{\"event\":\"Location\",\"timestamp\":%q,\"StarSystem\":\"Fixture Fresh\",\"SystemAddress\":9007199254740993}\n", stamp, stamp, stamp)
+	if err := os.WriteFile(filepath.Join(dir, "Journal.20261115.01.log"), []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, s, func(v Summary) bool { return v.CurrentSystem == "Fixture Fresh" && v.Stage == "LIVE" && !v.Cached })
 }
 func TestG2JDurableRestartAndCatchup(t *testing.T) {
 	dir, profile := t.TempDir(), t.TempDir()
@@ -87,6 +100,7 @@ func BenchmarkG2JLifecycle(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		profile := b.TempDir()
+ if os.Getenv("G2J_BASELINE")=="1" {profile=""}
 		f, e := os.Create(filepath.Join(dir, "Journal.20260101.01.log"))
 		if e != nil {
 			b.Fatal(e)
@@ -94,7 +108,9 @@ func BenchmarkG2JLifecycle(b *testing.B) {
 		for j := 0; j < 100000; j++ {
 			if j%50000 == 0 {
 				fmt.Fprintf(f, "{\"event\":\"LoadGame\",\"FID\":\"SYNTHETIC-%d\",\"timestamp\":\"2026-01-01T00:00:00Z\"}\n", j/50000)
-			} else {
+            } else if j%50000==1 {
+                fmt.Fprintf(f,"{\"event\":\"Location\",\"timestamp\":\"2026-01-01T00:00:01Z\",\"StarSystem\":\"Fixture %d\",\"SystemAddress\":%d}\n",j/50000,uint64(9007199254740993)+uint64(j/50000))
+            } else {
 				fmt.Fprintf(f, "{\"event\":\"MaterialCollected\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"Name\":\"iron\",\"Category\":\"Raw\",\"Count\":1}\n")
 			}
 		}
@@ -136,8 +152,19 @@ func BenchmarkG2JLifecycle(b *testing.B) {
 		}
 		b.ReportMetric(float64(time.Since(warmStarted).Microseconds())/1000, "warm-ms")
 		b.ReportMetric(float64(warm.Details().ReaderBytes), "warm-journal-bytes")
-		warmCancel()
-		<-warmDone
+        warmCancel();<-warmDone
+        f,e=os.OpenFile(filepath.Join(dir,"Journal.20260101.01.log"),os.O_APPEND|os.O_WRONLY,0600);if e!=nil{b.Fatal(e)}
+        for j:=0;j<1000;j++ {fmt.Fprintln(f,`{"event":"MaterialCollected","timestamp":"2026-01-08T00:00:00Z","Name":"iron","Category":"Raw","Count":1}`)};f.Close()
+        catchup,_:=NewService(Options{StorageDir:profile,Directory:dir,EnableParity:true,PollInterval:time.Millisecond})
+        catchCtx,catchCancel:=context.WithCancel(context.Background());catchDone:=make(chan struct{});catchStarted:=time.Now();go func(){catchup.Run(catchCtx);close(catchDone)}()
+        cacheAt:=time.Duration(0)
+        deadline:=time.Now().Add(2*time.Minute)
+        for {v:=catchup.Snapshot();if v.Stage=="DB_ERROR"||time.Now().After(deadline){catchCancel();b.Fatal(v)};if cacheAt==0&&v.Cached&&v.CurrentSystem!=""{cacheAt=time.Since(catchStarted)};if !v.ImportInProgress&&v.EventsRead==101000{break};time.Sleep(time.Millisecond)}
+        b.ReportMetric(float64(time.Since(catchStarted).Microseconds())/1000,"catchup-1000-ms")
+        b.ReportMetric(float64(cacheAt.Microseconds())/1000,"cached-view-ms")
+        b.ReportMetric(float64(catchup.Details().ReaderBytes),"catchup-journal-bytes")
+        catchCancel();<-catchDone
+        var memory runtime.MemStats;runtime.ReadMemStats(&memory);b.ReportMetric(float64(memory.HeapInuse),"Go-heap-inuse-bytes");b.ReportMetric(float64(peakRSS()),"process-peak-RSS-bytes")
 
 	}
 }

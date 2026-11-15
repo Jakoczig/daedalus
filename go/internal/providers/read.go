@@ -20,11 +20,19 @@ func (m *Manager) Layers() Layers {
 	v.Points = slices.Clone(v.Points)
 	return v
 }
-func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, error) {
+func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int) (*Snapshot, error) {
+	page := 1
+	if len(pages) > 0 {
+		page = pages[0]
+	}
+	if page < 1 || page > 10 {
+		return nil, errors.New("Page must be 1 through 10")
+	}
+	cacheKey := fmt.Sprintf("%s/%s/%d", kind, query, page)
 	m.mu.Lock()
 	s := m.states[id]
 	cap := m.cap(id)
-	if m.closed || s == nil || !s.config.Read || s.config.Paused || cap.Gate != "" || !slices.Contains(cap.Read, kind) {
+	if m.closed || (m.opts.RequireHistory && m.history == nil) || s == nil || !s.config.Read || s.config.Paused || cap.Gate != "" || !slices.Contains(cap.Read, kind) {
 		m.mu.Unlock()
 		return nil, errors.New("Provider read consent/approval required")
 	}
@@ -36,9 +44,34 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 			return cached, nil
 		}
 	}
+	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven") && m.history != nil {
+		raw, err := m.history.CachedReference(id, cacheKey, m.opts.Now())
+		if err != nil {
+			m.mu.Unlock()
+			return nil, err
+		}
+		if len(raw) > 0 {
+			var v Snapshot
+			if json.Unmarshal(raw, &v) == nil {
+				s.snapshot = &v
+				m.mu.Unlock()
+				return &v, nil
+			}
+		}
+	}
+	if id == "inara" && kind == "communitygoals" && !s.config.CommunityGoals {
+		m.mu.Unlock()
+		return nil, errors.New("Separate public community-goals read consent required")
+	}
 	if s.busy || m.opts.Now().Before(s.next) {
 		m.mu.Unlock()
 		return nil, errors.New("Provider cooldown active")
+	}
+	if m.history != nil {
+		if err := m.history.AuthorizeRead(id, kind, m.opts.Now()); err != nil {
+			m.mu.Unlock()
+			return nil, err
+		}
 	}
 	s.busy = true
 	s.next = m.opts.Now().Add(time.Minute)
@@ -46,7 +79,11 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 	providerCtx := s.ctx
 	cred := m.secrets[id]
 	now := m.opts.Now()
-	identity, commander := m.identity, m.name
+	identity, commander, fid := m.identity, m.name, m.fid
+	if id == "inara" && m.history != nil && kind == "profile" && !m.history.NeedsInara(ctx, fid, "commander", []string{"name", "ranks", "squadron"}, now) {
+		m.mu.Unlock()
+		return nil, errors.New("Local and Frontier facts are current; Inara gap read not needed")
+	}
 	m.mu.Unlock()
 	requestCtx, cancel := context.WithTimeout(providerCtx, 8*time.Second)
 	defer cancel()
@@ -59,6 +96,18 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 	var body []byte
 	bearer := ""
 	switch id {
+	case "elitebgs", "raven", "canonn":
+		var err error
+		endpoint, err = communityEndpoint(id, kind, query, page)
+		if err != nil {
+			return nil, err
+		}
+	case "spansh":
+		var err error
+		endpoint, err = referenceEndpoint(id, kind, query)
+		if err != nil {
+			return nil, err
+		}
 	case "edsm":
 		if cred.APIKey == "" || cred.Commander == "" {
 			return nil, errors.New("Store EDSM account/key first")
@@ -77,7 +126,15 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 		if app == "" {
 			app = InaraApplicationName
 		}
-		body, _ = json.Marshal(map[string]any{"header": map[string]any{"appName": app, "appVersion": version, "isBeingDeveloped": true, "APIkey": cred.APIKey}, "events": []any{map[string]any{"eventName": "getCommanderProfile", "eventTimestamp": now.UTC().Format(time.RFC3339), "eventData": map[string]any{}}}})
+		eventName := "getCommanderProfile"
+		var eventData any = map[string]any{"searchName": commander}
+		if kind == "communitygoals" {
+			eventName = "getCommunityGoalsRecent"
+			eventData = []any{}
+		} else if commander == "" {
+			return nil, errors.New("Verified local commander name required for profile lookup")
+		}
+		body, _ = json.Marshal(map[string]any{"header": map[string]any{"appName": app, "appVersion": version, "isBeingDeveloped": true, "APIkey": cred.APIKey}, "events": []any{map[string]any{"eventName": eventName, "eventTimestamp": now.UTC().Format(time.RFC3339), "eventData": eventData}}})
 	case "edastro":
 		if kind == "gec" {
 			endpoint = "https://edastro.com/gec/json/rare"
@@ -117,6 +174,24 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 		return nil, errors.New("Provider did not authorize or return the requested data")
 	}
 	snapshot := &Snapshot{Source: id + " / " + kind, FetchedAt: now.UTC().Format(time.RFC3339), ExpiresAt: now.Add(5 * time.Minute).UTC().Format(time.RFC3339), Facts: []Fact{}}
+	if id == "spansh" {
+		parsed, err := normalizeSpansh(kind, query, raw)
+		if err != nil {
+			return nil, err
+		}
+		parsed.FetchedAt = snapshot.FetchedAt
+		parsed.ExpiresAt = now.Add(6 * time.Hour).UTC().Format(time.RFC3339)
+		snapshot = parsed
+	}
+	if id == "elitebgs" || id == "canonn" || id == "raven" {
+		parsed, err := normalizeCommunity(id, kind, query, raw)
+		if err != nil {
+			return nil, err
+		}
+		parsed.FetchedAt = snapshot.FetchedAt
+		parsed.ExpiresAt = now.Add(time.Hour).UTC().Format(time.RFC3339)
+		snapshot = parsed
+	}
 	add := func(name string, value any) {
 		if value == nil || len(snapshot.Facts) >= 100 {
 			return
@@ -133,7 +208,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 		snapshot.Facts = append(snapshot.Facts, Fact{Name: name, Value: s})
 	}
 	data := object(raw)
-	if data == nil && !(id == "edastro" && kind == "gec") {
+	if data == nil && !(id == "edastro" && kind == "gec") && id != "canonn" && id != "raven" && !(id == "elitebgs" && kind == "ticks") {
 		return nil, errors.New("Unsupported or oversized provider response")
 	}
 	if (id == "edsm" || id == "inara") && identity != "" && commander != "" && cred.Commander == commander {
@@ -153,7 +228,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 			}
 		}
 	}
-	if id == "inara" {
+	if id == "inara" && kind == "profile" {
 		if a, ok := data["events"].([]any); ok && len(a) > 0 {
 			if v, ok := a[0].(map[string]any); ok {
 				if d, ok := v["eventData"].(map[string]any); ok {
@@ -167,6 +242,23 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 						}
 					}
 				}
+			}
+		}
+	}
+	if id == "inara" && kind == "communitygoals" {
+		events, _ := data["events"].([]any)
+		if len(events) != 1 {
+			return nil, errors.New("Expected one public goals response")
+		}
+		event, _ := events[0].(map[string]any)
+		goals, ok := event["eventData"].([]any)
+		if !ok || len(goals) > 32 {
+			return nil, errors.New("Unsupported public goals response")
+		}
+		for _, item := range goals {
+			g, _ := item.(map[string]any)
+			for _, k := range []string{"communitygoalName", "starsystemName", "stationName", "goalExpiry", "tierReached", "tierMax", "contributorsNum", "contributionsTotal", "isCompleted", "lastUpdate"} {
+				add(k, g[k])
 			}
 		}
 	}
@@ -246,6 +338,27 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string) (*Snapshot, 
 	defer m.mu.Unlock()
 	if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
 		return nil, errors.New("Read consent was revoked")
+	}
+	if m.history != nil && kind == "profile" {
+		if err := m.persistCommanderRead(requestCtx, id, kind, fid, commander, data, now); err != nil {
+			return nil, err
+		}
+	}
+	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven") && m.history != nil {
+		encoded, _ := json.Marshal(snapshot)
+		expires, _ := time.Parse(time.RFC3339, snapshot.ExpiresAt)
+		if err := m.history.SaveReference(requestCtx, id, cacheKey, encoded, now, expires); err != nil {
+			return nil, err
+		}
+		if id == "spansh" && kind == "station" {
+			station, err := spanshStation(raw, snapshot)
+			if err != nil {
+				return nil, err
+			}
+			if err = m.history.SaveStation(station); err != nil {
+				return nil, err
+			}
+		}
 	}
 	s.snapshot = snapshot
 	s.lastSuccess = now.UTC().Format(time.RFC3339)

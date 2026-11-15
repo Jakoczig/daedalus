@@ -100,7 +100,14 @@ func (s *Service) CommitRecords(records []journal.Record, cp journal.Checkpoint)
 			if r.Event.Type == "LoadGame" && !r.Event.Timestamp.IsZero() {
 				last, _ := time.Parse(time.RFC3339Nano, s.summary.LastEventAt)
 				if !r.Event.Timestamp.Before(last) {
-					applyRecords = records[i:]
+					header := i
+					for j := i - 1; j >= 0; j-- {
+						if records[j].Event.Type == "Fileheader" {
+							header = j
+							break
+						}
+					}
+					applyRecords = records[header:]
 					break
 				}
 			}

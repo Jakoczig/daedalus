@@ -94,12 +94,19 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 		}
 		server.remote = manager
 		if opts.EnableParity {
+			opts.ProviderOptions.RequireHistory = opts.EnableJournal
 			server.providers = providers.New(ctx, dir, opts.ProviderOptions)
+			if opts.CommunityClient == nil {
+				opts.CommunityClient = server.providers.PublicReadClient()
+			}
+			server.community = community.New(dir, opts.CommunityClient)
+			if opts.EnableJournal {
+				server.community.RequireHistory()
+			}
 			server.openAuthorization = opts.OpenAuthorization
 		}
 		server.startGame(ctx, opts)
 		if server.g2e {
-			server.community = community.New(dir, opts.CommunityClient)
 			server.initCompanion(opts)
 		}
 		manager.mu.Lock()

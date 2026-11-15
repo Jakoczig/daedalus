@@ -62,7 +62,7 @@ func StageRecovery(ctx context.Context, dir, source string) error {
 		return err
 	}
 	pending.SetMaxOpenConns(1)
-	_, err = pending.Exec(`BEGIN IMMEDIATE; UPDATE publication_policy SET mode='Never'; UPDATE provider_consent SET config_json=json_set(config_json,'$.upload',json('false'),'$.paused',json('true')); UPDATE publication_candidates SET status='held',reason='Restored backup requires renewed consent' WHERE status IN ('eligible','queued'); COMMIT;`)
+	_, err = pending.Exec(`BEGIN IMMEDIATE; UPDATE publication_policy SET mode='Never'; DELETE FROM publication_exceptions; UPDATE provider_consent SET config_json=json_set(config_json,'$.upload',json('false'),'$.paused',json('true')); UPDATE publication_candidates SET status='held',reason='Restored backup requires renewed consent' WHERE status IN ('eligible','queued'); COMMIT;`)
 	if err != nil {
 		pending.Close()
 		return err

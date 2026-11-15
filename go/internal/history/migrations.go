@@ -15,7 +15,8 @@ CREATE INDEX events_commander_type_id ON journal_events(commander_fid,type,event
 CREATE TABLE derived_statistics(loadout_hash TEXT NOT NULL,formula_version TEXT NOT NULL,result_json TEXT NOT NULL,computed_at TEXT NOT NULL,PRIMARY KEY(loadout_hash,formula_version));
 CREATE TABLE reconciliation_state(commander_fid TEXT NOT NULL,provider TEXT NOT NULL,last_attempt TEXT,last_success TEXT,outcome TEXT NOT NULL,PRIMARY KEY(commander_fid,provider));
 CREATE TABLE station_reference(provider TEXT NOT NULL,market_id TEXT NOT NULL,system_address TEXT,system_name TEXT NOT NULL,name TEXT NOT NULL,station_type TEXT,arrival_ls REAL,x REAL,y REAL,z REAL,services_json TEXT NOT NULL,observed_at TEXT,fetched_at TEXT NOT NULL,expires_at TEXT NOT NULL,PRIMARY KEY(provider,market_id));
-CREATE INDEX station_reference_system ON station_reference(system_address,expires_at);`}
+CREATE INDEX station_reference_system ON station_reference(system_address,expires_at);`, `CREATE TABLE sidecar_snapshots(id INTEGER PRIMARY KEY,source_event_id INTEGER NOT NULL REFERENCES journal_events(event_id),commander_fid TEXT NOT NULL REFERENCES commander(fid),kind TEXT NOT NULL,content_hash TEXT NOT NULL,observed_at TEXT NOT NULL,raw_json TEXT NOT NULL,UNIQUE(source_event_id,content_hash));
+CREATE INDEX sidecar_commander_kind_time ON sidecar_snapshots(commander_fid,kind,observed_at);`}
 
 func migrate(db *sql.DB, dir string) error {
 	var count int

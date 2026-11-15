@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Jakoczig/daedalus/go/internal/history"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
 	"github.com/Jakoczig/daedalus/go/internal/privatefs"
 	"io"
@@ -22,6 +23,9 @@ import (
 )
 
 type Manager struct {
+	station                                        stationSession
+	history                                        *history.Store
+	fid                                            string
 	vaultMu                                        sync.Mutex
 	sourceFile                                     string
 	sourceSequence                                 uint64
@@ -160,13 +164,19 @@ func (m *Manager) saveLocked() error {
 		Ledger    map[string]int64        `json:"ledger"`
 		Uploader  string                  `json:"uploader"`
 	}{configs, m.ledger, m.uploader})
+	if m.history != nil {
+		return m.history.SaveProviderConsent(b)
+	}
+	if m.opts.RequireHistory {
+		return errors.New("Database consent is not ready")
+	}
 	return privatefs.Write(m.dir, "providers.json", b)
 }
 func (m *Manager) Configure(id string, c Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed {
-		return errors.New("Provider service closed")
+	if m.closed || (m.opts.RequireHistory && m.history == nil) {
+		return errors.New("Provider service or database consent unavailable")
 	}
 	s := m.states[id]
 	if s == nil {
@@ -180,6 +190,11 @@ func (m *Manager) Configure(id string, c Config) error {
 			return errors.New("Start the game and witness a commander before consenting to uploads")
 		}
 		c.CommanderHash = m.identity
+	}
+	if m.history != nil && m.fid != "" {
+		if err := m.history.CancelCandidates(m.fid, id); err != nil {
+			return errors.New("Could not cancel durable queue")
+		}
 	}
 	s.cancel()
 	s.ctx, s.cancel = context.WithCancel(m.ctx)
@@ -208,8 +223,8 @@ func (m *Manager) SetCredential(id string, c Credential) error {
 	defer m.vaultMu.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed {
-		return errors.New("Provider service closed")
+	if m.closed || (m.opts.RequireHistory && m.history == nil) {
+		return errors.New("Provider service or database consent unavailable")
 	}
 	if id != "edsm" && id != "inara" {
 		return errors.New("provider does not accept personal API keys")
@@ -365,6 +380,7 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 	if e.Position.Sequence != 0 {
 		if e.Type != "Fileheader" && m.sourceSequence != 0 && (e.Position.FileID != m.sourceFile || e.Position.Sequence != m.sourceSequence+1) {
 			m.identity = ""
+			m.fid = ""
 			m.name = ""
 			m.system = ""
 			m.position = nil
@@ -373,8 +389,10 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 		m.sourceFile = e.Position.FileID
 		m.sourceSequence = e.Position.Sequence
 	}
+	m.stationEventLocked(e, phase)
 	if e.Type == "Fileheader" {
 		m.identity = ""
+		m.fid = ""
 		m.name = ""
 		m.system = ""
 		m.position = nil
@@ -385,9 +403,11 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 	}
 	if e.Type == "LoadGame" {
 		m.identity = ""
+		m.fid = ""
 		m.name = ""
 		if e.FID != "" {
 			m.identity = hash(e.FID)
+			m.fid = e.FID
 			m.name = text(v["Commander"])
 		}
 		m.odyssey, _ = v["Odyssey"].(bool)
@@ -395,6 +415,7 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 	}
 	if e.Type == "Shutdown" {
 		m.identity = ""
+		m.fid = ""
 		return
 	}
 	if e.Type == "FSDJump" || e.Type == "Location" || e.Type == "CarrierJump" {
@@ -406,7 +427,7 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 			m.address = v["SystemAddress"]
 		}
 	}
-	if phase != journal.Live || m.identity == "" || !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") {
+	if (m.opts.RequireHistory && m.history == nil) || phase != journal.Live || m.identity == "" || !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") {
 		return
 	}
 	age := m.opts.Now().Sub(e.Timestamp)
@@ -421,6 +442,18 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 		cat := category(id, e.Type)
 		if cat == "" || !slices.Contains(s.config.Categories, cat) {
 			continue
+		}
+		candidateID := ""
+		if m.history != nil {
+			candidate, err := m.history.Candidate(m.fid, id, cat, e, phase, false, m.opts.Now())
+			if err != nil {
+				s.lastError = "Database publication authorization failed"
+				continue
+			}
+			if candidate.Status != "eligible" {
+				continue
+			}
+			candidateID = candidate.ID
 		}
 		cred := m.secrets[id]
 		if (id == "edsm" || id == "inara") && (cred.APIKey == "" || cred.Commander != m.name || m.name == "") {
@@ -448,7 +481,13 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 			s.lastError = "Queue full (64 events / 2 MiB); newest event dropped"
 			continue
 		}
-		s.queue = append(s.queue, queued{key: key, category: cat, body: body, endpoint: endpoint, contentType: ct, generation: s.generation})
+		if m.history != nil && candidateID != "" {
+			if err := m.history.CandidateOutcome(candidateID, "queued", "Fresh authorized event queued"); err != nil {
+				s.lastError = "Cannot persist publication queue"
+				continue
+			}
+		}
+		s.queue = append(s.queue, queued{candidateID: candidateID, key: key, category: cat, body: body, endpoint: endpoint, contentType: ct, generation: s.generation})
 		select {
 		case s.wake <- struct{}{}:
 		default:
@@ -513,6 +552,7 @@ func (m *Manager) dispatch(id string) {
 	}
 	// EDAstro's JSON status 401 means no new observations, not HTTP authentication failure.
 	if err == nil && status >= 200 && status < 300 && id == "edastro" && fmt.Sprint(object(raw)["status"]) == "401" {
+		m.outcomeLocked(batch, "no_new_observations", "Recipient reported no new observations")
 		s.noNewObservations += uint64(len(batch))
 		s.noNewLast = true
 		s.lastError = ""
@@ -520,6 +560,7 @@ func (m *Manager) dispatch(id string) {
 	}
 	s.noNewLast = false
 	if err == nil && status >= 200 && status < 300 && accepted(id, raw) {
+		m.outcomeLocked(batch, "confirmed", "Recipient acceptance contract satisfied")
 		for _, item := range batch {
 			s.sent++
 			s.counts[item.category]++
@@ -527,6 +568,11 @@ func (m *Manager) dispatch(id string) {
 		s.lastSuccess = m.opts.Now().UTC().Format(time.RFC3339)
 		s.lastError = ""
 		return
+	}
+	if err != nil {
+		m.outcomeLocked(batch, "unknown_delivery", "Transport outcome uncertain; no silent retry")
+	} else if status != 429 && status != 503 {
+		m.outcomeLocked(batch, "failed", "Recipient did not confirm acceptance")
 	}
 	s.lastError = "Submission not confirmed; no private server response retained"
 	// Only explicit refusal responses are safe to retry. A timeout is ambiguous:

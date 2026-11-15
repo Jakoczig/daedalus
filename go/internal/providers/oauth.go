@@ -36,7 +36,7 @@ func (m *Manager) BeginAuthorization(base string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := m.states["frontier"]
-	if m.closed {
+	if m.closed || (m.opts.RequireHistory && m.history == nil) {
 		return "", errors.New("Provider service closed")
 	}
 	if m.clientID() == "" {

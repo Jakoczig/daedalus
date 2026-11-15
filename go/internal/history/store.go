@@ -21,7 +21,7 @@ import (
 //go:embed schema.sql
 var schema string
 
-const schemaVersion = 2
+const schemaVersion = 3
 const maxCache = 32 << 20
 
 var ErrQuarantined = errors.New("Journal identity changed; cached history retained. Review quarantined source in Data/History")
@@ -108,6 +108,9 @@ func (s *Store) Resume(src journal.Source) (journal.Checkpoint, error) {
 	var state string
 	err := s.writer.QueryRow("SELECT committed_offset,committed_sequence,fingerprint_head,fingerprint_anchor,discard,state FROM journal_sources WHERE source_id=?", src.ID).Scan(&cp.Offset, &cp.Sequence, &cp.Head, &cp.Anchor, &cp.Discard, &state)
 	if err == nil {
+		if state == "replaced" {
+			return s.resumedGeneration(src)
+		}
 		if state != "verified" {
 			return cp, ErrQuarantined
 		}
@@ -174,8 +177,12 @@ func (s *Store) Commit(ctx context.Context, cp journal.Checkpoint, records []jou
 }
 func (s *Store) Stats() Stats {
 	v := Stats{Schema: schemaVersion, State: "verified"}
-	s.reader.QueryRow("SELECT count(*),coalesce(max(event_utc),'') FROM journal_events").Scan(&v.Events, &v.LastEvent)
-	s.reader.QueryRow("SELECT count(*),coalesce(sum(committed_offset),0),coalesce(max(committed_offset),0) FROM journal_sources").Scan(&v.Files, &v.Bytes, &v.LastOffset)
+	if err := s.reader.QueryRow("SELECT count(*),coalesce(max(event_utc),'') FROM journal_events").Scan(&v.Events, &v.LastEvent); err != nil {
+		v.State = "DB_ERROR"
+	}
+	if err := s.reader.QueryRow("SELECT count(*),coalesce(sum(committed_offset),0),coalesce(max(committed_offset),0) FROM journal_sources").Scan(&v.Files, &v.Bytes, &v.LastOffset); err != nil {
+		v.State = "DB_ERROR"
+	}
 	return v
 }
 func null(v string) any {

@@ -9,6 +9,13 @@ import (
 )
 
 func (s *Server) providerRPC(ctx context.Context, name string, raw json.RawMessage) (any, error) {
+	if name == "previewGoHistorical" || name == "confirmGoHistorical" {
+		var selection providers.HistorySelection
+		if strictDecode(raw, &selection) != nil {
+			return nil, errors.New("Invalid historical selection")
+		}
+		return s.providers.Historical(ctx, selection, name == "confirmGoHistorical")
+	}
 	switch name {
 	case "getGoProviders":
 		return s.providers.Status(), nil
@@ -31,6 +38,7 @@ func (s *Server) providerRPC(ctx context.Context, name string, raw json.RawMessa
 		Credential providers.Credential `json:"credential"`
 		Remove     bool                 `json:"remove"`
 		Kind       string               `json:"kind"`
+		Page       int                  `json:"page"`
 		Query      string               `json:"query"`
 	}
 	if strictDecode(raw, &req) != nil {
@@ -45,7 +53,11 @@ func (s *Server) providerRPC(ctx context.Context, name string, raw json.RawMessa
 	case "disconnectGoProvider":
 		err = s.providers.Disconnect(req.ID, req.Remove)
 	case "readGoProvider":
-		return s.providers.Read(ctx, req.ID, req.Kind, req.Query)
+		page := req.Page
+		if page == 0 {
+			page = 1
+		}
+		return s.providers.Read(ctx, req.ID, req.Kind, req.Query, page)
 	default:
 		return nil, errors.New("Unsupported provider action")
 	}

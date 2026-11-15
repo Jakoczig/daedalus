@@ -15,6 +15,10 @@ func allowedEndpoint(u *url.URL) bool {
 		return false
 	}
 	switch u.Host {
+	case "elitebgs.app", "api.canonn.tech", ravenHost:
+		return communityPath(u)
+	case "spansh.co.uk":
+		return u.RawQuery == "" && spanshPath(u.Path)
 	case "www.edsm.net":
 		return u.Path == "/api-journal-v1" || u.Path == "/api-logs-v1/get-logs"
 	case "inara.cz":
@@ -26,7 +30,7 @@ func allowedEndpoint(u *url.URL) bool {
 	case "auth.frontierstore.net":
 		return u.Path == "/token"
 	case "companion.orerve.net":
-		return u.Path == "/profile" || u.Path == "/market" || u.Path == "/shipyard" || u.Path == "/fleetcarrier"
+		return u.Path == "/profile" || u.Path == "/market" || u.Path == "/shipyard" || u.Path == "/fleetcarrier" || u.Path == "/communitygoals"
 	}
 	return false
 }
