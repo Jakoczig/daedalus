@@ -1,3 +1,4 @@
+import { BGSTally, ImportedItinerary } from './go-field-operations'
 import { useState, useEffect } from 'react'
 import Layout from './layout'
 import Panel from './panel'
@@ -30,8 +31,10 @@ export default function GoTerminal (props) {
   if (group === 'nav' && props.stage === 'G2E') items.push({ name: 'Galaxy', icon: 'system-orbits', url: '/nav/galaxy', active: page === 'galaxy' })
   const { value: summary } = useGoProjection(props, 'getJournalSummary', 'journalSummaryChanged')
   const { value: ship } = useGoProjection(props, 'getGoShip', 'goShipChanged')
+  if (group === 'cmdr' && props.stage === 'G2E') items.push({ name: 'Field / BGS', icon: 'scan', url: '/cmdr/field', active: page === 'field' })
   let content
-  if (path === '/nav/galaxy' && props.stage === 'G2E') content = <GoGalaxy context={flight?.navigation} route={plotted} {...props} />
+  if (path === '/cmdr/field' && props.stage === 'G2E') content = <BGSTally {...props} />
+  else if (path === '/nav/galaxy' && props.stage === 'G2E') content = <><GoGalaxy context={flight?.navigation} route={plotted} {...props} /><details><summary>Imported itinerary · separate user plan</summary><ImportedItinerary {...props} /></details></>
   else if (props.stage === 'G2E' && parityPaths.includes(path)) content = <GoParity {...props} path={path} />
   else if (['/nav/map', '/nav/list', '/exploration/system', '/exploration/biologicals'].includes(path)) content = <GoTerminalSurvey {...props} communityVersion={communityVersion} path={path} />
   else if (['/ship/status', '/ship/stats'].includes(path)) content = <GoTerminalShip {...props} />
@@ -70,7 +73,7 @@ export default function GoTerminal (props) {
         </div>
         <PrimaryNavigation />
       </header>
-      <div className='go-terminal__telemetry'><span><Icon name='location-filled' /> {summary?.currentSystem || 'Awaiting local journal'}</span><span className='text-muted'>{summary?.stage ? 'G2J' : props.stage || 'G2D'} · {summary?.cached ? 'LAST KNOWN / ' : ''}{summary?.stage || summary?.sourceState || 'waiting'} · local-first · explicit provider consent</span><span><Icon name='ship' /> {ship?.shipType || 'Ship unknown'} · Fuel {show(ship?.fuelMainT, 'T')}</span></div>
+      <div className='go-terminal__telemetry'><span><Icon name='location-filled' /> {summary?.currentSystem || 'Awaiting local journal'}</span><span className='text-muted'>{summary?.stage ? 'G2K' : props.stage || 'G2D'} · {summary?.cached ? 'LAST KNOWN / ' : ''}{summary?.stage || summary?.sourceState || 'waiting'} · local-first · explicit provider consent</span><span><Icon name='ship' /> {ship?.shipType || 'Ship unknown'} · Fuel {show(ship?.fuelMainT, 'T')}</span></div>
       <Layout connected={props.connected} ready={props.ready} className='go-terminal__layout'>
         <Panel temporaryLabels navigation={items} className='go-terminal__panel'><div className='go-content'>{display.visible ? <section className='go-fsd' aria-label='Automatic FSD display'><div className='go-page__heading'><h2>{display.finished ? 'Jump ended' : flight?.navigation?.mode === 'charge' ? 'Hyperdrive charging' : 'Hyperspace jump'}</h2><button onClick={() => setDisplay(previous => transition(previous, { ...controllerInput, manual: true }))}>Return to previous screen</button></div><div className='go-fsd-columns'><GoTerminalRoute {...props} compact context={flight?.navigation} /><GoGalaxy context={flight?.navigation} route={plotted} {...props} compact /></div></section> : content}</div></Panel>
       </Layout>
