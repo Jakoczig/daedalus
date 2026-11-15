@@ -133,6 +133,13 @@ func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
 	s.views.dirty = true
 }
 func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
+	if c.Kind == "Status" {
+		s.bioStatus = nil
+		if c.Valid && !s.summary.ImportInProgress && s.summary.SourceState == "live" && !s.stopped {
+			s.bioStatus = append([]byte(nil), c.Raw...)
+			s.captureBioLocked()
+		}
+	}
 	if s.opts.EnableParity {
 		s.views.parity.ApplySidecar(s.active, c)
 		if c.Kind == "Status" && !s.summary.ImportInProgress && s.summary.SourceState == "live" {
