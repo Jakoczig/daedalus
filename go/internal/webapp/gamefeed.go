@@ -18,6 +18,8 @@ type Options struct {
 	ProviderOptions   providers.Options
 	OpenAuthorization func(string) error
 	DesktopAction     func(string) error
+	CopyWaypoint      func(string) error
+	SaveFieldCSV      func(string, string) error
 	DesktopCloseMode  func(string)
 	// CommunityClient is injectable for offline tests; no endpoint is browser-configurable.
 	CommunityClient   *http.Client
