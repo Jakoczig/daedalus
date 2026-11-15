@@ -128,7 +128,10 @@ async function main () {
       const mergeCheck = await evaluate('({inspector:document.querySelector(\'.go-inspector\').innerText,privateLeak:document.body.innerText.includes(\'PRIVATE_PROVIDER\'),bodies:document.querySelectorAll(\'.go-chart__body\').length})')
       if (!mergeCheck.inspector.toUpperCase().includes('FIXTURE COMMUNITY PLANET') || !mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
       await evaluate('Array.from(document.querySelectorAll(\'.go-community-stations summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
-      if (!await evaluate('document.body.innerText.includes(\'Fixture Community Station\')&&document.body.innerText.includes(\'2026-01-01\')')) throw new Error('Station source freshness missing')
+      const stations = await evaluate('(()=>{const d=document.querySelector(".go-community-stations");return {open:d.open,text:d.textContent}})()')
+      if (!stations.open || !stations.text.includes('Fixture Community Station') || !stations.text.includes('2026-01-01')) throw new Error('Station source freshness missing')
+      await evaluate('document.querySelector(".go-community-stations button").click()')
+      await waitFor(() => evaluate('(()=>{const t=document.querySelector(".go-station-inspector")?.textContent||"";return t.includes("Fixture Community Station")&&t.includes("EDSM community reported")&&t.includes("2026-01-01")&&t.includes("Stations fetched")})()'))
       await screenshot('community-map-' + viewport)
       report.pages.push({ viewport, page: 'community-map', provenance: true, stations: true })
     }
@@ -136,7 +139,7 @@ async function main () {
     await evaluate('document.querySelector(\'.go-data-providers\').open=true')
     await waitFor(() => evaluate('document.querySelector(\'[aria-label="Optional EDSM enrichment"]\')?.textContent.includes(\'Disable EDSM lookups\')'))
     await evaluate('Array.from(document.querySelectorAll(\'[aria-label="Optional EDSM enrichment"] button\')).find(b=>b.textContent===\'Disable EDSM lookups\').click()')
-    await waitFor(() => evaluate('!document.body.innerText.includes(\'Fixture Community Planet\')'))
+    await waitFor(() => evaluate("!document.querySelector('[aria-label=\"Inspect Fixture Community Planet\"]')&&!document.querySelector('.go-station-inspector,.go-chart__stations')"))
     report.community = { mockOnly: true, ownerDisableClears: true }
     if (report.errors.length || report.blockedRequests.length) throw new Error('Runtime errors or unexpected external requests')
     report.passed = true
