@@ -2,9 +2,48 @@ package history
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"strings"
 	"testing"
 )
+
+func TestSalePreviewTransmitsExactJSONAsText(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	src := journal.Source{ID: "organic-preview", Identity: "synthetic"}
+	cp, _ := s.Resume(src)
+	records := []journal.Record{}
+	for i, raw := range []string{`{"event":"LoadGame","FID":"SYNTHETIC-A"}`, `{"event":"ScanOrganic","ScanType":"Analyse","Genus":"fixture-genus","Species":"fixture-species","Body":1,"SystemAddress":18446744073709551615}`, `{"event":"SellOrganicData","BioData":[{"Genus":"fixture-genus","Species":"fixture-species"}]}`} {
+		e, err := journal.ParseLine([]byte(raw), journal.SourcePosition{FileID: src.ID, Sequence: uint64(i + 1), Offset: int64(i * 100), Length: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		records = append(records, journal.Record{Event: e, Phase: journal.Replay})
+	}
+	cp.Sequence = 3
+	cp.Offset = 300
+	if err = s.Commit(context.Background(), cp, records, nil); err != nil {
+		t.Fatal(err)
+	}
+	links, err := s.SaleLinks("SYNTHETIC-A")
+	if err != nil || len(links) != 1 {
+		t.Fatal(links, err)
+	}
+	raw, err := json.Marshal(links)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []map[string]any
+	json.Unmarshal(raw, &decoded)
+	sample, ok := decoded[0]["sample"].(string)
+	if !ok || !strings.Contains(sample, "18446744073709551615") {
+		t.Fatal("sale preview allows unsafe numeric decoding", string(raw))
+	}
+}
 
 func TestSaleOnlyLinksProvenPriorSystemObservations(t *testing.T) {
 	s, err := Open(t.TempDir())

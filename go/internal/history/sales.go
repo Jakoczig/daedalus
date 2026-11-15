@@ -2,7 +2,6 @@ package history
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"strconv"
 )
@@ -83,11 +82,11 @@ func (s *Store) ConfirmOrganicSale(fid, sale, observation string, ack bool) erro
 }
 
 type SaleLink struct {
-	Sale        string          `json:"sale"`
-	Observation string          `json:"observation"`
-	Confidence  string          `json:"confidence"`
-	Reason      string          `json:"reason"`
-	Sample      json.RawMessage `json:"sample"`
+	Sale        string `json:"sale"`
+	Observation string `json:"observation"`
+	Confidence  string `json:"confidence"`
+	Reason      string `json:"reason"`
+	Sample      string `json:"sample"`
 }
 
 func (s *Store) SaleLinks(fid string) ([]SaleLink, error) {
@@ -104,7 +103,7 @@ func (s *Store) SaleLinks(fid string) ([]SaleLink, error) {
 			return nil, err
 		}
 		if len(raw) <= 16384 {
-			v.Sample = json.RawMessage(raw)
+			v.Sample = raw
 		}
 		out = append(out, v)
 	}

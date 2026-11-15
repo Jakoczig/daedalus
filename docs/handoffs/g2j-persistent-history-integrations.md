@@ -1,7 +1,7 @@
 # G2J — persistent history and controlled integrations
 
 Stacked on G2H `d7c5cd93e16ee0480fa11ef53d2ea9d9d0d4cb58`. PR #13 remains unchanged.
-The new draft is on `go/g2j-persistent-history-integrations`, targeting
+The new [draft PR #14](https://github.com/Jakoczig/daedalus/pull/14) is on `go/g2j-persistent-history-integrations`, targeting
 `go/g2h-unified-navigation-integrations`; its final head, exact CI run links and
 artifact digests are recorded in that PR's consolidated delivery report.
 
@@ -9,7 +9,7 @@ Implementation commits:
 
 - [`eea3608`](https://github.com/Jakoczig/daedalus/commit/eea360867e7a1b5967911c2da0f88682a9011084): native SQLite WAL, normalized retained history, atomic checkpoints/reducers, migrations and verified recovery.
 - [`72815f2`](https://github.com/Jakoczig/daedalus/commit/72815f23d8e969ee51014e2e5256e839ee95eb2a): canonical consent/provenance, publication review, reference adapters and schema-validated station sharing.
-- [`a79e05b`](https://github.com/Jakoczig/daedalus/commit/a79e05bebb05e505e6118290ef2f05410bb4f4cf): verified nearby services, construction history, copy/fingerprint safeguards and exact identifiers. Final delivery additionally covers accepted-sidecar persistence, safe restoration of exact route ownership, offline cached routes, provenance JSON precision and mandatory G2J artifact/visual/performance gates.
+- [`a79e05b`](https://github.com/Jakoczig/daedalus/commit/a79e05bebb05e505e6118290ef2f05410bb4f4cf): verified nearby services, construction history, copy/fingerprint safeguards and exact identifiers. Final delivery additionally covers accepted-sidecar persistence, safe restoration of exact route ownership, offline cached routes, provenance and organic-sale-preview JSON precision and mandatory G2J artifact/visual/performance gates.
 
 Working local functionality: cached startup, first import and incremental catch-up;
 per-commander indexed history; whole-file verified copy aliases; explicit quarantine
