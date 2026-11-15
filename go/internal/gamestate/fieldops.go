@@ -112,6 +112,31 @@ func (s *Service) FieldBio(body string, owner bool) (map[string]any, error) {
 		v["confirmed"] = b.Organisms
 		v["signals"] = b.BioSignals
 		v["bodyName"] = b.Name
+		samples := v["samples"].([]history.BioSample)
+		if !s.stopped && s.summary.SourceState == "live" && len(samples) > 0 && (samples[0].Stage == "Log" || samples[0].Stage == "Sample") && samples[0].Session != "" && samples[0].Session == s.store.BioSession(s.active, s.activeSource) && samples[0].Event == s.store.ActiveOrganicEvent(s.active, s.activeSource) {
+			if current, ok := fieldops.StatusPosition(s.bioStatus, b.Name, time.Now(), time.Now()); ok {
+				points := []fieldops.Position{}
+				complete := false
+				expected := 0
+				for _, sample := range samples {
+					if sample.Session != samples[0].Session || sample.Genus != samples[0].Genus || sample.Species != samples[0].Species || sample.Variant != samples[0].Variant {
+						continue
+					}
+					if sample.Stage == "Analyse" {
+						break
+					}
+					expected++
+					if sample.Position != nil {
+						points = append(points, *sample.Position)
+					}
+					if sample.Stage == "Log" {
+						complete = len(points) > 0 && len(points) == expected
+						break
+					}
+				}
+				v["liveSpacing"] = fieldops.LiveSpacing(current, points, fieldops.MinimumDistance(samples[0].Genus), complete)
+			}
+		}
 		if !owner {
 			samples := v["samples"].([]history.BioSample)
 			for i := range samples {
