@@ -266,7 +266,8 @@ jobs:
         with:
           name: g2j-synthetic-evidence-${{ runner.os }}
           path: |
-            temp/g2j-visual
+            temp/g2j-visual/*.png
+            temp/g2j-visual/report.json
             temp/g2j-lifecycle.txt
             temp/g2j-baseline.txt
           if-no-files-found: error

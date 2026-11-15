@@ -14,7 +14,9 @@ async function main () {
   const known = spawnSync('git', ['cat-file', '-e', base + '^{commit}'], { cwd: root, windowsHide: true })
   if (known.status !== 0) run('git', ['fetch', '--depth=1', 'origin', base])
   run('git', ['archive', '--format=tar', '--output=' + archive, base, 'go'])
-  run('tar', ['-xf', archive, '-C', directory])
+  // GNU tar treats a Windows drive prefix as a remote host. Relative POSIX
+  // paths work with both Git Bash GNU tar and Windows/Linux native tar.
+  run('tar', ['-xf', path.relative(root, archive).split(path.sep).join('/'), '-C', path.relative(root, directory).split(path.sep).join('/')])
   // Expose G2H's existing ReaderStats byte counter only; retain its reader and
   // reducer algorithms unchanged. No persistent storage is added to the baseline.
   const servicePath = path.join(directory, 'go/internal/gamestate/service.go')
