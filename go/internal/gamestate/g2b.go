@@ -80,7 +80,7 @@ func (s *Service) projectionLocked() Projections {
 		p.Exploration = explorestate.ExplorationView{SurveyState: "replaying", Bodies: []explorestate.BodyView{}}
 	} else if s.summary.SourceState != "live" && s.summary.SourceState != "replaying" && s.summary.SourceState != "partial" && s.summary.SourceState != "parse_warning" {
 		p.Ship.Evidence = "stale_source"
-		if len(p.Navigation.Hops) > 0 || p.Navigation.TargetSystem != "" {
+		if !s.summary.Cached && (len(p.Navigation.Hops) > 0 || p.Navigation.TargetSystem != "") {
 			p.Navigation.Hops = []navstate.Hop{}
 			p.Navigation.DestinationSystem = ""
 			p.Navigation.TargetSystem = ""
@@ -94,6 +94,10 @@ func (s *Service) projectionLocked() Projections {
 		}
 	}
 	if s.summary.Cached {
+		if p.Navigation.RouteState == "verified_last_known" || p.Navigation.RouteState == "verified" {
+			p.Navigation.RouteState = "cached"
+			p.Navigation.TargetEvidence = "cached"
+		}
 		p.Ship.Evidence = "cached"
 		if p.Workspace != nil {
 			p.Workspace.Parity.Evidence = "cached"

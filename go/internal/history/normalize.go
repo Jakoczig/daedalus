@@ -211,7 +211,7 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record, c
 			facts["communityGoals"] = v
 		}
 		for field, value := range facts {
-			raw, _ := json.Marshal(value)
+			raw, _ := json.Marshal(exactFactValue(value))
 			if _, err = tx.Exec("INSERT INTO field_provenance(entity,field,commander_fid,source,source_ref,observed_at,fetched_at,confidence,stale,value_json) VALUES('commander',?,?,'journal',?,?,?,'witnessed local event',0,?)", field, fid.String, strconv.FormatInt(eventID, 10), stamp, utc(), string(raw)); err != nil {
 				return err
 			}

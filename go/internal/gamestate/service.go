@@ -396,14 +396,35 @@ func (s *Service) Run(ctx context.Context) error {
 			if opts.ConfigError == "" && (!found || reader == nil || reader.Stats().SourceState == "waiting") {
 				configure(false)
 			}
-			if snapshots != nil {
+			if snapshots != nil && found {
 				changes, _ := snapshots.Poll(ctx)
 				s.mu.Lock()
-				for _, change := range changes {
-					s.details.Sidecars[change.Kind] = change.State
-					s.sidecarProjectionLocked(change)
-					if s.opts.ProviderSidecar != nil {
-						s.opts.ProviderSidecar(change)
+				var beforeSidecars []byte
+				var cacheErr error
+				if s.store != nil && len(changes) > 0 && s.databaseError == "" {
+					beforeSidecars, cacheErr = s.cacheLocked()
+				}
+				if cacheErr == nil && s.databaseError == "" {
+					for _, change := range changes {
+						s.details.Sidecars[change.Kind] = change.State
+						s.sidecarProjectionLocked(change)
+					}
+					if s.store != nil && len(changes) > 0 && ctx.Err() == nil {
+						var raw []byte
+						raw, cacheErr = s.cacheLocked()
+						if cacheErr == nil {
+							cacheErr = s.store.SaveCache(ctx, raw)
+						}
+						if cacheErr != nil {
+							_ = s.restoreCacheLocked(beforeSidecars)
+							s.databaseError = "Sidecar cache could not be committed; previous verified cache retained. Review Data/History."
+							s.summary.Stage = "DB_ERROR"
+						}
+					}
+					if cacheErr == nil && s.opts.ProviderSidecar != nil {
+						for _, change := range changes {
+							s.opts.ProviderSidecar(change)
+						}
 					}
 				}
 				s.mu.Unlock()

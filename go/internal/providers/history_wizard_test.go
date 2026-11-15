@@ -25,15 +25,15 @@ func TestHistoricalWizardRequiresExactPreviewConsentAndNeverRetriesQueued(t *tes
 	src := journal.Source{ID: "wizard-fixture", Identity: "synthetic"}
 	cp, _ := db.Resume(src)
 	records := []journal.Record{}
-	for i, raw := range []string{`{"event":"Fileheader","gameversion":"4.1"}`, `{"event":"LoadGame","FID":"SYNTHETIC-A","Commander":"Fixture"}`, `{"event":"FSDJump","timestamp":"2026-11-14T12:00:00Z","StarSystem":"Fixture","SystemAddress":9007199254740993,"StarPos":[1,2,3],"Commander":"PRIVATE"}`} {
+	for i, raw := range []string{`{"event":"Fileheader","gameversion":"4.1"}`, `{"event":"LoadGame","FID":"SYNTHETIC-A","Commander":"Fixture"}`, `{"event":"FSDJump","timestamp":"2026-11-14T12:00:00Z","StarSystem":"Fixture","SystemAddress":9007199254740993,"StarPos":[1,2,3],"Commander":"PRIVATE"}`, `{"event":"Loadout","timestamp":"2026-11-14T12:00:01Z","ShipID":18446744073709551615,"Ship":"asp","Modules":[{"Slot":"FrameShiftDrive","Item":"int_hyperdrive_size5_class5"}]}`} {
 		e, err := journal.ParseLine([]byte(raw), journal.SourcePosition{FileID: src.ID, Sequence: uint64(i + 1), Offset: int64(i * 100), Length: 100})
 		if err != nil {
 			t.Fatal(err)
 		}
 		records = append(records, journal.Record{Event: e, Phase: journal.Replay})
 	}
-	cp.Offset = 300
-	cp.Sequence = 3
+	cp.Offset = 400
+	cp.Sequence = 4
 	if err = db.Commit(context.Background(), cp, records, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestHistoricalWizardRequiresExactPreviewConsentAndNeverRetriesQueued(t *tes
 	if err = m.SetCredential("inara", Credential{APIKey: "SYNTHETIC_SECRET", Commander: "Fixture"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = m.Configure("inara", Config{Upload: true, Categories: []string{"travel"}}); err != nil {
+	if err = m.Configure("inara", Config{Upload: true, Categories: []string{"travel", "loadout"}}); err != nil {
 		t.Fatal(err)
 	}
 	selection := HistorySelection{FID: "SYNTHETIC-A", Provider: "inara", Category: "travel", From: "2026-11-13T00:00:00Z", To: "2026-11-15T12:00:00Z"}
@@ -64,6 +64,12 @@ func TestHistoricalWizardRequiresExactPreviewConsentAndNeverRetriesQueued(t *tes
 	}
 	if len(m.states["inara"].queue) != 0 {
 		t.Fatal("preview enqueued data")
+	}
+	loadoutSelection := selection
+	loadoutSelection.Category = "loadout"
+	loadoutPreview, err := m.Historical(context.Background(), loadoutSelection, false)
+	if err != nil || len(loadoutPreview.Rows) != 1 || !strings.Contains(loadoutPreview.Rows[0].Fields, "18446744073709551615") {
+		t.Fatalf("exact outgoing review text lost: %+v %v", loadoutPreview, err)
 	}
 	selection.Token = preview.Token
 	if _, err = m.Historical(context.Background(), selection, true); err == nil {

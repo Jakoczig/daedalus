@@ -77,6 +77,7 @@ func (s *Service) restoreCacheLocked(raw []byte) error {
 	s.views.ship = c.Ship
 	s.views.parity = c.Parity
 	s.views.activity = c.Activity
+	c.Navigation.RestoreLinks()
 	s.views.navigation = c.Navigation
 	c.Exploration.RestoreLinks()
 	s.views.exploration = c.Exploration

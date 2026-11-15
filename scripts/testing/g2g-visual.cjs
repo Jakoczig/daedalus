@@ -29,7 +29,7 @@ async function main () {
       await evaluate('document.querySelector(".go-companion-settings .go-data-providers summary").focus()')
       await c.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
       await c.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
-      await waitFor(() => evaluate('document.querySelector(".go-companion-settings .go-data-providers").open&&document.querySelectorAll(".go-provider-card").length===5'))
+      await waitFor(() => evaluate('document.querySelector(".go-companion-settings .go-data-providers").open&&document.querySelectorAll(".go-provider-card").length===10'))
       await evaluate('(()=>{const links=document.querySelectorAll(".go-provider-card a");links[links.length-1].focus()})()')
       const focus = await evaluate('(()=>{const e=document.querySelector(".go-launcher"),a=document.activeElement,r=a.getBoundingClientRect();return {label:a.textContent,top:r.top,bottom:r.bottom,height:innerHeight,overflow:e.scrollWidth-e.clientWidth,extra:e.scrollHeight-e.clientHeight,scrollTop:e.scrollTop}})()')
       if (focus.label !== 'Provider documentation' || focus.extra < 100 || focus.scrollTop < 100 || focus.top < 0 || focus.bottom > height + 2 || focus.overflow > 2) throw new Error('Launcher keyboard focus/settings clipped: ' + JSON.stringify(focus))

@@ -250,13 +250,34 @@ jobs:
           path: temp/g2h-visual
           if-no-files-found: error
           retention-days: 14
+      - name: G2J database lifecycle performance
+        run: |
+          cd go
+          go test ./internal/gamestate -run '^$' -bench '^BenchmarkG2JLifecycle$' -benchtime=1x -benchmem -count=1 | tee ../temp/g2j-lifecycle.txt
+          cd ..
+          node scripts/testing/g2j-baseline.cjs
+          cd temp/g2j-exact-g2h-baseline/go
+          go test ./internal/gamestate -run '^$' -bench '^BenchmarkG2HExactLifecycle$' -benchtime=1x -benchmem -count=1 | tee ../../g2j-baseline.txt
+      - name: G2J database history and privacy visuals
+        run: node scripts/testing/g2j-visual.cjs
+      - name: Upload G2J synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g2j-synthetic-evidence-${{ runner.os }}
+          path: |
+            temp/g2j-visual
+            temp/g2j-lifecycle.txt
+            temp/g2j-baseline.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g2h-${{ runner.os }}-x64-experimental-unsigned-orbital-integrations
+          name: daedalus-g2j-${{ runner.os }}-x64-experimental-unsigned-persistent-history
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

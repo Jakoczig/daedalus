@@ -104,6 +104,24 @@ func TestG2JActiveSourceSameSizeAndTimestampStillVerifiesFingerprint(t *testing.
 		t.Fatal("changed source silently reimported")
 	}
 }
+func TestG2JAcceptedRouteSidecarSurvivesOfflineRestartWithoutAnotherJournalEvent(t *testing.T) {
+	dir := g2bSource(t)
+	profile := t.TempDir()
+	s, stop := durableService(t, profile, dir)
+	waitProjection(t, s, func() bool { return len(s.Navigation().Hops) == 2 })
+	stop()
+	if err := os.Rename(dir, dir+"-moved"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Rename(dir+"-moved", dir) })
+	s, stop = durableService(t, profile, dir)
+	defer stop()
+	waitState(t, s, func(v Summary) bool { return v.Cached && !v.ImportInProgress })
+	route := s.Navigation()
+	if len(route.Hops) != 2 || route.RouteState != "cached" || route.TargetEvidence == "journal" {
+		t.Fatalf("offline cached route lost or claimed live: %+v", route)
+	}
+}
 func TestG2JDurableRestartAndCatchup(t *testing.T) {
 	dir, profile := t.TempDir(), t.TempDir()
 	appendEvent(t, dir, `{"timestamp":"2026-01-01T00:00:00Z","event":"Fileheader","gameversion":"4.0"}`)

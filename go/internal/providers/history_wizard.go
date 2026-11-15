@@ -20,15 +20,15 @@ type HistorySelection struct {
 	Acknowledge bool   `json:"acknowledge"`
 }
 type HistoryPreviewRow struct {
-	ID        string          `json:"id"`
-	Candidate string          `json:"candidate"`
-	Type      string          `json:"type"`
-	Timestamp string          `json:"timestamp"`
-	System    string          `json:"system"`
-	Status    string          `json:"status"`
-	Reason    string          `json:"reason"`
-	Fields    json.RawMessage `json:"fields,omitempty"`
-	Bytes     int             `json:"bytes"`
+	ID        string `json:"id"`
+	Candidate string `json:"candidate"`
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+	System    string `json:"system"`
+	Status    string `json:"status"`
+	Reason    string `json:"reason"`
+	Fields    string `json:"fields,omitempty"`
+	Bytes     int    `json:"bytes"`
 }
 type HistoryPreview struct {
 	Rows   []HistoryPreviewRow `json:"rows"`
@@ -90,7 +90,7 @@ func (m *Manager) Historical(ctx context.Context, selection HistorySelection, co
 				// Only the event array is returned, never credential-bearing request headers.
 				root := object(body)
 				fields, _ := json.Marshal(root["events"])
-				row.Fields = fields
+				row.Fields = string(fields)
 				row.Bytes = len(body)
 				jobs = append(jobs, queued{candidateID: candidate.ID, key: hash(selection.Provider + "/" + hash(selection.FID) + "/" + string(r.Event.Raw)), category: selection.Category, body: body, endpoint: endpoint, contentType: ct, generation: state.generation})
 			}

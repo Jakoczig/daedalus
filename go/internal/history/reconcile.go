@@ -32,6 +32,30 @@ type EffectiveFact struct {
 
 var allowedFacts = map[string]bool{"name": true, "credits": true, "debt": true, "ranks": true, "squadron": true, "ships": true, "ship": true, "carrier": true, "inventory": true, "communityGoals": true, "market": true, "shipyard": true, "system": true, "station": true, "coordinates": true}
 
+// Fact inspection is not a calculation API. Preserve every journal number as
+// its original decimal text, including identifiers nested in goals/squadrons.
+// The typed reducers separately retain numeric physical measurements.
+func exactFactValue(value any) any {
+	switch v := value.(type) {
+	case json.Number:
+		return string(v)
+	case map[string]any:
+		out := map[string]any{}
+		for k, x := range v {
+			out[k] = exactFactValue(x)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, x := range v {
+			out[i] = exactFactValue(x)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func (s *Store) SaveExternal(ctx context.Context, x ExternalFacts) error {
 	if (x.Provider != "frontier" && x.Provider != "inara") || x.Entity == "" || len(x.Entity) > 64 || len(x.EntityID) > 128 || len(x.FID) > 128 || !x.IdentityVerified || x.Fetched.IsZero() || !x.Expires.After(x.Fetched) || len(x.Fields) > 32 {
 		return errors.New("Verified bounded external identity and freshness required")
