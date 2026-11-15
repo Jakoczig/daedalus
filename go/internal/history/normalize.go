@@ -86,12 +86,23 @@ func relevant(kind string) bool {
 	}
 	return false
 }
-func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) error {
+func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record, checkpointSequence uint64) error {
 	var fid, session, system sql.NullString
 	var previous uint64
 	if err := tx.QueryRow("SELECT context_fid,context_session,context_system,committed_sequence FROM journal_sources WHERE source_id=?", source).Scan(&fid, &session, &system, &previous); err != nil {
 		return err
 	}
+	insertEvent, err := tx.Prepare("INSERT OR IGNORE INTO journal_events(source_id,byte_offset,byte_length,record_sequence,line_hash,event_utc,type,commander_fid,session_id,system_address,raw_relevant_json,ingested_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+	if err != nil {
+		return err
+	}
+	defer insertEvent.Close()
+	domainStatements := map[string]*sql.Stmt{}
+	defer func() {
+		for _, stmt := range domainStatements {
+			stmt.Close()
+		}
+	}()
 	for _, r := range records {
 		e := r.Event
 		if previous != 0 && e.Position.Sequence != previous+1 {
@@ -146,7 +157,7 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) e
 		if address == "" && system.Valid {
 			address = system.String
 		}
-		res, err := tx.Exec("INSERT OR IGNORE INTO journal_events(source_id,byte_offset,byte_length,record_sequence,line_hash,event_utc,type,commander_fid,session_id,system_address,raw_relevant_json,ingested_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", source, e.Position.Offset, e.Position.Length, e.Position.Sequence, digest(e.Raw), null(stamp), e.Type, fid, session, null(address), retainedRaw, utc())
+		res, err := insertEvent.Exec(source, e.Position.Offset, e.Position.Length, e.Position.Sequence, digest(e.Raw), null(stamp), e.Type, fid, session, null(address), retainedRaw, utc())
 		if err != nil {
 			return err
 		}
@@ -173,7 +184,15 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) e
 			if entity == "" {
 				entity = identifier(v["BodyID"])
 			}
-			if _, err = tx.Exec("INSERT INTO "+table+"(commander_fid,source_event_id,entity_id,system_address,observed_at,raw_json) VALUES(?,?,?,?,?,?)", fid.String, eventID, null(entity), null(address), null(stamp), string(e.Raw)); err != nil {
+			stmt := domainStatements[table]
+			if stmt == nil {
+				stmt, err = tx.Prepare("INSERT INTO " + table + "(commander_fid,source_event_id,entity_id,system_address,observed_at,raw_json) VALUES(?,?,?,?,?,?)")
+				if err != nil {
+					return err
+				}
+				domainStatements[table] = stmt
+			}
+			if _, err = stmt.Exec(fid.String, eventID, null(entity), null(address), null(stamp), string(e.Raw)); err != nil {
 				return err
 			}
 		}
@@ -250,7 +269,12 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record) e
 			}
 		}
 	}
-	_, err := tx.Exec("UPDATE journal_sources SET context_fid=?,context_session=?,context_system=? WHERE source_id=?", fid, session, system, source)
+	if previous != checkpointSequence {
+		fid = sql.NullString{}
+		session = sql.NullString{}
+		system = sql.NullString{}
+	}
+	_, err = tx.Exec("UPDATE journal_sources SET context_fid=?,context_session=?,context_system=? WHERE source_id=?", fid, session, system, source)
 	return err
 }
 func normalizeLoadout(tx *sql.Tx, fid string, eventID int64, stamp string, v map[string]any, raw string) error {

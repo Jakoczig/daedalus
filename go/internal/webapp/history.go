@@ -69,6 +69,8 @@ func (s *Server) historyRPC(ctx context.Context, name string, raw json.RawMessag
 		return nil, errors.New("Database is not ready; check recovery status")
 	}
 	switch name {
+	case "getGoConstruction":
+		return db.Construction(ctx, req.FID)
 	case "getGoNearest":
 		return db.Nearest(ctx, req.Address, req.Service, req.Radius, time.Now())
 	case "getGoSaleLinks":

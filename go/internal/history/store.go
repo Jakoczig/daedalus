@@ -13,6 +13,7 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/privatefs"
 	_ "github.com/mattn/go-sqlite3"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ import (
 //go:embed schema.sql
 var schema string
 
-const schemaVersion = 3
+const schemaVersion = 4
 const maxCache = 32 << 20
 
 var ErrQuarantined = errors.New("Journal identity changed; cached history retained. Review quarantined source in Data/History")
@@ -34,6 +35,7 @@ type Store struct {
 }
 type Stats struct {
 	Events, Files, Bytes, LastOffset int64
+	DatabaseBytes                    int64
 	Schema                           int
 	LastEvent                        string
 	State                            string
@@ -157,7 +159,7 @@ func (s *Store) Commit(ctx context.Context, cp journal.Checkpoint, records []jou
 		return err
 	}
 	defer tx.Rollback()
-	if err = s.normalize(tx, cp.Source.ID, records); err != nil {
+	if err = s.normalize(tx, cp.Source.ID, records, cp.Sequence); err != nil {
 		return err
 	}
 	result, err := tx.ExecContext(ctx, "UPDATE journal_sources SET canonical_path=?,observed_size=?,committed_offset=?,committed_sequence=?,fingerprint_head=?,fingerprint_anchor=?,discard=?,last_seen_at=? WHERE source_id=? AND state='verified'", cp.Source.Path, cp.Source.Size, cp.Offset, cp.Sequence, cp.Head, cp.Anchor, cp.Discard, utc(), cp.Source.ID)
@@ -182,6 +184,13 @@ func (s *Store) Stats() Stats {
 	}
 	if err := s.reader.QueryRow("SELECT count(*),coalesce(sum(committed_offset),0),coalesce(max(committed_offset),0) FROM journal_sources").Scan(&v.Files, &v.Bytes, &v.LastOffset); err != nil {
 		v.State = "DB_ERROR"
+	}
+	var pages, size int64
+	if s.reader.QueryRow("PRAGMA page_count").Scan(&pages) == nil && s.reader.QueryRow("PRAGMA page_size").Scan(&size) == nil {
+		v.DatabaseBytes = pages * size
+	}
+	if f, e := os.Stat(s.path + "-wal"); e == nil {
+		v.DatabaseBytes += f.Size()
 	}
 	return v
 }

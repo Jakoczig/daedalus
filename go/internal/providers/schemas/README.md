@@ -1,1 +1,3 @@
 EDDN journal/1 schema, fetched 2026-11-14 from https://raw.githubusercontent.com/EDCD/EDDN/live/schemas/journal-v1.0.json. BSD-3-Clause, see LICENSE. Embedded locally; validation never fetches a schema over the network. Only the supported travel/exploration subset is constructed. Schema updates require contract tests.
+
+G2J additionally embeds commodity-v3.0.json, shipyard-v2.0.json and outfitting-v2.0.json from the same EDDN live schema repository (retrieved 2026-11-15). BSD-3-Clause LICENSE applies. Station publication validates locally, preserves source timestamps/MarketID and strips unrelated fields. Outfitting and shipyard use a conservative public subset; no CAPI-derived version metadata is invented.

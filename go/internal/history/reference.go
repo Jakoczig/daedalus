@@ -89,20 +89,43 @@ type StationReference struct {
 	Expires       string          `json:"expiresAt"`
 }
 
-func (s *Store) SaveStation(x StationReference) error {
-	if identifier(x.MarketID) == "" || identifier(x.SystemAddress) == "" || x.Name == "" || x.SystemName == "" || len(x.Services) > 32 {
-		return errors.New("Exact station/system identity required")
+func (s *Store) SaveStation(x StationReference) error { return s.SaveStations([]StationReference{x}) }
+func (s *Store) SaveStations(values []StationReference) error {
+	if len(values) > 512 {
+		return errors.New("Station batch exceeds limit")
 	}
-	for _, v := range x.Coordinates {
-		if math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > 1e6 {
-			return errors.New("Invalid station coordinates")
+	for _, x := range values {
+		if identifier(x.MarketID) == "" || identifier(x.SystemAddress) == "" || x.Name == "" || x.SystemName == "" || len(x.Services) > 32 {
+			return errors.New("Exact station/system identity required")
+		}
+		for _, v := range x.Coordinates {
+			if math.IsNaN(v) || math.IsInf(v, 0) || math.Abs(v) > 1e6 {
+				return errors.New("Invalid station coordinates")
+			}
 		}
 	}
-	services, _ := json.Marshal(x.Services)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.writer.Exec(`INSERT INTO station_reference VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,market_id) DO UPDATE SET system_address=excluded.system_address,system_name=excluded.system_name,name=excluded.name,station_type=excluded.station_type,arrival_ls=excluded.arrival_ls,x=excluded.x,y=excluded.y,z=excluded.z,services_json=excluded.services_json,observed_at=excluded.observed_at,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at`, x.Provider, x.MarketID, x.SystemAddress, x.SystemName, x.Name, x.Type, x.ArrivalLS, x.Coordinates[0], x.Coordinates[1], x.Coordinates[2], string(services), x.Observed, x.Fetched, x.Expires)
-	return err
+	tx, err := s.writer.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO station_reference VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,market_id) DO UPDATE SET system_address=excluded.system_address,system_name=excluded.system_name,name=excluded.name,station_type=excluded.station_type,arrival_ls=excluded.arrival_ls,x=excluded.x,y=excluded.y,z=excluded.z,services_json=excluded.services_json,observed_at=excluded.observed_at,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, x := range values {
+		services, _ := json.Marshal(x.Services)
+		if _, err = stmt.Exec(x.Provider, x.MarketID, x.SystemAddress, x.SystemName, x.Name, x.Type, x.ArrivalLS, x.Coordinates[0], x.Coordinates[1], x.Coordinates[2], string(services), x.Observed, x.Fetched, x.Expires); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.Exec("DELETE FROM station_reference WHERE rowid NOT IN (SELECT rowid FROM station_reference ORDER BY fetched_at DESC LIMIT 4096)"); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 type NearestStation struct {
@@ -120,7 +143,7 @@ func (s *Store) Nearest(ctx context.Context, address, service string, radius flo
 	if err := s.reader.QueryRowContext(ctx, "SELECT x,y,z FROM systems WHERE system_address=?", address).Scan(&x, &y, &z); err != nil || !x.Valid || !y.Valid || !z.Valid {
 		return nil, errors.New("Origin coordinates unknown")
 	}
-	rows, err := s.reader.QueryContext(ctx, `SELECT provider,market_id,coalesce(system_address,''),system_name,name,coalesce(station_type,''),arrival_ls,x,y,z,services_json,coalesce(observed_at,''),fetched_at,expires_at FROM station_reference WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND z BETWEEN ? AND ? LIMIT 512`, x.Float64-radius, x.Float64+radius, y.Float64-radius, y.Float64+radius, z.Float64-radius, z.Float64+radius)
+	rows, err := s.reader.QueryContext(ctx, `SELECT provider,market_id,coalesce(system_address,''),system_name,name,coalesce(station_type,''),arrival_ls,x,y,z,services_json,coalesce(observed_at,''),fetched_at,expires_at FROM station_reference WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND z BETWEEN ? AND ? AND json_extract(services_json,'$.'||?)=1 ORDER BY (x-?)*(x-?)+(y-?)*(y-?)+(z-?)*(z-?) LIMIT 512`, x.Float64-radius, x.Float64+radius, y.Float64-radius, y.Float64+radius, z.Float64-radius, z.Float64+radius, service, x.Float64, x.Float64, y.Float64, y.Float64, z.Float64, z.Float64)
 	if err != nil {
 		return nil, err
 	}

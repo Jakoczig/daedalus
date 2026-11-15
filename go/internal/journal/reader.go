@@ -46,15 +46,16 @@ type cursor struct {
 	discard, pending    bool
 }
 type Reader struct {
-	dir       string
-	opts      ReaderOptions
-	mu        sync.RWMutex
-	stats     ReaderStats
-	cursors   map[string]*cursor
-	serial    uint64
-	started   bool
-	startedAt time.Time
-	running   atomic.Bool
+	currentFile string
+	dir         string
+	opts        ReaderOptions
+	mu          sync.RWMutex
+	stats       ReaderStats
+	cursors     map[string]*cursor
+	serial      uint64
+	started     bool
+	startedAt   time.Time
+	running     atomic.Bool
 }
 
 func NewReader(dir string, opts ReaderOptions) (*Reader, error) {
@@ -153,6 +154,9 @@ func (r *Reader) poll(ctx context.Context, emit func(Event, Phase) error) error 
 			s.SourceState = "replaying"
 		}
 	})
+	if len(names) > 0 {
+		r.currentFile = names[len(names)-1]
+	}
 	current := map[string]bool{}
 	for _, name := range names {
 		if ctx.Err() != nil {
@@ -205,7 +209,7 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 		return nil
 	}
 	c := r.cursors[name]
-	if c != nil && os.SameFile(c.info, info) && c.info.Size() == info.Size() && c.info.ModTime() == info.ModTime() {
+	if (r.opts.Durable == nil || name != r.currentFile) && c != nil && os.SameFile(c.info, info) && c.info.Size() == info.Size() && c.info.ModTime() == info.ModTime() {
 		if c.pending {
 			r.change(func(s *ReaderStats) { s.Pending = true })
 		}
@@ -243,6 +247,20 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			if err != nil {
 				return err
 			}
+			source.ID = saved.Source.ID
+			if saved.Offset == 0 && saved.Sequence == 0 {
+				if resolver, ok := r.opts.Durable.(interface {
+					ResolveCopy(Source, []byte, []byte, *os.File) (Checkpoint, bool, error)
+				}); ok {
+					resolved, match, err := resolver.ResolveCopy(source, prefix, sample(f, max(0, info.Size()-128), int(min(info.Size(), 128))), f)
+					if err != nil {
+						return err
+					}
+					if match {
+						saved = resolved
+					}
+				}
+			}
 			if saved.Offset > info.Size() || len(prefix) < len(saved.Head) || !bytes.Equal(prefix[:min(len(prefix), len(saved.Head))], saved.Head) || !bytes.Equal(sample(f, saved.Offset-int64(len(saved.Anchor)), len(saved.Anchor)), saved.Anchor) {
 				if q, ok := r.opts.Durable.(interface{ RejectSource(Source) error }); ok {
 					_ = q.RejectSource(source)
@@ -251,10 +269,13 @@ func (r *Reader) readFile(ctx context.Context, name string, emit func(Event, Pha
 			}
 			source.ID = saved.Source.ID
 			c = &cursor{id: source.ID, offset: saved.Offset, sequence: saved.Sequence, discard: saved.Discard, replayUntil: info.Size()}
-			if r.started && saved.Offset==0 {c.replayUntil=0}
+			if r.started && saved.Offset == 0 {
+				c.replayUntil = 0
+			}
 			r.cursors[name] = c
 			reset = false
 		} else if reset {
+			source.ID = c.id
 			if q, ok := r.opts.Durable.(interface{ RejectSource(Source) error }); ok {
 				_ = q.RejectSource(source)
 			}

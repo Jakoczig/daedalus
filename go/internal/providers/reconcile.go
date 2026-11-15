@@ -41,6 +41,33 @@ func normalizedCommander(id, kind, fid, name string, data map[string]any, now ti
 				x.Fields["ranks"] = safe
 			}
 		}
+		ships := []CAPIShip{}
+		switch values := data["ships"].(type) {
+		case []any:
+			if len(values) > 512 {
+				return x, errors.New("CAPI ship limit")
+			}
+			for _, raw := range values {
+				if ship, ok := normalizeCAPIShip(raw); ok {
+					ships = append(ships, ship)
+				}
+			}
+		case map[string]any:
+			if len(values) > 512 {
+				return x, errors.New("CAPI ship limit")
+			}
+			for _, raw := range values {
+				if ship, ok := normalizeCAPIShip(raw); ok {
+					ships = append(ships, ship)
+				}
+			}
+		}
+		if len(ships) > 0 {
+			x.Fields["ships"] = ships
+		}
+		if ship, ok := normalizeCAPIShip(data["ship"]); ok {
+			x.Fields["ship"] = ship
+		}
 		// No stored-ship loadout or current-station inference from incomplete CAPI dictionaries.
 	case "inara":
 		events, _ := data["events"].([]any)
@@ -68,6 +95,39 @@ func normalizedCommander(id, kind, fid, name string, data map[string]any, now ti
 	}
 	x.IdentityVerified = true
 	return x, nil
+}
+
+type CAPIShip struct {
+	ID              string `json:"id"`
+	Model           string `json:"model"`
+	Name            string `json:"name"`
+	Ident           string `json:"ident"`
+	SystemAddress   string `json:"systemAddress"`
+	SystemName      string `json:"systemName"`
+	Station         string `json:"station"`
+	Ownership       string `json:"ownership"`
+	LoadoutComplete bool   `json:"loadoutComplete"`
+}
+
+func normalizeCAPIShip(raw any) (CAPIShip, bool) {
+	v, ok := raw.(map[string]any)
+	if !ok {
+		return CAPIShip{}, false
+	}
+	id, ok := v["id"].(json.Number)
+	if !ok || !canonicalID(string(id)) {
+		return CAPIShip{}, false
+	}
+	ship := CAPIShip{ID: string(id), Model: text(v["name"]), Name: text(v["shipName"]), Ident: text(v["shipID"]), Ownership: "owned according to authenticated CAPI profile; may lag", LoadoutComplete: false}
+	system, _ := v["starsystem"].(map[string]any)
+	address, ok := system["systemaddress"].(json.Number)
+	if ok && canonicalID(string(address)) {
+		ship.SystemAddress = string(address)
+		ship.SystemName = text(system["name"])
+	}
+	station, _ := v["station"].(map[string]any)
+	ship.Station = text(station["name"])
+	return ship, true
 }
 
 func (m *Manager) persistCommanderRead(ctx context.Context, id, kind, fid, name string, data map[string]any, now time.Time) error {

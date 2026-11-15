@@ -16,7 +16,10 @@ CREATE TABLE derived_statistics(loadout_hash TEXT NOT NULL,formula_version TEXT 
 CREATE TABLE reconciliation_state(commander_fid TEXT NOT NULL,provider TEXT NOT NULL,last_attempt TEXT,last_success TEXT,outcome TEXT NOT NULL,PRIMARY KEY(commander_fid,provider));
 CREATE TABLE station_reference(provider TEXT NOT NULL,market_id TEXT NOT NULL,system_address TEXT,system_name TEXT NOT NULL,name TEXT NOT NULL,station_type TEXT,arrival_ls REAL,x REAL,y REAL,z REAL,services_json TEXT NOT NULL,observed_at TEXT,fetched_at TEXT NOT NULL,expires_at TEXT NOT NULL,PRIMARY KEY(provider,market_id));
 CREATE INDEX station_reference_system ON station_reference(system_address,expires_at);`, `CREATE TABLE sidecar_snapshots(id INTEGER PRIMARY KEY,source_event_id INTEGER NOT NULL REFERENCES journal_events(event_id),commander_fid TEXT NOT NULL REFERENCES commander(fid),kind TEXT NOT NULL,content_hash TEXT NOT NULL,observed_at TEXT NOT NULL,raw_json TEXT NOT NULL,UNIQUE(source_event_id,content_hash));
-CREATE INDEX sidecar_commander_kind_time ON sidecar_snapshots(commander_fid,kind,observed_at);`}
+CREATE INDEX sidecar_commander_kind_time ON sidecar_snapshots(commander_fid,kind,observed_at);`, `CREATE INDEX provenance_current ON field_provenance(commander_fid,entity,field,source,id DESC);
+CREATE INDEX requests_provider_time ON provider_requests(provider,id DESC);
+CREATE INDEX station_coordinates ON station_reference(x,y,z);
+CREATE INDEX external_type_entity ON external_snapshots(provider,entity_type,entity_id,id DESC);`}
 
 func migrate(db *sql.DB, dir string) error {
 	var count int

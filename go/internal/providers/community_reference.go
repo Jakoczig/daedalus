@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const ravenHost = "ravencolonial100-awcbdvabgze4c5cq.canadacentral-01.azurewebsites.net"
@@ -180,6 +181,12 @@ func normalizeCommunity(id, kind, query string, raw []byte) (*Snapshot, error) {
 		case map[string]any:
 			objects = []any{x}
 		case string:
+			if kind != "last" {
+				return nil, errors.New("Unsupported Raven response")
+			}
+			if _, err := time.Parse(time.RFC3339Nano, x); err != nil {
+				return nil, errors.New("Invalid Raven last-change timestamp")
+			}
 			add("last change", x)
 		}
 		if len(objects) > 32 {

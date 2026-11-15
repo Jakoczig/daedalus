@@ -77,7 +77,7 @@ func (s *Store) EffectiveFacts(ctx context.Context, fid, entity string, now time
 	if len(fid) > 128 || len(entity) > 64 {
 		return nil, errors.New("Invalid fact query")
 	}
-	rows, err := s.reader.QueryContext(ctx, `SELECT p.field,p.source,p.source_ref,coalesce(p.observed_at,''),coalesce(p.fetched_at,''),p.value_json,coalesce(e.expires_at,'') FROM field_provenance p LEFT JOIN external_snapshots e ON cast(e.id AS TEXT)=p.source_ref AND p.source=e.provider WHERE coalesce(p.commander_fid,'')=? AND p.entity=? ORDER BY p.id DESC LIMIT 256`, fid, entity)
+	rows, err := s.reader.QueryContext(ctx, `SELECT p.field,p.source,p.source_ref,coalesce(p.observed_at,''),coalesce(p.fetched_at,''),p.value_json,coalesce(e.expires_at,'') FROM field_provenance p LEFT JOIN external_snapshots e ON e.id=cast(p.source_ref AS INTEGER) AND p.source=e.provider WHERE p.id IN (SELECT max(id) FROM field_provenance WHERE coalesce(commander_fid,'')=? AND entity=? GROUP BY field,source) ORDER BY p.id DESC LIMIT 256`, fid, entity)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *Store) EffectiveFacts(ctx context.Context, fid, entity string, now time
 		v.Stale = e != nil || !now.Before(expiry)
 		if v.Source == "journal" {
 			at, e := time.Parse(time.RFC3339Nano, v.Observed)
-			v.Stale = e != nil || now.Sub(at) > 5*time.Minute
+			v.Stale = e != nil || at.After(now.Add(5*time.Second)) || now.Sub(at) > 5*time.Minute
 		}
 		values[field] = append(values[field], v)
 	}

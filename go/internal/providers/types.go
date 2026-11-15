@@ -12,7 +12,7 @@ var FrontierClientID string     // set only after Frontier developer approval
 const software = "DAEDALUS"
 const version = "2.2.0"
 
-var ids = []string{"edsm", "inara", "edastro", "eddn", "frontier", "spansh", "elitebgs", "raven", "canonn"}
+var ids = []string{"edsm", "inara", "edastro", "eddn", "frontier", "spansh", "elitebgs", "raven", "canonn", "edsm-reference"}
 
 type Credential struct {
 	APIKey       string    `json:"apiKey,omitempty"`
@@ -47,6 +47,7 @@ type storedConfig struct {
 	Identity string `json:"identity,omitempty"`
 }
 type Capability struct {
+	Evidence        string   `json:"evidence"`
 	Protocol        string   `json:"protocol"`
 	EventTypes      []string `json:"eventTypes"`
 	ID              string   `json:"id"`
@@ -127,6 +128,7 @@ type providerState struct {
 
 func capabilities() []Capability {
 	return []Capability{
+		{ID: "edsm-reference", Protocol: "Public sphere/station reference GETs", Endpoint: "https://www.edsm.net", Documentation: "https://www.edsm.net/en/api-system-v1", Read: []string{"nearby", "stations", "market", "shipyard", "outfitting"}, IntervalSeconds: 60, Scopes: []string{"Owner-selected system; verified locked-coordinate candidates; no fan-out; separate account/map consent"}},
 		{ID: "elitebgs", Protocol: "V5 bounded named GET pages", Endpoint: "https://elitebgs.app/api/ebgs/v5", Documentation: "https://elitebgs.app/ebgs/docs/V5/paths/systems", Read: []string{"systems", "factions", "stations", "ticks"}, IntervalSeconds: 60, Scopes: []string{"Community observations; no causal attribution; no uploads"}},
 		{ID: "raven", Protocol: "Documented project GET only", Endpoint: "https://ravencolonial100-awcbdvabgze4c5cq.canadacentral-01.azurewebsites.net", Documentation: "https://ravencolonial100-awcbdvabgze4c5cq.canadacentral-01.azurewebsites.net/About", Read: []string{"system", "project", "last", "stats"}, IntervalSeconds: 60, Scopes: []string{"Optional read; writes unavailable pending canonical-host/authentication approval"}},
 		{ID: "canonn", Protocol: "CAPIv2 filtered site collections", Endpoint: "https://api.canonn.tech", Documentation: "https://docs.canonn.tech/home/about.html", Read: []string{"guardian", "thargoid", "biology", "generation"}, IntervalSeconds: 60, Scopes: []string{"Exact system.id64 filter; 32 sites/page; public science reference; no uploads"}},

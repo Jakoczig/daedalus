@@ -13,6 +13,7 @@ import (
 	"github.com/Jakoczig/daedalus/go/internal/navstate"
 	"github.com/Jakoczig/daedalus/go/internal/paritystate"
 	"github.com/Jakoczig/daedalus/go/internal/shipstate"
+	"os"
 	"time"
 )
 
@@ -113,6 +114,7 @@ func (s *Service) CommitRecords(records []journal.Record, cp journal.Checkpoint)
 			}
 		}
 	}
+	s.summary.EventsRead += uint64(len(records) - len(applyRecords))
 	if len(applyRecords) > 0 {
 		s.activeSource = cp.Source.ID
 	}
@@ -151,4 +153,8 @@ func (s *Service) History() (*history.Store, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.store, s.databaseError
+}
+
+func (s *Service) ResolveCopy(src journal.Source, head, anchor []byte, current *os.File) (journal.Checkpoint, bool, error) {
+	return s.store.ResolveCopy(src, head, anchor, current)
 }

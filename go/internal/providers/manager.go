@@ -17,12 +17,14 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Manager struct {
+	hostCooldown                                   map[string]time.Time
 	station                                        stationSession
 	history                                        *history.Store
 	fid                                            string
@@ -125,6 +127,7 @@ func New(parent context.Context, dir string, opts Options) *Manager {
 func (m *Manager) cap(id string) Capability {
 	for _, c := range capabilities() {
 		if c.ID == id {
+			c.Evidence = "Contract-fixture tested; live authentication/publication acceptance not established"
 			if id == "inara" && (m.opts.InaraAppName != "" || InaraApplicationName != "") {
 				c.Gate = ""
 			}
@@ -380,6 +383,7 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 	if e.Position.Sequence != 0 {
 		if e.Type != "Fileheader" && m.sourceSequence != 0 && (e.Position.FileID != m.sourceFile || e.Position.Sequence != m.sourceSequence+1) {
 			m.identity = ""
+			m.station = stationSession{}
 			m.fid = ""
 			m.name = ""
 			m.system = ""
@@ -605,11 +609,38 @@ func (m *Manager) request(ctx context.Context, method, endpoint, ct string, body
 	if err := ctx.Err(); err != nil {
 		return nil, 0, err
 	}
+	m.mu.Lock()
+	until := m.hostCooldown[req.URL.Host]
+	m.mu.Unlock()
+	if m.opts.Now().Before(until) {
+		return nil, 429, nil
+	}
 	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, 0, errors.New("Provider request failed")
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == 429 {
+		wait := time.Minute
+		if seconds, e := strconv.Atoi(resp.Header.Get("Retry-After")); e == nil && seconds > 0 {
+			wait = time.Duration(min(seconds, 3600)) * time.Second
+		} else if at, e := http.ParseTime(resp.Header.Get("Retry-After")); e == nil {
+			wait = at.Sub(m.opts.Now())
+			if wait < time.Minute {
+				wait = time.Minute
+			}
+			if wait > time.Hour {
+				wait = time.Hour
+			}
+		}
+		m.mu.Lock()
+		if m.hostCooldown == nil {
+			m.hostCooldown = map[string]time.Time{}
+		}
+		m.hostCooldown[req.URL.Host] = m.opts.Now().Add(wait)
+		m.mu.Unlock()
+	}
+
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, (2<<20)+1))
 	if err != nil || len(raw) > 2<<20 {
 		return nil, resp.StatusCode, errors.New("Provider response exceeds limit")

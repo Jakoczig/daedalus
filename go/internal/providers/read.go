@@ -44,7 +44,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			return cached, nil
 		}
 	}
-	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven") && m.history != nil {
+	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
 		raw, err := m.history.CachedReference(id, cacheKey, m.opts.Now())
 		if err != nil {
 			m.mu.Unlock()
@@ -63,12 +63,24 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		m.mu.Unlock()
 		return nil, errors.New("Separate public community-goals read consent required")
 	}
+	if id == "inara" && m.history != nil && kind == "profile" && !m.history.NeedsInara(ctx, m.fid, "commander", []string{"name", "ranks", "squadron"}, m.opts.Now()) {
+		m.mu.Unlock()
+		return nil, errors.New("Local and Frontier facts are current; Inara gap read not needed")
+	}
+	if m.history != nil && kind == "profile" && (id == "frontier" || id == "inara") && (m.fid == "" || m.name == "") {
+		m.mu.Unlock()
+		return nil, errors.New("Verified local commander required before account reconciliation")
+	}
 	if s.busy || m.opts.Now().Before(s.next) {
 		m.mu.Unlock()
 		return nil, errors.New("Provider cooldown active")
 	}
 	if m.history != nil {
-		if err := m.history.AuthorizeRead(id, kind, m.opts.Now()); err != nil {
+		rateID := id
+		if id == "edsm-reference" {
+			rateID = "edsm"
+		}
+		if err := m.history.AuthorizeRead(rateID, kind, m.opts.Now()); err != nil {
 			m.mu.Unlock()
 			return nil, err
 		}
@@ -80,10 +92,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	cred := m.secrets[id]
 	now := m.opts.Now()
 	identity, commander, fid := m.identity, m.name, m.fid
-	if id == "inara" && m.history != nil && kind == "profile" && !m.history.NeedsInara(ctx, fid, "commander", []string{"name", "ranks", "squadron"}, now) {
-		m.mu.Unlock()
-		return nil, errors.New("Local and Frontier facts are current; Inara gap read not needed")
-	}
+
 	m.mu.Unlock()
 	requestCtx, cancel := context.WithTimeout(providerCtx, 8*time.Second)
 	defer cancel()
@@ -96,6 +105,12 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	var body []byte
 	bearer := ""
 	switch id {
+	case "edsm-reference":
+		var err error
+		endpoint, err = m.edsmReferenceEndpoint(requestCtx, kind, query)
+		if err != nil {
+			return nil, err
+		}
 	case "elitebgs", "raven", "canonn":
 		var err error
 		endpoint, err = communityEndpoint(id, kind, query, page)
@@ -192,6 +207,21 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		parsed.ExpiresAt = now.Add(time.Hour).UTC().Format(time.RFC3339)
 		snapshot = parsed
 	}
+	if id == "edsm-reference" {
+		m.mu.Lock()
+		if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
+			m.mu.Unlock()
+			return nil, errors.New("Read consent revoked")
+		}
+		parsed, err := m.normalizeEDSMReference(requestCtx, kind, query, raw, now)
+		m.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		parsed.FetchedAt = snapshot.FetchedAt
+		parsed.ExpiresAt = now.Add(6 * time.Hour).UTC().Format(time.RFC3339)
+		snapshot = parsed
+	}
 	add := func(name string, value any) {
 		if value == nil || len(snapshot.Facts) >= 100 {
 			return
@@ -208,7 +238,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		snapshot.Facts = append(snapshot.Facts, Fact{Name: name, Value: s})
 	}
 	data := object(raw)
-	if data == nil && !(id == "edastro" && kind == "gec") && id != "canonn" && id != "raven" && !(id == "elitebgs" && kind == "ticks") {
+	if data == nil && !(id == "edsm-reference" && kind == "nearby") && !(id == "edastro" && kind == "gec") && id != "canonn" && id != "raven" && !(id == "elitebgs" && kind == "ticks") {
 		return nil, errors.New("Unsupported or oversized provider response")
 	}
 	if (id == "edsm" || id == "inara") && identity != "" && commander != "" && cred.Commander == commander {
@@ -344,7 +374,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			return nil, err
 		}
 	}
-	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven") && m.history != nil {
+	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
 		encoded, _ := json.Marshal(snapshot)
 		expires, _ := time.Parse(time.RFC3339, snapshot.ExpiresAt)
 		if err := m.history.SaveReference(requestCtx, id, cacheKey, encoded, now, expires); err != nil {

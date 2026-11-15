@@ -14,7 +14,7 @@ func TestG2JPairedViewerCannotReadPrivateDatabaseOrAuthorizeProviders(t *testing
 	defer c.CloseNow()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for _, name := range []string{"getGoDataStatus", "queryGoHistory", "backupGoHistory", "exportGoHistory", "stageGoRestore", "rebuildGoHistory", "reimportGoSource", "getGoPublicationPolicy", "setGoPublicationPolicy", "setGoPublicationException", "getGoSourceFacts", "getGoSaleLinks", "confirmGoOrganicSale", "getGoNearest", "previewGoHistorical", "confirmGoHistorical"} {
+	for _, name := range []string{"getGoConstruction", "getGoDataStatus", "queryGoHistory", "backupGoHistory", "exportGoHistory", "stageGoRestore", "rebuildGoHistory", "reimportGoSource", "getGoPublicationPolicy", "setGoPublicationPolicy", "setGoPublicationException", "getGoSourceFacts", "getGoSaleLinks", "confirmGoOrganicSale", "getGoNearest", "previewGoHistorical", "confirmGoHistorical"} {
 		if len(callRPC(t, ctx, c, name)["error"]) == 0 {
 			t.Fatalf("viewer obtained owner operation %s", name)
 		}

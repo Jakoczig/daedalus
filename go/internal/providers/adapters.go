@@ -20,7 +20,7 @@ func allowedEndpoint(u *url.URL) bool {
 	case "spansh.co.uk":
 		return u.RawQuery == "" && spanshPath(u.Path)
 	case "www.edsm.net":
-		return u.Path == "/api-journal-v1" || u.Path == "/api-logs-v1/get-logs"
+		return u.Path == "/api-journal-v1" || u.Path == "/api-logs-v1/get-logs" || u.Path == "/api-v1/sphere-systems" || u.Path == "/api-system-v1/stations" || u.Path == "/api-system-v1/stations/market" || u.Path == "/api-system-v1/stations/shipyard" || u.Path == "/api-system-v1/stations/outfitting"
 	case "inara.cz":
 		return u.Path == "/inapi/v1/"
 	case "edastro.com":
