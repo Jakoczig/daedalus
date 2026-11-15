@@ -48,7 +48,6 @@ test('G2H statistics render fuel and cargo pairs without formatting them as NaN'
   const html = h.html(); assert.doesNotMatch(html, /NaN/); assert.match(html, /16 \/ 32 T/); assert.match(html, /4 \/ 64 T/)
 })
 
-
 test('G2H waiting journal uses a focused empty state, not an empty orbital map', async () => {
   const h = harness('go-terminal-survey', { systemName: '', surveyState: 'waiting_game', bodies: [] })
   h.props.path = '/nav/map'
@@ -68,4 +67,48 @@ test('G2H community stations are visible as selectable system-level map markers'
   assert.match(html, /Garratt Ring|Vinge Silo/)
   assert.match(html, /orbital positions not available/)
   assert.match(html, /aria-pressed="false"/)
+})
+
+test('G2H valid empty system differs from filtered observations and journal startup', async () => {
+  const h = harness('go-terminal-survey', { systemName: 'Empty Fixture', surveyState: 'observed', bodies: [] })
+  h.props.path = '/nav/map'; h.html(); const html = await h.flush()
+  assert.match(html, /No body observations available/)
+  assert.doesNotMatch(html, /Awaiting local journal|No matching observations|Selectable star and body map|Find observed body/)
+  h.broadcast(exploration, 'goExplorationChanged')
+  assert.match(h.html(), /Selectable star and body map/)
+  h.elements('input').find(e => e.props['aria-label'] === 'Find observed body or genus').props.onChange({ target: { value: 'no-such-fixture' } })
+  assert.match(h.html(), /No matching observations/)
+  assert.doesNotMatch(h.html(), /No body observations available/)
+  h.broadcast({ systemName: '', bodies: [] }, 'goExplorationChanged')
+  assert.match(h.html(), /Current system not available yet/)
+  h.unmount()
+})
+
+test('G2H historical requests never display a previously requested system while loading', async () => {
+  const h = harness('go-terminal-survey', name => name === 'getGoSystem' ? { local: { systemName: 'History Beta', bodies: [] }, availability: 'retained' } : exploration)
+  Object.assign(h.props, { path: '/nav/map', system: 'History Beta' })
+  h.html(); await h.flush(); const loaded = await h.flush()
+  assert.match(loaded, /History Beta/)
+  h.props.system = 'History Gamma'
+  assert.doesNotMatch(h.html(), /History Beta/)
+  assert.match(h.html(), /History Gamma/)
+  h.unmount()
+})
+
+test('G2H station inspector retains identity across cache reordering and exposes freshness', async () => {
+  const a = { name: 'Fixture Station A', type: 'Coriolis Starport', distanceLS: 50, updatedAt: '2026-01-01' }
+  const b = { name: 'Fixture Station B', type: 'Outpost', distanceLS: null }
+  let community = { enabled: true, status: 'cached', systemName: exploration.systemName, stations: [a, b], stationsFetchedAt: '2026-11-15', expiresAt: '2026-11-16' }
+  const h = harness('go-terminal-survey', name => name === 'getGoCommunity' ? community : exploration)
+  Object.assign(h.props, { path: '/nav/map', stage: 'G2E' })
+  h.html(); await h.flush(); await h.flush()
+  const select = () => h.elements('button').find(e => e.props.children?.[0]?.props?.children === a.name).props.onClick()
+  select(); let html = h.html(); assert.match(html, /Station inspector/); assert.match(html, /Stations fetched: 2026-11-15/)
+  community = { ...community, status: 'stale', stations: [b, a] }; h.props.communityVersion = 1
+  await h.flush(); html = await h.flush()
+  assert.match(html, /<h2 class="text-info">Fixture Station A/)
+  assert.match(html, /STALE CACHE/)
+  community = { ...community, enabled: false }; h.props.communityVersion = 2
+  await h.flush(); html = await h.flush(); assert.doesNotMatch(html, /Station inspector|Community station markers/)
+  h.unmount()
 })

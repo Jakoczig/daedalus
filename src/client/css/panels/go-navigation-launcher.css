@@ -19,3 +19,12 @@ body:has(.go-launcher)::before,body:has(.go-launcher)::after,.go-launcher *{anim
    window height; keep scrolling inside the launcher because the legacy body
    uses overflow:clip for dashboard windows. */
 .go-launcher{height:100vh;max-height:100vh;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+
+/* The legacy dashboard body zoom must not shrink the launcher's scrollport. */
+body:has(.go-launcher){zoom:1}
+.go-launcher{scrollbar-width:auto;scrollbar-color:var(--color-primary) #100b06}
+.go-launcher :focus-visible{outline:2px solid var(--color-info);outline-offset:3px}
+.go-launcher:focus-visible{outline-offset:-3px}
+.go-launcher input,.go-launcher select{min-width:0;max-width:100%}
+.go-launcher .go-provider-card{min-width:0;overflow-wrap:anywhere}
+.go-launcher .go-provider-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))}

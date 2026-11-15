@@ -66,7 +66,11 @@ func main() {
 	stage := flag.String("stage", "G2D", "G2C, G2D or G2E test stage")
 	reference := flag.String("reference", "", "generated synthetic legacy reference HTML")
 	communityFixture := flag.Bool("community-fixture", false, "explicit synthetic EDSM transport; never contacts provider")
+	deferJournal := flag.Bool("defer-journal", false, "G2H synthetic startup without a known system")
 	flag.Parse()
+	if *deferJournal && filepath.Base(*fixture) != "g2h" {
+		panic("deferred journal requires G2H fixture")
+	}
 	if *fixture == "" || (*stage != "G2D" && *stage != "G2C" && *stage != "G2E") {
 		panic("explicit synthetic fixture/stage required")
 	}
@@ -85,6 +89,9 @@ func main() {
 		raw, err := os.ReadFile(filepath.Join(*fixture, pair[0]))
 		if err != nil {
 			panic(err)
+		}
+		if *deferJournal && pair[1] == "Journal.20260101.01.log" {
+			raw = []byte(`{"timestamp":"2026-01-01T00:00:00Z","event":"Fileheader","gameversion":"synthetic"}` + "\n" + `{"timestamp":"2026-01-01T00:00:01Z","event":"LoadGame","FID":"SYNTHETIC-G2B","Commander":"PRIVATE_SYNTHETIC"}` + "\n")
 		}
 		if err = os.WriteFile(filepath.Join(journalDir, pair[1]), raw, 0600); err != nil {
 			panic(err)
@@ -119,13 +126,31 @@ func main() {
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			if filepath.Base(*fixture) != "g2g" {
+			if filepath.Base(*fixture) != "g2g" && filepath.Base(*fixture) != "g2h" {
 				continue
 			}
 			kind := scanner.Text()
+			if kind == "load" && *deferJournal {
+				raw, err := os.ReadFile(filepath.Join(*fixture, "replay.jsonl"))
+				if err != nil {
+					panic(err)
+				}
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_WRONLY|os.O_APPEND, 0600)
+				if err != nil {
+					panic(err)
+				}
+				_, err = f.Write(append(raw, '\n'))
+				f.Close()
+				if err != nil {
+					panic(err)
+				}
+				continue
+			}
 			at := time.Now().UTC().Format(time.RFC3339Nano)
 			var e any
-			if kind == "jump" {
+			if kind == "empty-system" {
+				e = map[string]any{"event": "Location", "timestamp": at, "StarSystem": "Fixture Empty", "SystemAddress": uint64(9007199254740995)}
+			} else if kind == "jump" {
 				e = map[string]any{"event": "StartJump", "JumpType": "Hyperspace", "timestamp": at, "StarSystem": "Fixture Beta", "SystemAddress": uint64(9007199254740994)}
 			} else if kind == "arrival" {
 				e = map[string]any{"event": "FSDJump", "timestamp": at, "StarSystem": "Fixture Alpha", "SystemAddress": uint64(9007199254740993), "StarPos": []int{3, 4, 5}}

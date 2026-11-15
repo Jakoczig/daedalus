@@ -40,7 +40,18 @@ export function chartScene (bodies, contextBodies = bodies) {
   const ids = new Set(bodies.map(b => b.bodyId))
   return { nodes: [...nodes.values()].filter(n => ids.has(n.body.bodyId) || n.body.virtual), width, height: Math.max(6000, y) }
 }
-export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect, systemKey, stations = [], selectedStation = null, onSelectStation = () => {} }) {
+export const stationKey = station => JSON.stringify([station.name, station.type || ''])
+export function stationIcon (station) {
+  const type = (station.type || '').toLowerCase()
+  if (type.includes('planetary') || type.includes('settlement')) return 'planetary-port'
+  if (type.includes('coriolis')) return 'coriolis-starport'
+  if (type.includes('orbis')) return 'orbis-starport'
+  if (type.includes('ocellus')) return 'ocellus-starport'
+  if (type.includes('carrier')) return 'fleet-carrier'
+  if (type.includes('mega')) return 'megaship'
+  return 'outpost'
+}
+export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect, systemKey, stations = [], selectedStation = null, onSelectStation = () => {}, emptyTitle = 'No matching observations', emptyDescription = 'Change the local filter to see observed bodies.' }) {
   const [showAllStations, setShowAllStations] = useState(false)
   const [zoom, setZoom] = useState(1); const [fit, setFit] = useState(true); const viewport = useRef(null); const [bounds, setBounds] = useState({ width: 800, height: 500 })
   useEffect(() => { setFit(true); setZoom(1); setShowAllStations(false); if (viewport.current) { viewport.current.scrollTop = 0; viewport.current.scrollLeft = 0 } }, [systemKey])
@@ -48,36 +59,39 @@ export default function GoTerminalChart ({ bodies, contextBodies, selected, onSe
   const scene = useMemo(() => chartScene(bodies, contextBodies), [bodies, contextBodies])
   const scale = Math.max(0.001, Math.min(bounds.width / scene.width, bounds.height / scene.height)); const labelSize = fit ? Math.max(270, 10 / scale) : 270; const shortName = name => { if (!fit) return name; if (name === systemKey) return 'Primary'; return name.startsWith(systemKey + ' ') ? name.slice(systemKey.length + 1) : name.length > 16 ? name.slice(0, 15) + '…' : name }
   return (
-    <section className='go-chart navigation-panel__map' aria-label='System visual map'>
+    <section className={`go-chart navigation-panel__map ${stations.length ? 'go-chart--stations' : ''}`} aria-label='System visual map'>
       <div className='navigation-panel__map-frame'><div className='navigation-panel__map-frame-border navigation-panel__map-frame-border-top-left' /><div className='navigation-panel__map-frame-border navigation-panel__map-frame-border-top-right' /><div className='navigation-panel__map-frame-border navigation-panel__map-frame-border-bottom-left' /><div className='navigation-panel__map-frame-border navigation-panel__map-frame-border-bottom-right' /></div>
-      <div className='go-chart__tools'><button type='button' onClick={() => { setFit(false); setZoom(z => Math.min(3, z + 0.25)) }} aria-label='Zoom in'><Icon name='search' /> +</button><button type='button' onClick={() => { setFit(false); setZoom(z => Math.max(0.4, z - 0.25)) }} aria-label='Zoom out'>−</button><button type='button' onClick={() => { setFit(true); setZoom(1) }}>Fit</button><span>Schematic · {bodies.length} observations</span></div>
+      <div className='go-chart__tools'><button type='button' disabled={!bodies.length} onClick={() => { setFit(false); setZoom(z => Math.min(3, z + 0.25)) }} aria-label='Zoom in'><Icon name='search' /> +</button><button type='button' disabled={!bodies.length} onClick={() => { setFit(false); setZoom(z => Math.max(0.4, z - 0.25)) }} aria-label='Zoom out'>−</button><button type='button' disabled={!bodies.length} onClick={() => { setFit(true); setZoom(1) }}>Fit</button><span>Schematic · {bodies.length} observations</span></div>
       <div className='go-chart__viewport scrollable' ref={viewport}>
-        <svg aria-label='Selectable star and body map' role='group' viewBox={`0 0 ${scene.width} ${scene.height}`} style={{ width: fit ? '100%' : `${Math.max(900, scene.width / 12) * zoom}px`, height: fit ? '100%' : `${Math.max(430, scene.height / 12) * zoom}px` }}>
-          <defs><filter id='svg-filter__star-glow--light'><feGaussianBlur stdDeviation='18' /><feMerge><feMergeNode /><feMergeNode in='SourceGraphic' /></feMerge></filter></defs>
-          {scene.nodes.map(n => {
-            if (n.body.virtual) return <g key={'bary-' + n.body.bodyId} aria-label={n.body.name}><circle cx={n.x} cy={n.y} r='180' fill='none' stroke='currentColor' strokeWidth='30' /><text className='go-chart__name' style={{ fontSize: labelSize }} x={n.x} y={n.y - 500} textAnchor='middle'>{n.body.name}</text></g>
-            const b = n.body; const p = n.parent; const object = { id: `go-${b.bodyId}`, name: b.name || `Body ${b.bodyId}`, label: b.name || `Body ${b.bodyId}`, type: b.details?.isStar ? 'Star' : 'Planet', subType: b.details?.isStar ? legacyStarSubtype(b.kind) : b.kind, atmosphereType: b.atmosphere, isLandable: b.landable === true, distanceToArrival: b.distanceLS ?? 0, orbitsStar: false, rings: !!b.details?.rings?.length, _x: n.x, _y: n.y, _r: n.radius }; const choose = () => onSelect(b.bodyId)
-            return (
-              <g key={b.bodyId} className='go-chart__body' role='button' tabIndex={0} aria-label={`Inspect ${object.name}`} aria-pressed={selected === b.bodyId} onClick={choose} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose() } }}>
-                <circle cx={n.x} cy={n.y} r={fit ? Math.min(1100, Math.max(n.radius, 10 / scale)) : n.radius} fill='transparent' />
-                {p && !n.unresolved && <path d={`M ${p.x} ${p.y} L ${n.x} ${p.y} L ${n.x} ${n.y}`} fill='none' stroke='currentColor' strokeWidth='12' opacity='.3' />}
-                {selected === b.bodyId && <circle cx={n.x} cy={n.y} r={n.radius + 230} className='go-chart__selection' />}
-                <SystemMapObject systemObject={object} setSystemObject={choose} labels={false} />
-                {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y - n.radius - 450} textAnchor='middle' className='go-chart__name' style={{ fontSize: labelSize }}>{shortName(object.name)}</text>}
-                {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y + n.radius + 540} textAnchor='middle' className='go-chart__caption' style={{ fontSize: fit ? labelSize * 0.8 : 190 }}>{n.unresolved ? 'Parent unobserved' : b.details?.isStar ? `Class ${b.kind}` : b.distanceLS == null ? 'Distance unknown' : `${b.distanceLS.toFixed(1)} LS`}</text>}
-                {b.bioSignals > 0 && <text x={n.x} y={n.y + n.radius + 880} textAnchor='middle' className='go-chart__bio'>BIO {b.bioSignals}</text>}
-              </g>
-            )
-          })}
-        </svg>
+        {bodies.length > 0 && (
+          <svg aria-label='Selectable star and body map' role='group' viewBox={`0 0 ${scene.width} ${scene.height}`} style={{ width: fit ? '100%' : `${Math.max(900, scene.width / 12) * zoom}px`, height: fit ? '100%' : `${Math.max(430, scene.height / 12) * zoom}px` }}>
+            <defs><filter id='svg-filter__star-glow--light'><feGaussianBlur stdDeviation='18' /><feMerge><feMergeNode /><feMergeNode in='SourceGraphic' /></feMerge></filter></defs>
+            {scene.nodes.map(n => {
+              if (n.body.virtual) return <g key={'bary-' + n.body.bodyId} aria-label={n.body.name}><circle cx={n.x} cy={n.y} r='180' fill='none' stroke='currentColor' strokeWidth='30' /><text className='go-chart__name' style={{ fontSize: labelSize }} x={n.x} y={n.y - 500} textAnchor='middle'>{n.body.name}</text></g>
+              const b = n.body; const p = n.parent; const object = { id: `go-${b.bodyId}`, name: b.name || `Body ${b.bodyId}`, label: b.name || `Body ${b.bodyId}`, type: b.details?.isStar ? 'Star' : 'Planet', subType: b.details?.isStar ? legacyStarSubtype(b.kind) : b.kind, atmosphereType: b.atmosphere, isLandable: b.landable === true, distanceToArrival: b.distanceLS ?? 0, orbitsStar: false, rings: !!b.details?.rings?.length, _x: n.x, _y: n.y, _r: n.radius }; const choose = () => onSelect(b.bodyId)
+              return (
+                <g key={b.bodyId} className='go-chart__body' role='button' tabIndex={0} aria-label={`Inspect ${object.name}`} aria-pressed={selected === b.bodyId} onClick={choose} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose() } }}>
+                  <circle cx={n.x} cy={n.y} r={fit ? Math.min(1100, Math.max(n.radius, 10 / scale)) : n.radius} fill='transparent' />
+                  {p && !n.unresolved && <path d={`M ${p.x} ${p.y} L ${n.x} ${p.y} L ${n.x} ${n.y}`} fill='none' stroke='currentColor' strokeWidth='12' opacity='.3' />}
+                  {selected === b.bodyId && <circle cx={n.x} cy={n.y} r={n.radius + 230} className='go-chart__selection' />}
+                  <SystemMapObject systemObject={object} setSystemObject={choose} labels={false} />
+                  {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y - n.radius - 450} textAnchor='middle' className='go-chart__name' style={{ fontSize: labelSize }}>{shortName(object.name)}</text>}
+                  {(scene.nodes.length < 36 || !fit || selected === b.bodyId) && <text x={n.x} y={n.y + n.radius + 540} textAnchor='middle' className='go-chart__caption' style={{ fontSize: fit ? labelSize * 0.8 : 190 }}>{n.unresolved ? 'Parent unobserved' : b.details?.isStar ? `Class ${b.kind}` : b.distanceLS == null ? 'Distance unknown' : `${b.distanceLS.toFixed(1)} LS`}</text>}
+                  {b.bioSignals > 0 && <text x={n.x} y={n.y + n.radius + 880} textAnchor='middle' className='go-chart__bio'>BIO {b.bioSignals}</text>}
+                </g>
+              )
+            })}
+          </svg>
+        )}
+        {!bodies.length && <div className='go-chart__empty' role='status'><Icon name='scan' /><h3>{emptyTitle}</h3><p>{emptyDescription}</p></div>}
       </div>
       {stations.length > 0 && (
         <div className='go-chart__stations' role='group' aria-label='Community station markers on system map'>
-          <div className='go-chart__station-heading'><strong>◆ STATIONS · {stations.length} EDSM</strong><small>System-level markers; orbital positions not available</small></div>
+          <div className='go-chart__station-heading'><strong>STATIONS · {stations.length} EDSM</strong><small>Nonspatial system reference · orbital positions not available</small></div>
           <div className='go-chart__station-scroll'>
-            {stations.slice(0, showAllStations ? 64 : 6).map((station, index) => (
-              <button key={station.name + '-' + index} type='button' className='go-chart__station-marker' aria-pressed={selectedStation === index} title={[station.name, station.type, station.distanceLS == null ? 'Arrival distance unknown' : station.distanceLS + ' LS'].filter(Boolean).join(' · ')} onClick={() => onSelectStation(index)}>
-                <span aria-hidden='true'>◆</span><span>{station.name}</span>
+            {stations.slice(0, showAllStations ? 64 : 6).map(station => (
+              <button key={stationKey(station)} type='button' className='go-chart__station-marker' aria-pressed={selectedStation === stationKey(station)} title={[station.name, station.type, station.distanceLS == null ? 'Arrival distance unknown' : station.distanceLS + ' LS'].filter(Boolean).join(' · ')} onClick={() => onSelectStation(stationKey(station))} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectStation(stationKey(station)) } }}>
+                <Icon name={stationIcon(station)} /><span>{station.name}</span>
               </button>
             ))}
           </div>

@@ -20,13 +20,26 @@ async function main () {
     await navigate('/launcher', 'NATIVE COMPANION'); await waitFor(() => evaluate('document.body.innerText.includes(\'Paired / connected devices\')'))
     if (await evaluate('!!document.querySelector(\'.go-terminal\')') || rpcNames.some(n => ['getGoWorkspace', 'getGoExploration', 'getGoNavigation'].includes(n))) throw new Error('Launcher instantiated the dashboard pipeline')
     report.launcher = await sample(); report.launcher.noDashboardRPC = true; await screenshot('launcher-laptop')
-    await c.call('Emulation.setDeviceMetricsOverride', { width: 820, height: 580, deviceScaleFactor: 1, mobile: false })
-    await navigate('/launcher', 'NATIVE COMPANION')
-    await evaluate('Array.from(document.querySelectorAll(".go-launcher-actions button")).find(b=>b.textContent==="Settings").click()')
-    await waitFor(() => evaluate('!!document.querySelector(".go-companion-settings")'))
-    const launcherScroll = await evaluate('(()=>{const e=document.querySelector(".go-launcher");const extra=e.scrollHeight-e.clientHeight;e.scrollTop=e.scrollHeight;return {extra,scrollTop:e.scrollTop}})()')
-    if (launcherScroll.extra < 100 || launcherScroll.scrollTop < 100) throw new Error('Launcher settings cannot scroll: ' + JSON.stringify(launcherScroll))
-    await screenshot('launcher-settings-scrolled'); report.launcher.settingsScroll = launcherScroll
+    report.launcher.settingsScroll = []
+    for (const [label, width, height, factor] of [['native', 680, 580, 1], ['scaled150', 680, 580, 1.5], ['reduced125', 544, 464, 1.25]]) {
+      await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: factor, mobile: false })
+      await navigate('/launcher', 'NATIVE COMPANION')
+      await evaluate('Array.from(document.querySelectorAll(".go-launcher-actions button")).find(b=>b.textContent==="Settings").click()')
+      await waitFor(() => evaluate('!!document.querySelector(".go-companion-settings .go-data-providers summary")'))
+      await evaluate('document.querySelector(".go-companion-settings .go-data-providers summary").focus()')
+      await c.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
+      await c.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+      await waitFor(() => evaluate('document.querySelector(".go-companion-settings .go-data-providers").open&&document.querySelectorAll(".go-provider-card").length===5'))
+      await evaluate('(()=>{const links=document.querySelectorAll(".go-provider-card a");links[links.length-1].focus()})()')
+      const focus = await evaluate('(()=>{const e=document.querySelector(".go-launcher"),a=document.activeElement,r=a.getBoundingClientRect();return {label:a.textContent,top:r.top,bottom:r.bottom,height:innerHeight,overflow:e.scrollWidth-e.clientWidth,extra:e.scrollHeight-e.clientHeight,scrollTop:e.scrollTop}})()')
+      if (focus.label !== 'Provider documentation' || focus.extra < 100 || focus.scrollTop < 100 || focus.top < 0 || focus.bottom > height + 2 || focus.overflow > 2) throw new Error('Launcher keyboard focus/settings clipped: ' + JSON.stringify(focus))
+      await screenshot('launcher-settings-' + label)
+      await evaluate('(()=>{const e=document.querySelector(".go-launcher");e.focus();e.scrollTop=0})()')
+      await c.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'PageDown', code: 'PageDown', windowsVirtualKeyCode: 34 })
+      await c.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'PageDown', code: 'PageDown', windowsVirtualKeyCode: 34 })
+      await waitFor(() => evaluate('document.querySelector(".go-launcher").scrollTop>20'))
+      report.launcher.settingsScroll.push({ case: label, width, height, factor, ...focus, keyboardScroll: true })
+    }
     await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
     await navigate('/ship/status', 'POWER DISTRIBUTION'); await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Ship lights: On"]\')')); report.dashboard = await sample()
     for (const [viewport, width, height] of (focused ? [] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['portrait', 820, 1180]])) {
