@@ -193,6 +193,9 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record, c
 			if entity == "" {
 				entity = identifier(v["BodyID"])
 			}
+			if e.Type == "ScanOrganic" {
+				entity = identifier(v["Body"])
+			}
 			stmt := domainStatements[table]
 			if stmt == nil {
 				stmt, err = tx.Prepare("INSERT INTO " + table + "(commander_fid,source_event_id,entity_id,system_address,observed_at,raw_json) VALUES(?,?,?,?,?,?)")
