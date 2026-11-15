@@ -64,3 +64,18 @@ func TestSurfaceDistanceAndCorrelation(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveSpacingUsesNearestKnownSampleAndPreservesUnknownMinimum(t *testing.T) {
+	p := Position{Latitude: 0, Longitude: 0, Radius: 1000000}
+	a := Position{Latitude: 0, Longitude: 0.01, Radius: 1000000}
+	b := Position{Latitude: 0, Longitude: 0.02, Radius: 1000000}
+	minimum := 500.0
+	s := LiveSpacing(p, []Position{a, b}, &minimum, true)
+	if s.DistanceM == nil || math.Abs(*s.DistanceM-174.5329) > 0.01 || s.RemainingM == nil || math.Abs(*s.RemainingM-325.4671) > 0.01 {
+		t.Fatal(s)
+	}
+	s = LiveSpacing(p, []Position{a}, nil, false)
+	if s.RemainingM != nil || s.AllLocationsKnown {
+		t.Fatal("unknown eligibility hidden", s)
+	}
+}
