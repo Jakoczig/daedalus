@@ -44,6 +44,19 @@ func newProjectionState() projectionState {
 	return projectionState{parity: paritystate.NewModel(), activity: activitystate.NewModel(), ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
 }
 func (s *Service) projectionLocked() Projections {
+	if s.cachedProjection != nil && s.summary.ImportInProgress {
+		p := cloneProjection(*s.cachedProjection)
+		p.Source = s.summary
+		p.Ship.Evidence = "cached"
+		p.Navigation.RouteState = "cached"
+		p.Exploration.SurveyState = "cached"
+		if p.Workspace != nil {
+			p.Workspace.Parity.Evidence = "cached"
+			p.Workspace.Parity.Status.State = "stale_source"
+		}
+		return p
+	}
+
 	p := Projections{Ship: s.views.ship.View(s.active), Source: s.summary, Navigation: s.views.navigation.View(s.active)}
 	address := s.unknown.systemAddress
 	if s.active != "" {
@@ -78,6 +91,16 @@ func (s *Service) projectionLocked() Projections {
 		}
 		if len(p.Exploration.Bodies) > 0 {
 			p.Exploration.SurveyState = "stale_source"
+		}
+	}
+	if s.summary.Cached {
+		p.Ship.Evidence = "cached"
+		if p.Workspace != nil {
+			p.Workspace.Parity.Evidence = "cached"
+			p.Workspace.Activity.Evidence = "cached"
+		}
+		if p.Exploration.SystemName != "" {
+			p.Exploration.SurveyState = "cached"
 		}
 	}
 	return p
