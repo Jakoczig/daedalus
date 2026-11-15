@@ -11,6 +11,9 @@ import (
 // The numerical CAPI commander.id is not assumed to be a journal FID. The
 // authenticated response must match the exact name of the current verified FID.
 func normalizedCommander(id, kind, fid, name string, data map[string]any, now time.Time) (history.ExternalFacts, error) {
+	// Current profile contracts do not provide a trustworthy per-field observed-at
+	// timestamp. Keep Observed unknown; neither fetch time nor arbitrary response
+	// timestamps prove that these values postdate witnessed journal facts.
 	x := history.ExternalFacts{Provider: id, Entity: "commander", EntityID: fid, FID: fid, Fetched: now, Expires: now.Add(5 * time.Minute), Fields: map[string]any{}}
 	if fid == "" || name == "" {
 		return x, errors.New("Verified local commander required")

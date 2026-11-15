@@ -55,6 +55,11 @@ Service, never SQLite. Provider sees IP and requested/submitted location fields.
 Historical preview returns sanitized outgoing event fields, never request keys.
 Timeout delivery stays uncertain and is not silently retried as a new submission.
 
+After sale is **hold + manual review only**, with no automatic sale-triggered
+uploads. Manual review cannot authorize unsupported delayed recipients (EDDN,
+EDSM or EDAstro). Inara's existing approved-category one-off historical review
+still requires account/application approval, sale proof where applicable and
+explicit owner reconfirmation. No automatic delayed-upload contract is assumed.
 After sale holds location-sensitive categories across destinations. A live-only
 exception names one exact recipient/category and requires a separate disclosure
 acknowledgment. Sale evidence alone never enables a provider or enqueues history.

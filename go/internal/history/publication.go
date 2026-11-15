@@ -20,6 +20,7 @@ type LiveException struct {
 }
 type PublicationPolicy struct {
 	Mode       string           `json:"mode"`
+	Notice     string           `json:"notice"`
 	Exceptions []LiveException  `json:"exceptions"`
 	Counts     map[string]int64 `json:"counts"`
 }
@@ -32,6 +33,9 @@ func (s *Store) PublicationPolicy(fid string) (PublicationPolicy, error) {
 	err := s.reader.QueryRow("SELECT mode FROM publication_policy WHERE commander_fid=?", fid).Scan(&v.Mode)
 	if err != nil && err != sql.ErrNoRows {
 		return v, err
+	}
+	if v.Mode == "After sale" {
+		v.Notice = "After sale: hold + manual review only. No automatic sale-triggered uploads. Manual review cannot authorize unsupported delayed recipients; EDDN is live-only. Separately consented fresh live exceptions remain independent."
 	}
 	rows, err := s.reader.Query("SELECT provider,category,enabled FROM publication_exceptions WHERE commander_fid=? LIMIT 100", fid)
 	if err != nil {
@@ -135,7 +139,7 @@ func (s *Store) Candidate(fid, provider, category string, e journal.Event, phase
 						v.Reason = "Explicit historical Inara selection within documented 30-day window"
 					} else {
 						v.Status = "ineligible_delayed"
-						v.Reason = "Delayed contract not verified for this recipient; live-only relay requires a separate fresh exception"
+						v.Reason = "After sale: hold + manual review only; delayed contract not verified for this recipient. Manual review cannot authorize unsupported delayed recipients; live-only relay requires a separate fresh exception"
 					}
 				} else {
 					v.Status = "ambiguous"

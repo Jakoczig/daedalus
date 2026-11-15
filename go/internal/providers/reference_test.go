@@ -49,3 +49,14 @@ func TestCommanderProfilesRejectFuzzyIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestCommanderProfileFetchDoesNotInventObservationTime(t *testing.T) {
+	now := time.Date(2026, 11, 15, 12, 6, 0, 0, time.UTC)
+	x, err := normalizedCommander("frontier", "profile", "SYNTHETIC-A", "Exact", object([]byte(`{"timestamp":"2026-11-15T12:06:00Z","commander":{"name":"Exact","credits":100,"observedAt":"2026-11-15T12:06:00Z"}}`)), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !x.Observed.IsZero() || !x.Fetched.Equal(now) || x.Fields["credits"] != "100" {
+		t.Fatal("unsupported response timestamp became witnessed evidence", x)
+	}
+}

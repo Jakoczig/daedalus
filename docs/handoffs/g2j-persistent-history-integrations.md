@@ -5,6 +5,37 @@ The new [draft PR #14](https://github.com/Jakoczig/daedalus/pull/14) is on `go/g
 `go/g2h-unified-navigation-integrations`; its final head, exact CI run links and
 artifact digests are recorded in that PR's consolidated delivery report.
 
+## Targeted external-review correction
+
+The [review of `4c7aced`](https://github.com/Jakoczig/daedalus/pull/14#issuecomment-6897442992)
+confirmed two gaps. After sale now explicitly means **hold + manual review only**
+in the timing selector, policy status and unsupported-recipient reasons. No
+automatic sale-triggered upload contract was verified, so none was invented.
+EDDN stays live-only; EDSM/EDAstro delayed release stays unsupported. Existing
+Inara one-off historical review and separately consented fresh live exceptions
+remain unchanged. A mocked transport proves zero outbound requests for proven
+scans, unsold scans and ambiguous organic sales, including restart and commander
+switch. There is deliberately no automatic exactly-one Scan submission fixture:
+none of the current Scan recipients has a verified delayed-upload contract.
+
+Effective facts now distinguish retrieval TTL from observation chronology. A
+valid witnessed journal observation remains authoritative until the preferred
+fresh external source proves a strictly newer, nonfuture observation, no later
+than its fetch time (five-second clock tolerance). Unknown/older/equal/expired
+remote evidence remains inspectable as alternatives. Frontier retains precedence
+among fresh external sources. CAPI profile normalization deliberately leaves
+observed-at unknown because no trustworthy per-field contract is available.
+
+Before implementation, regression tests reproduced the manual-only disclosure
+gap and stale/unknown Frontier values overriding six-minute-old journal credits.
+After correction, full focused history/provider packages and the rendered React
+policy test passed. Tests also cover newer validated Frontier evidence, invalid
+future timestamps, persisted restart evidence and commander isolation. Final
+Windows/Linux native, race, security, browser and artifact evidence for the
+correction commit is recorded in PR #14; earlier `4c7aced` CI is not correction
+evidence. No schema migration, credentials, consent expansion or upload behavior
+was added by these corrections.
+
 Implementation commits:
 
 - [`eea3608`](https://github.com/Jakoczig/daedalus/commit/eea360867e7a1b5967911c2da0f88682a9011084): native SQLite WAL, normalized retained history, atomic checkpoints/reducers, migrations and verified recovery.

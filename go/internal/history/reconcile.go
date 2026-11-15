@@ -149,6 +149,35 @@ func (s *Store) EffectiveFacts(ctx context.Context, fid, entity string, now time
 	out := []EffectiveFact{}
 	for field, a := range values {
 		sort.SliceStable(a, func(i, j int) bool { return score(a[i]) > score(a[j]) })
+		// Cache TTL describes retrieval freshness, not when the source witnessed
+		// a fact. An old journal observation remains evidence even after its
+		// advisory freshness window. Prefer the best external source only when
+		// it can prove a strictly newer observation; never use fetch time as proof.
+		local, remote := -1, -1
+		for i, v := range a {
+			if v.Source == "journal" {
+				local = i
+			} else if remote == -1 {
+				remote = i // Frontier retains priority among fresh external sources.
+			}
+		}
+		if local >= 0 {
+			observed, err := time.Parse(time.RFC3339Nano, a[local].Observed)
+			if err == nil && !observed.IsZero() && !observed.After(now.Add(5*time.Second)) {
+				winner := local
+				if remote >= 0 && !a[remote].Stale {
+					r, re := time.Parse(time.RFC3339Nano, a[remote].Observed)
+					f, fe := time.Parse(time.RFC3339Nano, a[remote].Fetched)
+					if re == nil && fe == nil && r.After(observed) && !r.After(now.Add(5*time.Second)) && !r.After(f.Add(5*time.Second)) {
+						winner = remote
+					}
+				}
+				// Move, rather than discard, all competing evidence.
+				chosen := a[winner]
+				copy(a[1:winner+1], a[:winner])
+				a[0] = chosen
+			}
+		}
 		out = append(out, EffectiveFact{Field: field, FactEvidence: a[0], Alternatives: a[1:]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Field < out[j].Field })
