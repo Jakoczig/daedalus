@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -54,7 +55,41 @@ func newNativeHost(stop func()) (windowHost, error) {
 	return host, nil
 }
 
-func (h *nativeHost) Bind(c *Controller) { h.controller = c; c.Bind(h.Action) }
+func (h *nativeHost) Bind(c *Controller) {
+	h.controller = c
+	c.Bind(h.Action)
+	c.BindClipboard(func(name string) bool {
+		if !h.started.Load() || h.stopped.Load() {
+			return false
+		}
+		return application.InvokeSyncWithResult(func() bool { return h.app.Clipboard.SetText(name) })
+	})
+	c.BindCSV(func(name, data string) error {
+		path, err := h.app.Dialog.SaveFile().SetFilename(name).AddFilter("CSV", "*.csv").PromptForSingleSelection()
+		if err != nil {
+			return err
+		}
+		if path == "" {
+			return errors.New("Export cancelled")
+		}
+		if !strings.EqualFold(filepath.Ext(path), ".csv") {
+			return errors.New("Choose a CSV destination")
+		}
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return errors.New("Choose a new CSV filename; existing files are preserved")
+		}
+		_, err = f.WriteString(data)
+		if err == nil {
+			err = f.Sync()
+		}
+		closeErr := f.Close()
+		if err != nil {
+			return err
+		}
+		return closeErr
+	})
+}
 func (h *nativeHost) Open(localURL string) error {
 	h.trayAvailable = runtime.GOOS != "linux"
 	if runtime.GOOS == "linux" {
