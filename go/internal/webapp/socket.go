@@ -273,6 +273,29 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			} else {
 				response["message"] = s.providers.Layers()
 			}
+		case "getGoFieldView":
+			response["message"] = s.fieldView(principal.role == "owner")
+		case "getGoBioScan":
+			var req struct {
+				Body string `json:"body"`
+			}
+			if s.game == nil || strictDecode(request.Message, &req) != nil || len(req.Body) > 20 {
+				response["error"] = "Invalid BioScan body"
+			} else if v, e := s.game.FieldBio(req.Body, principal.role == "owner"); e != nil {
+				response["error"] = "BioScan unavailable"
+			} else {
+				response["message"] = v
+			}
+		case "getGoBuiltinModules", "setGoBuiltinModule", "importGoItinerary", "getGoItinerary", "editGoItinerary", "copyGoItineraryNext", "exportGoItinerary", "getGoBGSTally", "exportGoBGSTally":
+			if principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			if v, e := s.fieldRPC(readCtx, request.Name, request.Message); e != nil {
+				response["error"] = e.Error()
+			} else {
+				response["message"] = v
+			}
 		case "getGoConstruction", "getGoSaleLinks", "confirmGoOrganicSale", "getGoNearest", "getGoSourceFacts", "getGoDataStatus", "queryGoHistory", "backupGoHistory", "exportGoHistory", "stageGoRestore", "rebuildGoHistory", "reimportGoSource", "getGoPublicationPolicy", "setGoPublicationPolicy", "setGoPublicationException":
 			if principal.role != "owner" {
 				response["error"] = "Local owner required"
