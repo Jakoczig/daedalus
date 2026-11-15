@@ -24,3 +24,23 @@
 
 /* Compact padding cannot retain the older inspector title negative margins. */
 .go-terminal .go-cartography .go-inspector .inspector__title{margin:0 0 .4rem}
+
+
+/* Field-acceptance corrections: intentional empty state and a system-level station
+   index, since EDSM does not supply reliable orbital parent coordinates. */
+.go-terminal .go-cartography--pending{justify-content:flex-start}
+.go-terminal .go-cartography__pending{flex:1;min-height:12rem;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:.8rem;border:1px solid rgba(181,109,26,.35);background:linear-gradient(155deg,rgba(15,8,15,.85),rgba(0,0,0,.65));padding:1.5rem}
+.go-terminal .go-cartography__pending>.icon{font-size:3.5rem;color:var(--color-primary)}
+.go-terminal .go-cartography__pending h3{font-size:1.35rem;color:var(--color-info)}
+.go-terminal .go-cartography__pending p{max-width:36rem;color:var(--color-secondary);font-size:1rem;line-height:1.5}
+.go-terminal .go-chart__stations{position:absolute;z-index:3;bottom:2.1rem;left:.5rem;right:.5rem;display:flex;align-items:center;gap:.4rem;min-width:0;padding:.35rem .55rem;background:rgba(3,5,11,.92);border:1px solid #6f501c;box-sizing:border-box}
+.go-terminal .go-chart__station-heading{display:flex;flex-direction:column;flex:0 0 auto;gap:.1rem;max-width:15rem;font-size:.77rem;color:var(--color-primary)}
+.go-terminal .go-chart__station-heading small{color:var(--color-info);font-size:.65rem;line-height:1.15}
+.go-terminal .go-chart__station-scroll{display:flex;flex:1;min-width:0;gap:.3rem;overflow-x:auto;overflow-y:hidden;padding:.15rem 0}
+.go-terminal .go-chart__station-marker{display:inline-flex;align-items:center;gap:.3rem;flex:0 0 auto;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem;padding:.3rem .45rem;background:rgba(0,20,28,.9);border:1px solid #55788a;color:var(--color-info)}
+.go-terminal .go-chart__station-marker>span:last-child{overflow:hidden;text-overflow:ellipsis}
+.go-terminal .go-chart__station-marker>span:first-child{color:var(--color-secondary)}
+.go-terminal .go-chart__station-marker[aria-pressed='true']{background:var(--color-primary-dark);border-color:var(--color-primary);color:var(--color-primary)}
+.go-terminal .go-chart__station-more{white-space:nowrap;padding:.3rem .4rem;font-size:.72rem;flex:0 0 auto}
+.go-terminal .go-system-stations button{display:block;width:100%;text-align:left;font-size:.85rem;padding:.3rem .4rem;margin:0;border-bottom:1px solid #574028;background:transparent}
+@media(max-width:720px){.go-terminal .go-chart__stations{flex-wrap:wrap}.go-terminal .go-chart__station-heading{max-width:none;width:100%}.go-terminal .go-chart__station-scroll{width:75%}}

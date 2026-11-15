@@ -47,3 +47,25 @@ test('G2H statistics render fuel and cargo pairs without formatting them as NaN'
   const h = harness('go-ship-statistics'); h.props.workspace = { parity: { ship: { fuelMainT: 16, fuelCapacityT: 32, cargoCapacityT: 64 }, cargo: { count: 4 }, modules: [] } }
   const html = h.html(); assert.doesNotMatch(html, /NaN/); assert.match(html, /16 \/ 32 T/); assert.match(html, /4 \/ 64 T/)
 })
+
+
+test('G2H waiting journal uses a focused empty state, not an empty orbital map', async () => {
+  const h = harness('go-terminal-survey', { systemName: '', surveyState: 'waiting_game', bodies: [] })
+  h.props.path = '/nav/map'
+  h.html()
+  const html = await h.flush()
+  assert.match(html, /Current system not available yet/)
+  assert.doesNotMatch(html, /go-chart__viewport|No matching observations|Find observed body/)
+})
+
+test('G2H community stations are visible as selectable system-level map markers', () => {
+  const h = harness('go-terminal-chart')
+  const star = body('0', 'Star')
+  Object.assign(h.props, { bodies: [star], contextBodies: [star], systemKey: 'Fixture Alpha', onSelect () {}, onSelectStation () {}, stations: [{ name: 'Garratt Ring', type: 'Coriolis Starport', distanceLS: 977 }, { name: 'Vinge Silo', type: 'Planetary settlement', distanceLS: 978 }] })
+  const html = h.html()
+  assert.match(html, /Community station markers on system map/)
+  assert.match(html, /STATIONS · 2 EDSM/)
+  assert.match(html, /Garratt Ring|Vinge Silo/)
+  assert.match(html, /orbital positions not available/)
+  assert.match(html, /aria-pressed="false"/)
+})

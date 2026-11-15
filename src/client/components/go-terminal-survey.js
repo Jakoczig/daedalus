@@ -5,6 +5,17 @@ import { useCommunity } from './go-community'
 import { mergeCommunity } from '../lib/go-community'
 import { selectBodies, surveySummary } from '../lib/go-survey'
 import { Icon, Metric, Badge, SampleProgress, Evidence, show } from './go-terminal-widgets'
+function StationInspector ({ station, onClose }) {
+  return (
+    <aside className='inspector navigation-panel__inspector go-inspector go-station-inspector' aria-label='Station inspector'>
+      <div className='inspector__title'><button type='button' aria-label='Close station inspector' onClick={onClose}><Icon name='chevron-right' /></button><h3>EDSM community station</h3></div>
+      <div className='navigation-panel__inspector-heading'><Icon name='location-filled' /><h2 className='text-info'>{station.name}</h2><h3 className='text-primary'>{station.type || 'Type unknown'}</h3></div>
+      <p className='text-secondary'>System-level EDSM reference. This does not establish a particular orbital parent or docking availability.</p>
+      <h4>Distance from arrival <strong className='text-info'>{show(station.distanceLS, 'LS')}</strong></h4><hr />
+      <p>Provider information updated: {station.updatedAt || 'Unknown'}</p>
+    </aside>
+  )
+}
 function BodyInspector ({ body, onClose, navigation }) {
   const d = body.details || {}
   const facts = [['Radius', show(d.radiusKM, 'km')], ['Gravity', show(body.gravityG, 'g', 2)], ['Temperature', show(d.temperatureK, 'K')], ['Pressure', show(d.pressureATM, 'atm', 3)], ['Mass', show(d.isStar ? d.massSolar : d.massEarths, d.isStar ? 'M☉' : 'M⊕')], ['Orbital period', show(d.orbitalDays, 'days')], ['Rotation', show(d.rotationHours, 'hours')], ['Semi-major axis', show(d.semiMajorAU, 'AU', 3)], ['Eccentricity', show(d.eccentricity, '', 3)], ['Axial tilt', show(d.axialTiltDegrees, '°')]]
@@ -44,13 +55,23 @@ export default function GoTerminalSurvey (props) {
   const liveCommunity = useCommunity(props, requested || props.path === '/exploration/biologicals' ? null : current)
   const community = requested ? result?.community : liveCommunity
   const merged = useMemo(() => mergeCommunity(value, community), [value, community])
-  const [selected, setSelected] = useState(undefined); const [query, setQuery] = useState(''); const [filter, setFilter] = useState('all'); const [page, setPage] = useState(0)
+  const [selected, setSelected] = useState(undefined); const [selectedStation, setSelectedStation] = useState(null); const [query, setQuery] = useState(''); const [filter, setFilter] = useState('all'); const [page, setPage] = useState(0)
   const navigation = props.path?.startsWith('/nav/'); const biology = props.path === '/exploration/biologicals'; const list = props.path === '/nav/list'; const bodies = biology ? (value?.bodies || []) : merged
+  const stations = community?.enabled && ['cached', 'stale'].includes(community.status) && community.systemName?.toLowerCase() === value?.systemName?.toLowerCase() ? (community.stations || []) : []
+  useEffect(() => { setSelectedStation(null) }, [value?.systemName])
   const filtered = useMemo(() => selectBodies(bodies, query, biology ? 'biology' : filter), [bodies, query, filter, biology]); const summary = useMemo(() => surveySummary(value?.bodies || []), [value])
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 24) - 1)); const visible = filtered.slice(currentPage * 24, currentPage * 24 + 24)
   // Resolve selected data from the current DTO only, never a retained body object.
-  const body = selected === null ? null : filtered.find(b => b.bodyId === selected) || filtered[0]
+  const station = selectedStation == null ? null : stations[selectedStation] || null
+  const body = station || selected === null ? null : filtered.find(b => b.bodyId === selected) || filtered[0]
   if (!props.connected || !props.ready) return <div className='go-empty' role='status'><Icon name='signal' /><h2>{props.connected ? 'Awaiting service readiness' : 'Service disconnected'}</h2><p>Live observations resume after reconnect.</p></div>
+  if (!requested && !value?.systemName) return (
+    <div className='go-page go-cartography go-cartography--pending' aria-label='Exploration terminal'>
+      <div className='go-page__heading'><div><span className='text-primary'>{biology ? 'EXOBIOLOGY' : list ? 'SYSTEM CATALOGUE' : 'SYSTEM CARTOGRAPHY'}</span><h2>Awaiting local journal</h2></div></div>
+      <div className='go-cartography__pending' role='status'><Icon name='system-orbits' /><h3>Current system not available yet</h3><p>Start Elite Dangerous or choose a journal folder in the companion launcher. Cartography will appear automatically when a current system is known.</p></div>
+      {error && <p role='alert'>{error}</p>}
+    </div>
+  )
   return (
     <div className={`go-page ${navigation ? 'go-cartography' : ''}`} aria-label='Exploration terminal'>
       <div className='go-page__heading'><div><span className='text-primary'>{biology ? 'EXOBIOLOGY' : list ? 'SYSTEM CATALOGUE' : 'SYSTEM CARTOGRAPHY'}</span><h2>{value?.systemName || 'Awaiting local journal'}</h2></div>{!navigation && <Evidence state={value?.surveyState} />}</div>
@@ -59,14 +80,14 @@ export default function GoTerminalSurvey (props) {
       {!navigation && <div className='go-metrics'><Metric label='Observed / reported bodies' value={`${value?.bodies?.length || 0} / ${value?.reportedBodyCount ?? '—'}`} icon='system-bodies' /><Metric label='Your DSS scans' value={summary.mapped} icon='scan' /><Metric label='Biological bodies' value={summary.biologicalBodies} icon='plant' /><Metric label='Analysed organisms' value={summary.analysed} icon='exploration' /></div>}
       <div className='go-toolbar'><label><Icon name='search' /><input aria-label='Find observed body or genus' value={query} placeholder='Find body, class, genus or species' onChange={e => { setQuery(e.target.value); setPage(0) }} /></label>{!biology && <select aria-label='Filter observed bodies' value={filter} onChange={e => { setFilter(e.target.value); setPage(0) }}><option value='all'>All observations</option><option value='landable'>Landable</option><option value='unmapped'>No witnessed DSS</option><option value='biology'>Biological evidence</option></select>}<span>{filtered.length} matches{navigation && ` · ${value?.bodies?.length || 0} local / ${community?.reportedBodyCount ?? community?.bodyCount ?? value?.reportedBodyCount ?? '—'} ${community?.reportedBodyCount != null ? 'community reported' : 'journal reported'}`}</span>{!navigation && <><button disabled={!currentPage} onClick={() => setPage(currentPage - 1)} aria-label='Previous bodies'>‹</button><span>{currentPage + 1}/{Math.max(1, Math.ceil(filtered.length / 24))}</span><button disabled={(currentPage + 1) * 24 >= filtered.length} onClick={() => setPage(currentPage + 1)} aria-label='Next bodies'>›</button></>}</div>
       {value?.truncated && <p className='go-warning' role='alert'>Partial catalogue: a cache or display budget was reached.</p>}
-      {navigation && community?.stations?.length > 0 && <details className='go-community-stations go-system-stations'><summary>Community stations ({community.stations.length}) · system reference</summary>{community.stations.map((station, i) => <div key={i}><strong>{station.name}</strong><span> · {station.type} · {show(station.distanceLS, 'LS')} · Provider information updated {station.updatedAt || 'unknown'}</span></div>)}</details>}
-      <div className={`go-workspace ${body ? '' : 'go-workspace--wide'}`}>
+      {navigation && stations.length > 0 && <details className='go-community-stations go-system-stations'><summary>Community stations ({stations.length}) · system reference</summary>{stations.map((station, i) => <button type='button' key={station.name + '-' + i} onClick={() => setSelectedStation(i)}><strong>{station.name}</strong><span> · {station.type} · {show(station.distanceLS, 'LS')} · Provider information updated {station.updatedAt || 'unknown'}</span></button>)}</details>}
+      <div className={`go-workspace ${body || station ? '' : 'go-workspace--wide'}`}>
         <main className='go-workspace__main'>
-          {biology ? <div className='go-bio-worklist'>{visible.map(b => <button type='button' className={`go-bio-card ${body?.bodyId === b.bodyId ? 'is-selected' : ''}`} key={b.bodyId} onClick={() => setSelected(b.bodyId)}><div><Icon name='planet' /><h3>{b.name || `Body ${b.bodyId}`}</h3><span className='text-primary'>{b.bioSignals ?? '—'} confirmed biological signals</span></div><div className='go-chip-row'>{b.genuses?.map(g => <Badge key={g}>{g}</Badge>)}</div>{b.organisms?.length ? b.organisms.map((o, i) => <div key={i}><strong>{o.species}</strong><SampleProgress organism={o} /></div>) : <p className='text-muted'>Organic sampling not yet witnessed. Genus is not a species prediction.</p>}</button>)}</div> : list ? <div className='go-body-list'>{filtered.map(b => <button type='button' key={b.bodyId} onClick={() => setSelected(b.bodyId)} className={body?.bodyId === b.bodyId ? 'is-selected' : ''}><Icon name={b.details?.isStar ? 'star' : 'planet'} /><div><strong>{b.name || `Body ${b.bodyId}`}</strong><small>{b.kind || 'Class unknown'} · {b.source === 'community' ? 'EDSM community reported' : 'Local witnessed'}</small></div><span>{show(b.distanceLS, 'LS')}</span><Badge>{b.source === 'community' ? 'EDSM' : b.dssMapped ? 'DSS' : '—'}</Badge><Badge tone='text-success'>{b.bioSignals ?? '—'} BIO</Badge></button>)}</div> : <GoTerminalChart systemKey={value?.systemName} bodies={filtered} contextBodies={bodies} selected={body?.bodyId} onSelect={setSelected} />}
+          {biology ? <div className='go-bio-worklist'>{visible.map(b => <button type='button' className={`go-bio-card ${body?.bodyId === b.bodyId ? 'is-selected' : ''}`} key={b.bodyId} onClick={() => setSelected(b.bodyId)}><div><Icon name='planet' /><h3>{b.name || `Body ${b.bodyId}`}</h3><span className='text-primary'>{b.bioSignals ?? '—'} confirmed biological signals</span></div><div className='go-chip-row'>{b.genuses?.map(g => <Badge key={g}>{g}</Badge>)}</div>{b.organisms?.length ? b.organisms.map((o, i) => <div key={i}><strong>{o.species}</strong><SampleProgress organism={o} /></div>) : <p className='text-muted'>Organic sampling not yet witnessed. Genus is not a species prediction.</p>}</button>)}</div> : list ? <div className='go-body-list'>{filtered.map(b => <button type='button' key={b.bodyId} onClick={() => setSelected(b.bodyId)} className={body?.bodyId === b.bodyId ? 'is-selected' : ''}><Icon name={b.details?.isStar ? 'star' : 'planet'} /><div><strong>{b.name || `Body ${b.bodyId}`}</strong><small>{b.kind || 'Class unknown'} · {b.source === 'community' ? 'EDSM community reported' : 'Local witnessed'}</small></div><span>{show(b.distanceLS, 'LS')}</span><Badge>{b.source === 'community' ? 'EDSM' : b.dssMapped ? 'DSS' : '—'}</Badge><Badge tone='text-success'>{b.bioSignals ?? '—'} BIO</Badge></button>)}</div> : <GoTerminalChart systemKey={value?.systemName} bodies={filtered} contextBodies={bodies} selected={body?.bodyId} onSelect={id => { setSelectedStation(null); setSelected(id) }} stations={stations} selectedStation={selectedStation} onSelectStation={setSelectedStation} />}
           {!visible.length && <div className='go-empty'><Icon name='scan' /><h3>No matching observations</h3><p>Scan in game or change the local filter.</p></div>}
           {!navigation && <div className='go-body-strip' aria-label='Body selection'>{visible.map(b => <button key={b.bodyId} aria-pressed={body?.bodyId === b.bodyId} onClick={() => setSelected(b.bodyId)} title={b.kind}><Icon name={b.details?.isStar ? 'star' : 'planet'} />{b.name || `#${b.bodyId}`}</button>)}</div>}
         </main>
-        {body && <BodyInspector body={body} navigation={navigation} onClose={() => setSelected(null)} />}
+        {station ? <StationInspector station={station} onClose={() => setSelectedStation(null)} /> : body && <BodyInspector body={body} navigation={navigation} onClose={() => setSelected(null)} />}
       </div>
       {!navigation && <footer className='go-evidence-foot'><span>{value?.allBodiesFound ? 'FSS completion witnessed' : 'Partial local survey'} · FSS {value?.fssProgress == null ? '—' : `${Math.round(value.fssProgress * 100)}%`}</span><span>{biology ? 'Sampling is last-known journal evidence; historical analysis is not sale inventory.' : 'Local + optional community schematic · explicit provider consent · no game control'}</span></footer>}
     </div>

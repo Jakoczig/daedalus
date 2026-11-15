@@ -40,9 +40,10 @@ export function chartScene (bodies, contextBodies = bodies) {
   const ids = new Set(bodies.map(b => b.bodyId))
   return { nodes: [...nodes.values()].filter(n => ids.has(n.body.bodyId) || n.body.virtual), width, height: Math.max(6000, y) }
 }
-export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect, systemKey }) {
+export default function GoTerminalChart ({ bodies, contextBodies, selected, onSelect, systemKey, stations = [], selectedStation = null, onSelectStation = () => {} }) {
+  const [showAllStations, setShowAllStations] = useState(false)
   const [zoom, setZoom] = useState(1); const [fit, setFit] = useState(true); const viewport = useRef(null); const [bounds, setBounds] = useState({ width: 800, height: 500 })
-  useEffect(() => { setFit(true); setZoom(1); if (viewport.current) { viewport.current.scrollTop = 0; viewport.current.scrollLeft = 0 } }, [systemKey])
+  useEffect(() => { setFit(true); setZoom(1); setShowAllStations(false); if (viewport.current) { viewport.current.scrollTop = 0; viewport.current.scrollLeft = 0 } }, [systemKey])
   useEffect(() => { const element = viewport.current; if (!element || typeof ResizeObserver === 'undefined') return; const measure = () => { const r = element.getBoundingClientRect(); if (r.width && r.height) setBounds({ width: r.width, height: r.height }) }; measure(); const observer = new ResizeObserver(measure); observer.observe(element); return () => observer.disconnect() }, [])
   const scene = useMemo(() => chartScene(bodies, contextBodies), [bodies, contextBodies])
   const scale = Math.max(0.001, Math.min(bounds.width / scene.width, bounds.height / scene.height)); const labelSize = fit ? Math.max(270, 10 / scale) : 270; const shortName = name => { if (!fit) return name; if (name === systemKey) return 'Primary'; return name.startsWith(systemKey + ' ') ? name.slice(systemKey.length + 1) : name.length > 16 ? name.slice(0, 15) + '…' : name }
@@ -70,6 +71,19 @@ export default function GoTerminalChart ({ bodies, contextBodies, selected, onSe
           })}
         </svg>
       </div>
+      {stations.length > 0 && (
+        <div className='go-chart__stations' role='group' aria-label='Community station markers on system map'>
+          <div className='go-chart__station-heading'><strong>◆ STATIONS · {stations.length} EDSM</strong><small>System-level markers; orbital positions not available</small></div>
+          <div className='go-chart__station-scroll'>
+            {stations.slice(0, showAllStations ? 64 : 6).map((station, index) => (
+              <button key={station.name + '-' + index} type='button' className='go-chart__station-marker' aria-pressed={selectedStation === index} title={[station.name, station.type, station.distanceLS == null ? 'Arrival distance unknown' : station.distanceLS + ' LS'].filter(Boolean).join(' · ')} onClick={() => onSelectStation(index)}>
+                <span aria-hidden='true'>◆</span><span>{station.name}</span>
+              </button>
+            ))}
+          </div>
+          {stations.length > 6 && <button type='button' className='go-chart__station-more' aria-expanded={showAllStations} onClick={() => setShowAllStations(v => !v)}>{showAllStations ? 'Fewer' : '+' + (stations.length - 6) + ' more'}</button>}
+        </div>
+      )}
       <p className='go-chart__legend'><span className='text-primary'>●</span> Selected <span className='text-success'>●</span> Biological evidence · Orbital topology schematic, not to scale</p>
     </section>
   )

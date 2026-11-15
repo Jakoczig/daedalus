@@ -20,6 +20,14 @@ async function main () {
     await navigate('/launcher', 'NATIVE COMPANION'); await waitFor(() => evaluate('document.body.innerText.includes(\'Paired / connected devices\')'))
     if (await evaluate('!!document.querySelector(\'.go-terminal\')') || rpcNames.some(n => ['getGoWorkspace', 'getGoExploration', 'getGoNavigation'].includes(n))) throw new Error('Launcher instantiated the dashboard pipeline')
     report.launcher = await sample(); report.launcher.noDashboardRPC = true; await screenshot('launcher-laptop')
+    await c.call('Emulation.setDeviceMetricsOverride', { width: 820, height: 580, deviceScaleFactor: 1, mobile: false })
+    await navigate('/launcher', 'NATIVE COMPANION')
+    await evaluate('Array.from(document.querySelectorAll(".go-launcher-actions button")).find(b=>b.textContent==="Settings").click()')
+    await waitFor(() => evaluate('!!document.querySelector(".go-companion-settings")'))
+    const launcherScroll = await evaluate('(()=>{const e=document.querySelector(".go-launcher");const extra=e.scrollHeight-e.clientHeight;e.scrollTop=e.scrollHeight;return {extra,scrollTop:e.scrollTop}})()')
+    if (launcherScroll.extra < 100 || launcherScroll.scrollTop < 100) throw new Error('Launcher settings cannot scroll: ' + JSON.stringify(launcherScroll))
+    await screenshot('launcher-settings-scrolled'); report.launcher.settingsScroll = launcherScroll
+    await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
     await navigate('/ship/status', 'POWER DISTRIBUTION'); await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Ship lights: On"]\')')); report.dashboard = await sample()
     for (const [viewport, width, height] of (focused ? [] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['portrait', 820, 1180]])) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
