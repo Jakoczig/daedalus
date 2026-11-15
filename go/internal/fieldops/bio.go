@@ -171,6 +171,31 @@ type Position struct {
 	Radius    float64 `json:"radiusM"`
 	At        string  `json:"at"`
 }
+type Spacing struct {
+	At                string   `json:"at"`
+	DistanceM         *float64 `json:"distanceM"`
+	RemainingM        *float64 `json:"remainingM"`
+	AllLocationsKnown bool     `json:"allLocationsKnown"`
+	Notice            string   `json:"notice"`
+}
+
+func LiveSpacing(current Position, previous []Position, minimum *float64, complete bool) Spacing {
+	out := Spacing{At: current.At, AllLocationsKnown: complete, Notice: "Derived from current Status and approximate sample snapshots; never game-confirmed eligibility"}
+	for _, p := range previous {
+		if d, ok := SurfaceDistance(current, p); ok {
+			if out.DistanceM == nil || d < *out.DistanceM {
+				out.DistanceM = &d
+			}
+		} else {
+			out.AllLocationsKnown = false
+		}
+	}
+	if out.DistanceM != nil && minimum != nil && out.AllLocationsKnown {
+		n := math.Max(0, *minimum-*out.DistanceM)
+		out.RemainingM = &n
+	}
+	return out
+}
 
 func validPosition(p Position) bool {
 	return !math.IsNaN(p.Latitude) && !math.IsInf(p.Latitude, 0) && math.Abs(p.Latitude) <= 90 && !math.IsNaN(p.Longitude) && !math.IsInf(p.Longitude, 0) && math.Abs(p.Longitude) <= 180 && p.Radius > 0 && p.Radius < 1e9
