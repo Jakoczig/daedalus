@@ -1,0 +1,554 @@
+{
+  "name": "Fixture Alpha",
+  "id64": 9007199254740993,
+  "bodyCount": 12,
+  "bodies": [
+    {
+      "bodyId": 0,
+      "name": "Fixture Alpha",
+      "type": "Star",
+      "subType": "G star",
+      "solarRadius": 1
+    },
+    {
+      "bodyId": 9007199254740997,
+      "name": "Fixture Alpha 1",
+      "type": "Planet",
+      "subType": "Rocky body",
+      "radius": 9999,
+      "wasMapped": true
+    },
+    {
+      "bodyId": 20,
+      "name": "Fixture Community Planet",
+      "type": "Planet",
+      "subType": "Rocky body",
+      "radius": 2300,
+      "surfaceTemperature": 210,
+      "isLandable": true,
+      "distanceToArrival": 500,
+      "parents": [
+        {
+          "Star": 0
+        }
+      ],
+      "commander": "PRIVATE_PROVIDER",
+      "wasMapped": true
+    }
+  ],
+  "stations": [
+    {
+      "name": "Fixture Community Station",
+      "type": "Coriolis Starport",
+      "distanceToArrival": 500,
+      "updateTime": {
+        "information": "2026-01-01"
+      },
+      "marketId": 9007199254740993
+    },
+    {
+      "name": "Fixture Station 01",
+      "type": "Planetary settlement",
+      "distanceToArrival": 501,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 02",
+      "type": "Orbis Starport",
+      "distanceToArrival": 502,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 03",
+      "type": "Planetary settlement",
+      "distanceToArrival": 503,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 04",
+      "type": "Orbis Starport",
+      "distanceToArrival": 504,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 05",
+      "type": "Planetary settlement",
+      "distanceToArrival": 505,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 06",
+      "type": "Orbis Starport",
+      "distanceToArrival": 506,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 07",
+      "type": "Planetary settlement",
+      "distanceToArrival": 507,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 08",
+      "type": "Orbis Starport",
+      "distanceToArrival": 508,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 09",
+      "type": "Planetary settlement",
+      "distanceToArrival": 509,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 10",
+      "type": "Orbis Starport",
+      "distanceToArrival": 510,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 11",
+      "type": "Planetary settlement",
+      "distanceToArrival": 511,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 12",
+      "type": "Orbis Starport",
+      "distanceToArrival": 512,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 13",
+      "type": "Planetary settlement",
+      "distanceToArrival": 513,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 14",
+      "type": "Orbis Starport",
+      "distanceToArrival": 514,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 15",
+      "type": "Planetary settlement",
+      "distanceToArrival": 515,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 16",
+      "type": "Orbis Starport",
+      "distanceToArrival": 516,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 17",
+      "type": "Planetary settlement",
+      "distanceToArrival": 517,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 18",
+      "type": "Orbis Starport",
+      "distanceToArrival": 518,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 19",
+      "type": "Planetary settlement",
+      "distanceToArrival": 519,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 20",
+      "type": "Orbis Starport",
+      "distanceToArrival": 520,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 21",
+      "type": "Planetary settlement",
+      "distanceToArrival": 521,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 22",
+      "type": "Orbis Starport",
+      "distanceToArrival": 522,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 23",
+      "type": "Planetary settlement",
+      "distanceToArrival": 523,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 24",
+      "type": "Orbis Starport",
+      "distanceToArrival": 524,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 25",
+      "type": "Planetary settlement",
+      "distanceToArrival": 525,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 26",
+      "type": "Orbis Starport",
+      "distanceToArrival": 526,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 27",
+      "type": "Planetary settlement",
+      "distanceToArrival": 527,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 28",
+      "type": "Orbis Starport",
+      "distanceToArrival": 528,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 29",
+      "type": "Planetary settlement",
+      "distanceToArrival": 529,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 30",
+      "type": "Orbis Starport",
+      "distanceToArrival": 530,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 31",
+      "type": "Planetary settlement",
+      "distanceToArrival": 531,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 32",
+      "type": "Orbis Starport",
+      "distanceToArrival": 532,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 33",
+      "type": "Planetary settlement",
+      "distanceToArrival": 533,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 34",
+      "type": "Orbis Starport",
+      "distanceToArrival": 534,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 35",
+      "type": "Planetary settlement",
+      "distanceToArrival": 535,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 36",
+      "type": "Orbis Starport",
+      "distanceToArrival": 536,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 37",
+      "type": "Planetary settlement",
+      "distanceToArrival": 537,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 38",
+      "type": "Orbis Starport",
+      "distanceToArrival": 538,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 39",
+      "type": "Planetary settlement",
+      "distanceToArrival": 539,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 40",
+      "type": "Orbis Starport",
+      "distanceToArrival": 540,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 41",
+      "type": "Planetary settlement",
+      "distanceToArrival": 541,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 42",
+      "type": "Orbis Starport",
+      "distanceToArrival": 542,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 43",
+      "type": "Planetary settlement",
+      "distanceToArrival": 543,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 44",
+      "type": "Orbis Starport",
+      "distanceToArrival": 544,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 45",
+      "type": "Planetary settlement",
+      "distanceToArrival": 545,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 46",
+      "type": "Orbis Starport",
+      "distanceToArrival": 546,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 47",
+      "type": "Planetary settlement",
+      "distanceToArrival": 547,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 48",
+      "type": "Orbis Starport",
+      "distanceToArrival": 548,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 49",
+      "type": "Planetary settlement",
+      "distanceToArrival": 549,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 50",
+      "type": "Orbis Starport",
+      "distanceToArrival": 550,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 51",
+      "type": "Planetary settlement",
+      "distanceToArrival": 551,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 52",
+      "type": "Orbis Starport",
+      "distanceToArrival": 552,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 53",
+      "type": "Planetary settlement",
+      "distanceToArrival": 553,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 54",
+      "type": "Orbis Starport",
+      "distanceToArrival": 554,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 55",
+      "type": "Planetary settlement",
+      "distanceToArrival": 555,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 56",
+      "type": "Orbis Starport",
+      "distanceToArrival": 556,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 57",
+      "type": "Planetary settlement",
+      "distanceToArrival": 557,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 58",
+      "type": "Orbis Starport",
+      "distanceToArrival": 558,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 59",
+      "type": "Planetary settlement",
+      "distanceToArrival": 559,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 60",
+      "type": "Orbis Starport",
+      "distanceToArrival": 560,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 61",
+      "type": "Planetary settlement",
+      "distanceToArrival": 561,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 62",
+      "type": "Orbis Starport",
+      "distanceToArrival": 562,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    },
+    {
+      "name": "Fixture Station 63",
+      "type": "Planetary settlement",
+      "distanceToArrival": null,
+      "updateTime": {
+        "information": "2026-01-01"
+      }
+    }
+  ]
+}

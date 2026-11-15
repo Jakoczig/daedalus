@@ -42,7 +42,7 @@ func TestG2DViewerShipAllowlistAndReadOnly(t *testing.T) {
 	defer cancel()
 	reply := callRPC(t, ctx, c, "getGoShip")
 	raw := reply["message"]
-	onlyKeys(t, raw, "shipType evidence hullHealth fuelMainT fuelCapacityT cargoCapacityT maxJumpRangeLY unladenMassT docked landed")
+	onlyKeys(t, raw, "shipType evidence hullHealth fuelMainT fuelCapacityT cargoCapacityT maxJumpRangeLY unladenMassT docked landed loadoutAt rebuyCredits hullValueCredits modulesValueCredits")
 	if !strings.Contains(string(raw), `"hullHealth":0.82`) || strings.Contains(string(raw), "PRIVATE_") || strings.Contains(string(raw), "123") {
 		t.Fatal("ship public contract", string(raw))
 	}

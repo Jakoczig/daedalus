@@ -3,7 +3,7 @@ const fs = require('node:fs/promises')
 const sync = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
-const { fixture, browser, waitFor, delay } = require('./g2d-visual.cjs')
+const { fixture, browser, waitFor, delay, pageTextReady } = require('./g2d-visual.cjs')
 const root = path.resolve(__dirname, '../..')
 
 function backendSample (pid) {
@@ -42,7 +42,7 @@ async function main () {
   const screenshot = async name => { const value = await client.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, name + '.png'), Buffer.from(value.data, 'base64')) }
   const navigate = async (pathname, expected) => {
     await client.call('Page.navigate', { url: origin + pathname })
-    try { await waitFor(() => evaluate(`document.body.innerText.includes('SERVICE READY') && document.body.innerText.toUpperCase().includes(${JSON.stringify(expected.toUpperCase())})`)) } catch (error) { report.failedPage = { pathname, expected, text: await evaluate('document.body.innerText') }; await screenshot('failed-page'); throw error }
+    try { await waitFor(() => evaluate(pageTextReady(expected, true))) } catch (error) { report.failedPage = { pathname, expected, text: await evaluate('document.body?.innerText || \'\'') }; await screenshot('failed-page'); throw error }
     await evaluate('document.fonts.ready.then(()=>true)'); await delay(400)
     if (pathname === '/ship/status' && await evaluate("!!document.querySelector('.go-parity-ship')")) await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Ship lights: On"]\')'))
   }
@@ -122,13 +122,16 @@ async function main () {
     for (const [viewport, width, height] of (focused ? [['laptop', 1366, 768]] : [['desktop', 1920, 1080], ['laptop', 1366, 768], ['tablet', 820, 1180]])) {
       await client.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
       await navigate('/nav/map', 'SYSTEM CARTOGRAPHY')
-      await waitFor(() => evaluate('document.body.innerText.includes(\'Fixture Community Planet\')'))
+      await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Inspect Fixture Community Planet"]\')'))
       await evaluate('Array.from(document.querySelectorAll(\'.go-chart__body\')).find(b=>b.getAttribute(\'aria-label\')===\'Inspect Fixture Community Planet\').dispatchEvent(new MouseEvent(\'click\',{bubbles:true}))')
       await waitFor(() => evaluate('document.querySelector(\'.go-inspector\')?.innerText.includes(\'personal scan state unknown\')'))
       const mergeCheck = await evaluate('({inspector:document.querySelector(\'.go-inspector\').innerText,privateLeak:document.body.innerText.includes(\'PRIVATE_PROVIDER\'),bodies:document.querySelectorAll(\'.go-chart__body\').length})')
-      if (!mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
+      if (!mergeCheck.inspector.toUpperCase().includes('FIXTURE COMMUNITY PLANET') || !mergeCheck.inspector.includes('YOUR DSS UNKNOWN') || mergeCheck.privateLeak || mergeCheck.bodies !== 4) { await screenshot('community-failed-' + viewport); throw new Error('Community provenance or merge failed: ' + JSON.stringify(mergeCheck)) }
       await evaluate('Array.from(document.querySelectorAll(\'.go-community-stations summary\')).find(e=>e.innerText.includes(\'Community stations\')).click()')
-      if (!await evaluate('document.body.innerText.includes(\'Fixture Community Station\')&&document.body.innerText.includes(\'2026-01-01\')')) throw new Error('Station source freshness missing')
+      const stations = await evaluate('(()=>{const d=document.querySelector(".go-community-stations");return {open:d.open,text:d.textContent}})()')
+      if (!stations.open || !stations.text.includes('Fixture Community Station') || !stations.text.includes('2026-01-01')) throw new Error('Station source freshness missing')
+      await evaluate('document.querySelector(".go-community-stations button").click()')
+      await waitFor(() => evaluate('(()=>{const t=document.querySelector(".go-station-inspector")?.textContent||"";return t.includes("Fixture Community Station")&&t.includes("EDSM community reported")&&t.includes("2026-01-01")&&t.includes("Stations fetched")})()'))
       await screenshot('community-map-' + viewport)
       report.pages.push({ viewport, page: 'community-map', provenance: true, stations: true })
     }
@@ -136,7 +139,7 @@ async function main () {
     await evaluate('document.querySelector(\'.go-data-providers\').open=true')
     await waitFor(() => evaluate('document.querySelector(\'[aria-label="Optional EDSM enrichment"]\')?.textContent.includes(\'Disable EDSM lookups\')'))
     await evaluate('Array.from(document.querySelectorAll(\'[aria-label="Optional EDSM enrichment"] button\')).find(b=>b.textContent===\'Disable EDSM lookups\').click()')
-    await waitFor(() => evaluate('!document.body.innerText.includes(\'Fixture Community Planet\')'))
+    await waitFor(() => evaluate("!document.querySelector('[aria-label=\"Inspect Fixture Community Planet\"]')&&!document.querySelector('.go-station-inspector,.go-chart__stations')"))
     report.community = { mockOnly: true, ownerDisableClears: true }
     if (report.errors.length || report.blockedRequests.length) throw new Error('Runtime errors or unexpected external requests')
     report.passed = true

@@ -116,3 +116,25 @@ func TestG2DMissingIdentityCannotCarryFuel(t *testing.T) {
 		t.Fatal("unknown ship identity retained old fuel")
 	}
 }
+
+func TestG2HLoadoutStatisticsResetWithShip(t *testing.T) {
+	m := NewModel()
+	feed := func(raw string, seq int64) {
+		e, err := journal.ParseLine([]byte(raw), journal.SourcePosition{FileID: "fixture", Offset: seq, Sequence: uint64(seq)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.ApplyEvent("A", e)
+	}
+	feed(`{"event":"LoadGame","FID":"SYNTHETIC","Ship":"asp","ShipID":7}`, 1)
+	feed(`{"timestamp":"2026-11-14T10:00:00Z","event":"Loadout","Ship":"asp","ShipID":7,"ShipName":"Fixture Explorer","Rebuy":123456,"HullValue":5000000,"ModulesValue":4000000,"UnladenMass":280,"MaxJumpRange":45}`, 2)
+	v := m.View("A")
+	if v.LoadoutAt != "2026-11-14T10:00:00Z" || v.RebuyCredits == nil || *v.RebuyCredits != 123456 || v.ShipName != "Fixture Explorer" {
+		t.Fatalf("missing journal statistics: %+v", v)
+	}
+	feed(`{"event":"ShipyardSwap","ShipType":"adder"}`, 3)
+	v = m.View("A")
+	if v.RebuyCredits != nil || v.LoadoutAt != "" || v.ShipName != "" {
+		t.Fatal("old ship statistics retained")
+	}
+}

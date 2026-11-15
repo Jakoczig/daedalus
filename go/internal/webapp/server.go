@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/Jakoczig/daedalus/go/internal/community"
 	"github.com/Jakoczig/daedalus/go/internal/gamestate"
+	"github.com/Jakoczig/daedalus/go/internal/providers"
 	"io/fs"
 	"net"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 )
 
 type Server struct {
+	providers                 *providers.Manager
+	openAuthorization         func(string) error
 	companion                 *companionState
 	launcherReady             chan struct{}
 	launcherOnce              sync.Once
@@ -90,6 +93,10 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 			return nil, err
 		}
 		server.remote = manager
+		if opts.EnableParity {
+			server.providers = providers.New(ctx, dir, opts.ProviderOptions)
+			server.openAuthorization = opts.OpenAuthorization
+		}
 		server.startGame(ctx, opts)
 		if server.g2e {
 			server.community = community.New(dir, opts.CommunityClient)
@@ -132,6 +139,9 @@ func (s *Server) JournalClientReady() <-chan struct{}    { return s.journalReady
 func (s *Server) NavigationClientReady() <-chan struct{} { return s.navigationReady }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
+		if s.providers != nil {
+			s.providers.Close()
+		}
 		if s.community != nil {
 			s.community.Close()
 		}

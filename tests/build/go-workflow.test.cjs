@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2g-'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2h-'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2g-.*experimental-unsigned-companion-navigation/)
+  assert.match(job.steps[upload].with.name, /g2h-.*experimental-unsigned-orbital-integrations/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -113,4 +113,8 @@ test('G2G final companion and visual gates remain mandatory before packaging', (
   assert.ok(w.on.pull_request.branches.includes('go/g2f-usability-edsm'))
   const steps = w.jobs.desktop.steps; const pack = steps.findIndex(s => s.name === 'Package experimental preview')
   for (const name of ['Native G2G companion lifecycle smoke', 'G2G launcher navigation galaxy and display-controller visuals']) { const i = steps.findIndex(s => s.name === name); assert.ok(i > 0 && i < pack); assert.equal(steps[i].if, undefined) }
+})
+
+test('G2H keeps cross-platform native/security gates and new provider/visual checks before previews', () => {
+  const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8')); assert.ok(w.on.pull_request.branches.includes('go/g2g-navigation-launcher')); assert.ok(!w.on.push.branches.includes('go/g2h-unified-navigation-integrations')); const steps = w.jobs.desktop.steps; const pack = steps.findIndex(s => s.name === 'Package experimental preview'); for (const name of ['G2H orbital statistics galaxy and provider privacy visuals', 'G2H provider observation benchmark']) { const i = steps.findIndex(s => s.name === name); assert.ok(i > 0 && i < pack); assert.equal(steps[i].if, undefined) }
 })

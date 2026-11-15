@@ -41,7 +41,7 @@ func TestG2GOwnerOnlyLifecycleAndDevicePolicy(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		msg  any
-	}{{"desktopAction", map[string]string{"action": "quit"}}, {"setGoCompanion", config}, {"getGoLauncher", nil}, {"lookupGoSystem", map[string]string{"name": "Fixture Alpha"}}} {
+	}{{"getGoShipName", nil}, {"getGoProviders", nil}, {"configureGoProvider", map[string]any{"id": "eddn", "config": map[string]any{"upload": true, "categories": []string{"travel"}}}}, {"setGoProviderCredential", map[string]any{"id": "edsm", "credential": map[string]string{"apiKey": "PRIVATE"}}}, {"readGoProvider", map[string]string{"id": "edastro", "kind": "gec"}}, {"disconnectGoProvider", map[string]any{"id": "frontier", "remove": true}}, {"connectGoFrontier", nil}, {"desktopAction", map[string]string{"action": "quit"}}, {"setGoCompanion", config}, {"getGoLauncher", nil}, {"lookupGoSystem", map[string]string{"name": "Fixture Alpha"}}} {
 		if len(rpcMessage(t, ctx, c, test.name, test.msg)["error"]) == 0 {
 			t.Fatal("viewer privileged action", test.name)
 		}

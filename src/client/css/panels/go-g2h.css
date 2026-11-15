@@ -1,0 +1,62 @@
+/* G2H orbital workspace: the legacy chart gets the full available rectangle. */
+.go-terminal .go-cartography{position:relative;gap:.35rem;min-height:0;overflow:hidden}
+.go-terminal .go-cartography .go-page__heading{min-height:2.4rem;flex:none;margin:0}
+.go-terminal .go-cartography>.go-toolbar{max-width:65%;min-height:2.7rem;gap:.5rem;margin:0;flex:none;font-size:.95rem}
+.go-terminal .go-cartography>.go-toolbar label{min-width:8rem}.go-terminal .go-cartography>.go-toolbar input,.go-terminal .go-cartography>.go-toolbar select{font-size:1rem;padding:.3rem}
+.go-terminal .go-cartography .go-workspace{grid-template-columns:minmax(0,65fr) minmax(20rem,35fr);flex:1;min-height:0;gap:1rem}
+.go-terminal .go-cartography .go-workspace__main{display:flex;min-height:0;overflow:hidden}
+.go-terminal .go-cartography .go-chart{width:100%;height:100%;max-width:none;max-height:none;aspect-ratio:auto;flex:1;align-self:stretch}
+.go-terminal .go-cartography .go-chart__viewport{inset:2.6rem .3rem 1.6rem}.go-terminal .go-cartography .go-chart__legend{font-size:.8rem;margin:.2rem}
+.go-terminal .go-cartography .go-inspector{height:100%;min-height:0;overflow:auto;font-size:1rem;padding:.5rem;box-sizing:border-box}
+.go-terminal .go-cartography .go-inspector h2{font-size:1.45rem;line-height:1.15}.go-terminal .go-cartography .go-inspector h3{font-size:1.05rem}.go-terminal .go-cartography .go-inspector h4{margin:.5rem 0;font-size:1rem}.go-terminal .go-cartography .go-inspector p{margin:.4rem 0;line-height:1.25}
+.go-terminal .go-cartography .navigation-panel__inspector-heading{min-height:0;padding:.3rem 0;display:block}.go-terminal .go-cartography .navigation-panel__inspector-heading>.icon{float:left;font-size:2.4rem;margin-right:.6rem}
+.go-terminal .go-cartography .go-fact-grid{grid-template-columns:1fr 1fr;gap:0}.go-terminal .go-cartography .go-fact-grid>div{padding:.4rem .2rem}.go-terminal .go-cartography .go-fact-grid small{font-size:.9rem}.go-terminal .go-cartography .go-fact-grid strong{font-size:1.05rem}.go-terminal .go-cartography .go-chip-row{margin:.4rem 0}
+.go-terminal .go-cartography .go-body-list{overflow:auto;flex:1;min-height:0}.go-terminal .go-system-stations{font-size:.9rem;flex:none;max-height:30%;overflow:auto}.go-terminal .go-system-stations[open]{border:1px solid #795114;padding:.4rem}
+.go-ship-statistics{overflow:auto;font-size:1.1rem}.go-stats-columns{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.go-stats-grid{display:grid;grid-template-columns:1fr 1fr}.go-stat-fact{display:flex;flex-direction:column;gap:.3rem;padding:.7rem;border-bottom:1px solid #49331d}.go-stat-fact strong{font-size:1.7rem;color:var(--color-info)}.go-stat-fact .go-badge{align-self:flex-start;font-size:.7rem}.go-stats-evidence{font-size:.95rem;color:var(--color-secondary)}.go-stats-advanced{margin-top:1rem}
+@media(max-width:1050px){.go-terminal .go-cartography{height:auto;overflow:visible}.go-terminal .go-cartography>.go-toolbar{max-width:none;flex-wrap:wrap}.go-terminal .go-cartography .go-workspace{display:flex;flex-direction:column;min-height:0}.go-terminal .go-cartography .go-workspace__main{height:32rem;flex:none}.go-terminal .go-cartography .go-inspector{height:auto;overflow:visible}.go-stats-columns{grid-template-columns:1fr}}
+
+.go-galaxy-controls{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;font-size:.95rem}.go-galaxy-controls input,.go-provider-settings input[type=checkbox]{appearance:auto;width:1.1rem;height:1.1rem}.go-galaxy-controls small{flex-basis:100%}.go-galaxy-plane svg{touch-action:none}
+.go-provider-card{padding:.9rem;margin:1rem 0;border:1px solid #81551f;font-size:1rem;line-height:1.4}.go-provider-card h3{display:flex;justify-content:space-between;gap:1rem}.go-provider-card small{overflow-wrap:anywhere}.go-provider-card label{display:inline-flex;gap:.5rem;align-items:center;margin:.4rem .8rem .4rem 0}.go-provider-card fieldset{border:1px solid #5f4526;padding:.5rem}.go-provider-card input:not([type=checkbox]){width:15rem;font-size:1rem;padding:.4rem}.go-provider-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}.go-provider-card button{padding:.4rem .6rem;font-size:1rem}.go-provider-card dl>div{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}.go-provider-card dd{margin:0;overflow-wrap:anywhere}.go-provider-consent{color:var(--color-primary)}
+
+.go-provider-reference{font-size:1rem;padding:.5rem;max-height:30vh;overflow:auto}.go-provider-reference dl>div{display:grid;grid-template-columns:1fr 1fr}.go-provider-reference dd{margin:0}
+
+.go-terminal .go-cartography .navigation-panel__inspector-heading>.icon{position:static;display:inline-block;float:left;width:2.2rem;height:2.2rem;line-height:2.2rem;font-size:2.2rem;margin:0 .7rem .2rem 0}
+
+/* Compact padding cannot retain the older inspector title negative margins. */
+.go-terminal .go-cartography .go-inspector .inspector__title{margin:0 0 .4rem}
+
+
+/* Field-acceptance corrections: intentional empty state and a system-level station
+   index, since EDSM does not supply reliable orbital parent coordinates. */
+.go-terminal .go-cartography--pending{justify-content:flex-start}
+.go-terminal .go-cartography__pending{flex:1;min-height:12rem;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:.8rem;border:1px solid rgba(181,109,26,.35);background:linear-gradient(155deg,rgba(15,8,15,.85),rgba(0,0,0,.65));padding:1.5rem}
+.go-terminal .go-cartography__pending>.icon{font-size:3.5rem;color:var(--color-primary)}
+.go-terminal .go-cartography__pending h3{font-size:1.35rem;color:var(--color-info)}
+.go-terminal .go-cartography__pending p{max-width:36rem;color:var(--color-secondary);font-size:1rem;line-height:1.5}
+.go-terminal .go-chart__stations{position:absolute;z-index:3;bottom:2.1rem;left:.5rem;right:.5rem;display:flex;align-items:center;gap:.4rem;min-width:0;padding:.35rem .55rem;background:rgba(3,5,11,.92);border:1px solid #6f501c;box-sizing:border-box}
+.go-terminal .go-chart__station-heading{display:flex;flex-direction:column;flex:0 0 auto;gap:.1rem;max-width:15rem;font-size:.77rem;color:var(--color-primary)}
+.go-terminal .go-chart__station-heading small{color:var(--color-info);font-size:.65rem;line-height:1.15}
+.go-terminal .go-chart__station-scroll{display:flex;flex:1;min-width:0;gap:.3rem;overflow-x:auto;overflow-y:hidden;padding:.15rem 0}
+.go-terminal .go-chart__station-marker{display:inline-flex;align-items:center;gap:.3rem;flex:0 0 auto;max-width:11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem;padding:.3rem .45rem;background:rgba(0,20,28,.9);border:1px solid #55788a;color:var(--color-info)}
+.go-terminal .go-chart__station-marker>span:last-child{overflow:hidden;text-overflow:ellipsis}
+.go-terminal .go-chart__station-marker>span:first-child{color:var(--color-secondary)}
+.go-terminal .go-chart__station-marker[aria-pressed='true']{background:var(--color-primary-dark);border-color:var(--color-primary);color:var(--color-primary)}
+.go-terminal .go-chart__station-more{white-space:nowrap;padding:.3rem .4rem;font-size:.72rem;flex:0 0 auto}
+.go-terminal .go-system-stations button{display:block;width:100%;text-align:left;font-size:.85rem;padding:.3rem .4rem;margin:0;border-bottom:1px solid #574028;background:transparent}
+@media(max-width:720px){.go-terminal .go-chart__stations{flex-wrap:wrap}.go-terminal .go-chart__station-heading{max-width:none;width:100%}.go-terminal .go-chart__station-scroll{width:75%}}
+
+/* Reserve a separate dock for nonspatial stations; never paint over bodies. */
+.go-terminal .go-cartography .go-chart--stations .go-chart__viewport{bottom:6.7rem}
+.go-terminal .go-chart__stations{height:4.8rem;bottom:1.7rem}
+.go-terminal .go-chart__station-marker{font-size:.9rem;min-height:2.6rem}
+.go-terminal .go-chart__station-marker>.icon{font-size:1.6rem;flex:none}
+.go-terminal .go-chart__station-marker:focus-visible,.go-terminal .go-chart__station-more:focus-visible{outline:2px solid var(--color-info);outline-offset:1px}
+.go-terminal .go-chart__station-scroll{scrollbar-width:auto;scrollbar-color:var(--color-primary) #100b06}
+.go-terminal .go-chart__station-scroll::-webkit-scrollbar{height:9px}
+.go-terminal .go-chart__station-scroll::-webkit-scrollbar-thumb{background:var(--color-primary)}
+.go-terminal .go-chart__empty{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:.7rem;text-align:center;padding:1rem;box-sizing:border-box;color:var(--color-info)}
+.go-terminal .go-cartography .go-workspace.go-workspace--wide{grid-template-columns:1fr}
+@media(max-width:720px){.go-terminal .go-chart__stations{height:6.8rem}.go-terminal .go-cartography .go-chart--stations .go-chart__viewport{bottom:8.7rem}}
+
+/* Override legacy .scrollable horizontal clipping for a zoomed orbital canvas. */
+.go-terminal .go-chart__viewport.scrollable{overflow:auto!important}

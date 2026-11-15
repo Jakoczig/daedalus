@@ -1,0 +1,1 @@
+EDDN journal/1 schema, fetched 2026-11-14 from https://raw.githubusercontent.com/EDCD/EDDN/live/schemas/journal-v1.0.json. BSD-3-Clause, see LICENSE. Embedded locally; validation never fetches a schema over the network. Only the supported travel/exploration subset is constructed. Schema updates require contract tests.

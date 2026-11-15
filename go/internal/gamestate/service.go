@@ -27,11 +27,12 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
-	EnableParity bool
-	Directory    string
-	Discovery    journal.DiscoveryOptions
-	PollInterval time.Duration
-	ConfigError  string
+	ProviderEvent func(journal.Event, journal.Phase)
+	EnableParity  bool
+	Directory     string
+	Discovery     journal.DiscoveryOptions
+	PollInterval  time.Duration
+	ConfigError   string
 }
 type SourceDetails struct {
 	Directory, Override, Error string
@@ -348,6 +349,9 @@ func (s *Service) apply(event journal.Event, phase journal.Phase) error {
 		s.stopped = true
 	}
 	s.applyProjectionsLocked(event, phase)
+	if s.opts.ProviderEvent != nil {
+		s.opts.ProviderEvent(event, phase)
+	}
 	state := s.unknown
 	if s.active != "" {
 		state = s.commanders[s.active]
