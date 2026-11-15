@@ -1,3 +1,4 @@
+import { BioScanPanel } from './go-field-operations'
 import { useMemo, useState, useEffect } from 'react'
 import useGoProjection from './go-projection'
 import GoTerminalChart, { stationKey, stationIcon } from './go-terminal-chart'
@@ -16,7 +17,7 @@ function StationInspector ({ station, community, onClose }) {
     </aside>
   )
 }
-function BodyInspector ({ body, onClose, navigation }) {
+function BodyInspector ({ body, onClose, navigation, fieldProps }) {
   const d = body.details || {}
   const facts = [['Radius', show(d.radiusKM, 'km')], ['Gravity', show(body.gravityG, 'g', 2)], ['Temperature', show(d.temperatureK, 'K')], ['Pressure', show(d.pressureATM, 'atm', 3)], ['Mass', show(d.isStar ? d.massSolar : d.massEarths, d.isStar ? 'M☉' : 'M⊕')], ['Orbital period', show(d.orbitalDays, 'days')], ['Rotation', show(d.rotationHours, 'hours')], ['Semi-major axis', show(d.semiMajorAU, 'AU', 3)], ['Eccentricity', show(d.eccentricity, '', 3)], ['Axial tilt', show(d.axialTiltDegrees, '°')]]
   return (
@@ -36,7 +37,7 @@ function BodyInspector ({ body, onClose, navigation }) {
       )}
       {body.communityReference && <details><summary>EDSM physical reference · independent of local scans</summary><p>{body.communityReference.kind} · Radius {show(body.communityReference.details?.radiusKM, 'km')} · Temperature {show(body.communityReference.details?.temperatureK, 'K')} · Distance {show(body.communityReference.distanceLS, 'LS')}</p></details>}
       {!navigation && (
-        <><h4><Icon name='plant' /> Biological observations</h4><div className='go-chip-row'><Badge>{body.bioSignals ?? '—'} BIO SIGNALS</Badge><Badge>{body.geoSignals ?? '—'} GEO SIGNALS</Badge></div><p>{body.genuses?.join(' · ') || 'Genus not reported'}</p>
+        <>{fieldProps?.stage === 'G2E' && <BioScanPanel {...fieldProps} body={body.bodyId} />}<h4><Icon name='plant' /> Biological observations</h4><div className='go-chip-row'><Badge>{body.bioSignals ?? '—'} BIO SIGNALS</Badge><Badge>{body.geoSignals ?? '—'} GEO SIGNALS</Badge></div><p>{body.genuses?.join(' · ') || 'Genus not reported'}</p>
           {body.organisms?.map((o, i) => <div className='go-organism' key={i}><strong>{o.species}</strong><small>{o.genus}{o.variant && ` · ${o.variant}`}</small><SampleProgress organism={o} /></div>)}
         </>
       )}
@@ -91,7 +92,7 @@ export default function GoTerminalSurvey (props) {
           {!visible.length && (biology || list) && <div className='go-empty' role='status'><Icon name='scan' /><h3>{bodies.length ? 'No matching observations' : 'No body observations available'}</h3><p>{bodies.length ? 'Change the local filter.' : 'The system is known; no body observations are available yet.'}</p></div>}
           {!navigation && <div className='go-body-strip' aria-label='Body selection'>{visible.map(b => <button key={b.bodyId} aria-pressed={body?.bodyId === b.bodyId} onClick={() => { setSelectedStation(null); setSelected(b.bodyId) }} title={b.kind}><Icon name={b.details?.isStar ? 'star' : 'planet'} />{b.name || `#${b.bodyId}`}</button>)}</div>}
         </main>
-        {station ? <StationInspector station={station} community={community} onClose={() => setSelectedStation(null)} /> : body && <BodyInspector body={body} navigation={navigation} onClose={() => setSelected(null)} />}
+        {station ? <StationInspector station={station} community={community} onClose={() => setSelectedStation(null)} /> : body && <BodyInspector fieldProps={props} body={body} navigation={navigation} onClose={() => setSelected(null)} />}
       </div>
       {!navigation && <footer className='go-evidence-foot'><span>{value?.allBodiesFound ? 'FSS completion witnessed' : 'Partial local survey'} · FSS {value?.fssProgress == null ? '—' : `${Math.round(value.fssProgress * 100)}%`}</span><span>{biology ? 'Sampling is last-known journal evidence; historical analysis is not sale inventory.' : 'Local + optional community schematic · explicit provider consent · no game control'}</span></footer>}
     </div>
