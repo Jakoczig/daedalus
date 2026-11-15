@@ -18,7 +18,7 @@ func TestBioSnapshotsRequireCurrentCorrelatedBodyAndDoNotInventReplayLocations(t
 	cp, _ := s.Resume(src)
 	now := time.Now().UTC().Truncate(time.Second)
 	records := []journal.Record{}
-	for i, raw := range []string{`{"event":"LoadGame","FID":"SYNTHETIC"}`, fmt.Sprintf(`{"event":"ScanOrganic","timestamp":%q,"SystemAddress":9007199254740993,"Body":1,"ScanType":"Log","Genus":"$Codex_Ent_Bacterial_Genus_Name;","Species":"fixture"}`, now.Format(time.RFC3339))} {
+	for i, raw := range []string{`{"event":"LoadGame","FID":"SYNTHETIC"}`, fmt.Sprintf(`{"event":"ScanOrganic","timestamp":%q,"SystemAddress":9007199254740993,"Body":18446744073709551615,"ScanType":"Log","Genus":"$Codex_Ent_Bacterial_Genus_Name;","Species":"fixture"}`, now.Format(time.RFC3339))} {
 		v, e := journal.ParseLine([]byte(raw), journal.SourcePosition{FileID: src.ID, Sequence: uint64(i + 1), Offset: int64(i * 100), Length: 100})
 		if e != nil {
 			t.Fatal(e)
@@ -34,7 +34,7 @@ func TestBioSnapshotsRequireCurrentCorrelatedBodyAndDoNotInventReplayLocations(t
 	for _, x := range []struct {
 		fid, system, body, name string
 		at                      time.Time
-	}{{"OTHER", "9007199254740993", "1", "Fixture 1", now}, {"SYNTHETIC", "9007199254740994", "1", "Fixture 1", now}, {"SYNTHETIC", "9007199254740993", "2", "Fixture 1", now}, {"SYNTHETIC", "9007199254740993", "1", "Other body", now}, {"SYNTHETIC", "9007199254740993", "1", "Fixture 1", now.Add(10 * time.Second)}} {
+	}{{"OTHER", "9007199254740993", "18446744073709551615", "Fixture 1", now}, {"SYNTHETIC", "9007199254740994", "18446744073709551615", "Fixture 1", now}, {"SYNTHETIC", "9007199254740993", "2", "Fixture 1", now}, {"SYNTHETIC", "9007199254740993", "18446744073709551615", "Other body", now}, {"SYNTHETIC", "9007199254740993", "18446744073709551615", "Fixture 1", now.Add(10 * time.Second)}} {
 		if e = s.RecordBioPosition(x.fid, x.system, x.body, x.name, status, x.at, src.ID); e != nil {
 			t.Fatal(e)
 		}
@@ -44,10 +44,10 @@ func TestBioSnapshotsRequireCurrentCorrelatedBodyAndDoNotInventReplayLocations(t
 	if n != 0 {
 		t.Fatal("uncorrelated snapshot stored")
 	}
-	if e = s.RecordBioPosition("SYNTHETIC", "9007199254740993", "1", "Fixture 1", status, now, src.ID); e != nil {
+	if e = s.RecordBioPosition("SYNTHETIC", "9007199254740993", "18446744073709551615", "Fixture 1", status, now, src.ID); e != nil {
 		t.Fatal(e)
 	}
-	v, e := s.BioBody(context.Background(), "SYNTHETIC", "9007199254740993", "1")
+	v, e := s.BioBody(context.Background(), "SYNTHETIC", "9007199254740993", "18446744073709551615")
 	if e != nil {
 		t.Fatal(e)
 	}
