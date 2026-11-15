@@ -145,6 +145,9 @@ func (s *Service) CommitRecords(records []journal.Record, cp journal.Checkpoint)
 		}
 	}
 	if live || time.Since(s.lastPersistPublish) > 100*time.Millisecond {
+		if live {
+			s.captureBioLocked()
+		}
 		s.lastPersistPublish = time.Now()
 		s.publishLocked()
 	}
