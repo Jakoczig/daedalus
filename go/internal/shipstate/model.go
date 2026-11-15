@@ -71,6 +71,14 @@ func (m *Model) View(key string) View {
 	}
 	return View{Evidence: "unknown"}
 }
+
+// Identity is internal cache context; it is never a public projection field.
+func (m *Model) Identity(key string) string {
+	if s := m.states[key]; s != nil && s.verified {
+		return s.id
+	}
+	return ""
+}
 func shipType(value any) string {
 	s, ok := value.(string)
 	if !ok || len(s) > 64 {
