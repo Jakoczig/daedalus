@@ -10,12 +10,12 @@ async function regularBytes (filename) {
 }
 
 async function packagePreview ({ binaryPath, readmePath, outputParent, platform, milestone = 'g2b' }) {
-  if (!['g2b', 'g2c', 'g2d', 'g2e', 'g2f', 'g2g', 'g2h', 'g2j'].includes(milestone)) throw new Error('Unsupported preview milestone')
+  if (!['g2b', 'g2c', 'g2d', 'g2e', 'g2f', 'g2g', 'g2h', 'g2j', 'g2k'].includes(milestone)) throw new Error('Unsupported preview milestone')
   if (!['Windows', 'Linux'].includes(platform)) throw new Error('Unsupported preview platform')
   // Read explicit inputs only. Never enumerate/copy a build directory or profile.
   const binary = await regularBytes(binaryPath)
   const readme = await regularBytes(readmePath)
-  const descriptor = ['g2h', 'g2j'].includes(milestone) ? 'preview' : 'local-route-survey-no-uploads'
+  const descriptor = ['g2h', 'g2j', 'g2k'].includes(milestone) ? 'preview' : 'local-route-survey-no-uploads'
   const directory = await fs.mkdtemp(path.join(outputParent, `daedalus-${milestone}-experimental-unsigned-${descriptor}-`))
   const files = { [platform === 'Windows' ? 'daedalus.exe' : 'daedalus']: binary, 'README.md': readme }
   const hashes = []
@@ -32,10 +32,10 @@ async function main () {
   const platform = process.env.RUNNER_OS || (process.platform === 'win32' ? 'Windows' : 'Linux')
   const directory = await packagePreview({
     binaryPath: path.join(root, 'go/bin', platform === 'Windows' ? 'daedalus.exe' : 'daedalus'),
-    readmePath: path.join(root, 'docs/testing/g2j-persistent-history-preview.md'),
+    readmePath: path.join(root, 'docs/testing/g2k-native-field-operations-preview.md'),
     outputParent: process.env.RUNNER_TEMP || os.tmpdir(),
     platform,
-    milestone: 'g2j'
+    milestone: 'g2k'
   })
   if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`)
   console.log(`Packaged experimental, unsigned, local-first preview (optional providers; uploads require explicit consent) (${platform}); executable, README and hashes only`)

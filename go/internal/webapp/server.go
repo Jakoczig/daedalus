@@ -16,6 +16,8 @@ import (
 )
 
 type Server struct {
+	copyWaypoint              func(string) error
+	saveFieldCSV              func(string, string) error
 	providers                 *providers.Manager
 	openAuthorization         func(string) error
 	companion                 *companionState

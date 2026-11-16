@@ -25,7 +25,7 @@ function harness (panel = 'go-navigation', initial = navigation) {
     if (cache.has(filename)) return cache.get(filename)
     const code = transformSync(fs.readFileSync(filename, 'utf8'), { babelrc: false, configFile: false, presets: [[require('next/dist/compiled/babel/preset-react'), { runtime: 'automatic' }]], plugins: [require('next/dist/compiled/babel/plugin-transform-modules-commonjs')] }).code
     const mod = new Module(filename, module); mod.filename = filename; mod.paths = module.paths
-    mod.require = name => name === 'react' ? react : name.startsWith('./') ? load(path.resolve(path.dirname(filename), name + '.js')) : require(name)
+    mod.require = name => name === 'react' ? react : name.startsWith('.') ? load(path.resolve(path.dirname(filename), name + '.js')) : require(name)
     mod._compile(`module.exports = function (navigator) { const module = { exports: {} }; const exports = module.exports; ${code}; return module.exports }`, filename)
     const result = mod.exports(browser); cache.set(filename, result); return result
   }
@@ -81,4 +81,25 @@ test('G2B live notification wins over delayed bootstrap reply', async () => {
   const h = harness(); let resolveReply
   h.props.sendEvent = () => new Promise(resolve => { resolveReply = resolve }); h.html(); await h.flush(); h.broadcast({ ...navigation, currentSystem: 'Newest live system' }); resolveReply({ ...navigation, currentSystem: 'Stale bootstrap' })
   const html = await h.flush(); assert.match(html, /Newest live system/); assert.doesNotMatch(html, /Stale bootstrap/)
+})
+
+test('Ship Statistics ignores volatile Status timestamps but refreshes deployment and module evidence', async () => {
+  const h = harness('go-ship-statistics', { modules: [], knownPriorityMW: [0, 0, 0, 0, 0] })
+  h.props.workspace = { parity: { ship: { loadoutAt: 'same-time', shipType: 'asp' }, modules: [{ slot: 'MainEngines', on: true, priority: 0 }], status: { state: 'known', observedAt: 'first', flags: { hardpointsDeployed: false } } } }
+  h.html(); await h.flush()
+  const requests = () => h.calls.filter(v => v === 'getGoEngineeredStatistics').length
+  assert.equal(requests(), 1)
+  for (let i = 0; i < 20; i++) {
+    h.props.workspace.parity.status = { state: 'known', observedAt: String(i), fuelMainT: i, cargoT: i, flags: { hardpointsDeployed: false } }
+    h.html(); await h.flush()
+  }
+  assert.equal(requests(), 1)
+  h.props.workspace.parity.status.flags.hardpointsDeployed = true
+  h.html(); await h.flush(); assert.equal(requests(), 2)
+  h.props.workspace.parity.modules[0].priority = 2
+  h.html(); await h.flush(); assert.equal(requests(), 3)
+  h.props.workspace.parity.modules[0].on = false
+  h.html(); await h.flush(); assert.equal(requests(), 4)
+  h.props.workspace.parity.status = { state: 'unknown' }
+  h.html(); await h.flush(); assert.equal(requests(), 5)
 })

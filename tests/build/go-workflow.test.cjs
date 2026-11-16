@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2j-'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('daedalus-g2k-'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2j-.*experimental-unsigned-persistent-history/)
+  assert.match(job.steps[upload].with.name, /g2k-.*experimental-unsigned-field-operations/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -130,4 +130,10 @@ test('G2J stacks on G2H with native SQLite, database performance and privacy gat
   for (const name of ['Verify native SQLite compiler', 'G2J database lifecycle performance', 'G2J database history and privacy visuals']) { const i = steps.findIndex(s => s.name === name); assert.ok(i >= 0 && i < pack); assert.equal(steps[i].if, undefined) }
   assert.match(steps.find(s => s.name === 'G2J database lifecycle performance').run, /BenchmarkG2HExactLifecycle/)
   assert.match(steps.find(s => s.name === 'Go tests').run, /\.\/\.\.\./)
+})
+
+test('G2K stacked base and mandatory field-operation evidence are gated before packaging', () => {
+  for (const file of ['go-desktop.yml', 'ci.yml']) { const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows', file), 'utf8')); assert.ok(w.on.pull_request.branches.includes('go/g2j-persistent-history-integrations')) }
+  const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8')); const steps = w.jobs.desktop.steps; const pack = steps.findIndex(s => s.name === 'Package experimental preview')
+  for (const name of ['G2K exact G2J lifecycle comparison and field query performance', 'G2K field operations browser verification']) { const i = steps.findIndex(s => s.name === name); assert.ok(i >= 0 && i < pack); assert.equal(steps[i].if, undefined) }
 })

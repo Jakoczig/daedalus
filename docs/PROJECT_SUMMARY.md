@@ -73,3 +73,14 @@ The new G2J branch starts at G2H `d7c5cd93e16ee0480fa11ef53d2ea9d9d0d4cb58` and 
 Owner-only Data/History exposes indexed per-commander pages, provenance/conflicts, construction depot resources and explicit historical-publication review. Persistent Never/Live/After sale policies, independently consented recipient/category live exceptions and durable outcomes apply before provider queues. Paired displays retain bounded read-only public projections. New reference adapters cover published Spansh lookups, bounded Elite BGS, Raven read-only projects and filtered Canonn science collections; credentials remain outside SQLite. Native engineered statistics preserve final fitted modifiers and withhold unvalidated performance models.
 
 The [G2J preview matrix and acceptance checklist](testing/g2j-persistent-history-preview.md) distinguishes fixture implementation from approval-dependent or unverified live capabilities. Exact final-head CI/artifact evidence belongs to the new G2J draft PR; earlier milestones' green checks do not verify G2J. No production upload, release, merge, deployment or legacy replacement is authorized by this work.
+
+
+## G2K — Native Field Operations
+
+Stacked on accepted G2J `2adbc86`; adds offline CSV itinerary following, typed
+journal BGS Tally with tick/UTC provenance, licensed BioScan suggestions and
+correlated sample snapshots, canonical native power scenarios and built-in
+module controls. SQLite schema 5 preserves history with verified migration
+backup; read-only paired-display and publication boundaries remain intact.
+See [G2K handoff](handoffs/g2k-native-field-operations.md) and its preview matrix
+for limitations, exact-head evidence links and one gameplay/laptop checklist.

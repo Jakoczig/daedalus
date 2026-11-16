@@ -5,13 +5,53 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 type Controller struct {
 	mu          sync.Mutex
 	handle      func(string) error
+	clipboard   func(string) bool
+	saveCSV     func(string, string) error
 	quitOnClose atomic.Bool
 }
+
+func (c *Controller) BindCSV(f func(string, string) error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.saveCSV = f
+}
+func (c *Controller) SaveFieldCSV(name, data string) error {
+	if (name != "daedalus-itinerary.csv" && name != "daedalus-private-bgs.csv") || len(data) > 2<<20 {
+		return errors.New("Invalid field export")
+	}
+	c.mu.Lock()
+	f := c.saveCSV
+	c.mu.Unlock()
+	if f == nil {
+		return errors.New("Native save dialog unavailable")
+	}
+	return f(name, data)
+}
+
+func (c *Controller) BindClipboard(f func(string) bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clipboard = f
+}
+func (c *Controller) CopyWaypoint(name string) error {
+	if name == "" || len(name) > 256 || !utf8.ValidString(name) {
+		return errors.New("Invalid waypoint")
+	}
+	c.mu.Lock()
+	f := c.clipboard
+	c.mu.Unlock()
+	if f == nil || !f(name) {
+		return errors.New("Native clipboard unavailable; select and copy manually")
+	}
+	return nil
+}
+
 type controllerKey struct{}
 
 func WithController(ctx context.Context, c *Controller) context.Context {

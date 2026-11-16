@@ -22,7 +22,7 @@ import (
 //go:embed schema.sql
 var schema string
 
-const schemaVersion = 4
+const schemaVersion = 5
 const maxCache = 32 << 20
 
 var ErrQuarantined = errors.New("Journal identity changed; cached history retained. Review quarantined source in Data/History")
