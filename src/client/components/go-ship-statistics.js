@@ -18,8 +18,10 @@ export default function GoShipStatistics ({ workspace, role, sendEvent }) {
   const [effective, setEffective] = useState(null)
 
   const power = powerStatistics(effective)
+  const moduleEvidence = JSON.stringify(m.modules || {})
+  const deployment = status.state === 'known' ? status.flags?.hardpointsDeployed : null
 
-  useEffect(() => { let active = true; setEffective(null); sendEvent('getGoEngineeredStatistics').then(v => { if (active) setEffective(v) }).catch(() => {}); return () => { active = false } }, [sendEvent, s.loadoutAt, s.shipType, status.observedAt])
+  useEffect(() => { let active = true; setEffective(null); sendEvent('getGoEngineeredStatistics').then(v => { if (active) setEffective(v) }).catch(() => {}); return () => { active = false } }, [sendEvent, s.loadoutAt, s.shipType, moduleEvidence, deployment])
 
   useEffect(() => { let active = true; setOwnerName(''); if (role === 'owner') sendEvent('getGoShipName').then(v => { if (active) setOwnerName(v.shipName || '') }).catch(() => {}); return () => { active = false } }, [role, sendEvent, s.loadoutAt, s.shipType])
 

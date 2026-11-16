@@ -280,6 +280,9 @@ jobs:
           go build -o bin/g2k-baseline-fixture${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/visual-fixture
           cd ../../../go
           go test ./internal/history -run '^$' -bench '^BenchmarkG2KFieldQueries$' -benchtime=10x -benchmem -count=1 | tee ../temp/g2k-field-queries.txt
+      - name: G2K live Status statistics workload
+        working-directory: go
+        run: go test ./internal/gamestate -run '^$' -bench '^BenchmarkStatisticsLiveStatus$' -benchtime=1000x -benchmem -count=1 | tee ../temp/g2k-statistics-live.txt
       - name: G2K field operations browser verification
         run: node scripts/testing/g2k-visual.cjs
       - name: Upload G2K synthetic evidence
@@ -292,6 +295,7 @@ jobs:
             temp/g2k-visual/report.json
             temp/g2k-g2j-lifecycle.txt
             temp/g2k-field-queries.txt
+            temp/g2k-statistics-live.txt
           if-no-files-found: error
           retention-days: 14
       - name: Package experimental preview

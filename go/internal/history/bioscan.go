@@ -9,6 +9,9 @@ import (
 )
 
 type BioSample struct {
+	Source     string             `json:"-"`
+	Sequence   int64              `json:"-"`
+	Offset     int64              `json:"-"`
 	Event      int64              `json:"-"`
 	Session    string             `json:"-"`
 	Stage      string             `json:"stage"`
@@ -65,7 +68,7 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 		return out, e
 	}
 	scan := object([]byte(raw))
-	rows, e := s.reader.QueryContext(ctx, `SELECT e.raw_relevant_json,coalesce(e.event_utc,''),p.latitude,p.longitude,p.radius,p.status_at,coalesce(e.session_id,''),e.event_id FROM bio_samples b JOIN journal_events e ON e.event_id=b.source_event_id LEFT JOIN bio_positions p ON p.source_event=e.event_id WHERE b.commander_fid=? AND b.system_address=? AND b.entity_id=? ORDER BY b.source_event_id DESC LIMIT 24`, fid, system, body)
+	rows, e := s.reader.QueryContext(ctx, `SELECT e.raw_relevant_json,coalesce(e.event_utc,''),p.latitude,p.longitude,p.radius,p.status_at,coalesce(e.session_id,''),e.event_id,e.source_id,e.record_sequence,e.byte_offset FROM bio_samples b JOIN journal_events e ON e.event_id=b.source_event_id LEFT JOIN bio_positions p ON p.source_event=e.event_id WHERE b.commander_fid=? AND b.system_address=? AND b.entity_id=? ORDER BY b.source_event_id DESC LIMIT 24`, fid, system, body)
 	if e != nil {
 		return out, e
 	}
@@ -77,7 +80,7 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 		var raw string
 		var lat, lon, radius sql.NullFloat64
 		var at sql.NullString
-		if e = rows.Scan(&raw, &v.At, &lat, &lon, &radius, &at, &v.Session, &v.Event); e != nil {
+		if e = rows.Scan(&raw, &v.At, &lat, &lon, &radius, &at, &v.Session, &v.Event, &v.Source, &v.Sequence, &v.Offset); e != nil {
 			return out, e
 		}
 		x := object([]byte(raw))
@@ -96,43 +99,64 @@ func (s *Store) BioBody(ctx context.Context, fid, system, body string) (map[stri
 	if e = rows.Err(); e != nil {
 		return out, e
 	}
-	out["samples"] = samples
+	rows.Close()
 	for i := range samples {
-		if samples[i].Position == nil || samples[i].Stage == "Log" {
+		a := &samples[i]
+		if a.Session == "" || a.Position == nil || (a.Stage != "Sample" && a.Stage != "Analyse") {
 			continue
 		}
-		for j := i + 1; j < len(samples); j++ {
-			a, b := samples[i], samples[j]
-			if a.Genus != b.Genus || a.Species != b.Species || a.Variant != b.Variant {
-				continue
-			}
-			if b.Stage == "Analyse" {
-				break
-			}
-			if b.Position == nil {
-				if b.Stage == "Log" {
-					break
-				}
-				continue
-			}
-			if d, ok := fieldops.SurfaceDistance(*a.Position, *b.Position); ok {
-				if samples[i].DistanceM != nil && *samples[i].DistanceM < d {
-					d = *samples[i].DistanceM
-				}
-				samples[i].DistanceM = &d
-				if minimum := fieldops.MinimumDistance(a.Genus); minimum != nil {
-					remaining := *minimum - d
-					if remaining < 0 {
-						remaining = 0
-					}
-					samples[i].RemainingM = &remaining
-				}
-			}
-			if b.Stage == "Log" {
+		// A witnessed prefix Log->Sample (or completed Log->Sample->Analyse)
+		// is required. Never borrow positions from an incomplete previous cycle.
+		stages := []string{"Sample", "Log"}
+		if a.Stage == "Analyse" {
+			stages = []string{"Analyse", "Sample", "Log"}
+		}
+		if i+len(stages) > len(samples) {
+			continue
+		}
+		cycle := samples[i : i+len(stages)]
+		valid := true
+		for k, b := range cycle {
+			if b.Stage != stages[k] || b.Session != a.Session || b.Source != a.Source || b.Genus != a.Genus || b.Species != a.Species || b.Variant != a.Variant || b.Position == nil {
+				valid = false
 				break
 			}
 		}
+		if !valid {
+			continue
+		}
+		log := cycle[len(cycle)-1]
+		valid, err := s.bioCycleContinuous(ctx, fid, system, body, log, *a)
+		if err != nil {
+			return out, err
+		}
+		if !valid {
+			continue
+		}
+		var nearest *float64
+		for _, b := range cycle[1:] {
+			d, ok := fieldops.SurfaceDistance(*a.Position, *b.Position)
+			if !ok {
+				valid = false
+				break
+			}
+			if nearest == nil || d < *nearest {
+				nearest = &d
+			}
+		}
+		if !valid {
+			continue
+		}
+		a.DistanceM = nearest
+		if minimum := fieldops.MinimumDistance(a.Genus); minimum != nil && nearest != nil {
+			remaining := *minimum - *nearest
+			if remaining < 0 {
+				remaining = 0
+			}
+			a.RemainingM = &remaining
+		}
 	}
+	out["samples"] = samples
 	// A missing genus stays unknown. Observed signal evidence is needed before
 	// environmental suggestions; the caller supplies it from the survey reducer.
 	out["scan"] = json.RawMessage(raw)
@@ -152,4 +176,49 @@ func (s *Store) BioSession(fid, source string) string {
 	var session string
 	_ = s.reader.QueryRow("SELECT coalesce(context_session,'') FROM journal_sources WHERE source_id=? AND context_fid=? AND state='verified'", source, fid).Scan(&session)
 	return session
+}
+
+// Metadata for every journal record is retained, even when its payload is not.
+// Bound the proof work and fail closed on gaps or context/cycle boundaries.
+func (s *Store) bioCycleContinuous(ctx context.Context, fid, system, body string, log, target BioSample) (bool, error) {
+	if target.Sequence <= log.Sequence || target.Sequence-log.Sequence > 4096 {
+		return false, nil
+	}
+	rows, err := s.reader.QueryContext(ctx, `SELECT e.record_sequence,coalesce(e.session_id,''),coalesce(e.commander_fid,''),e.type,e.raw_relevant_json FROM journal_events e JOIN journal_sources j ON j.source_id=e.source_id JOIN game_sessions g ON g.session_id=e.session_id AND g.commander_fid=e.commander_fid AND g.file_id=e.source_id WHERE e.source_id=? AND j.state='verified' AND e.byte_offset>=? AND e.byte_offset<=? ORDER BY e.byte_offset LIMIT 4097`, log.Source, log.Offset, target.Offset)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	next := log.Sequence
+	organic := 0
+	expected := []string{"Log", "Sample", "Analyse"}
+	for rows.Next() {
+		var sequence int64
+		var session, commander, kind, raw string
+		if err = rows.Scan(&sequence, &session, &commander, &kind, &raw); err != nil {
+			return false, err
+		}
+		if sequence != next || session != log.Session || commander != fid {
+			return false, nil
+		}
+		next++
+		switch kind {
+		case "Fileheader", "LoadGame", "Shutdown", "FSDJump", "ApproachBody", "LeaveBody":
+			return false, nil
+		case "ScanOrganic":
+			v := object([]byte(raw))
+			if organic >= len(expected) || text(v["ScanType"]) != expected[organic] || identifier(v["Body"]) != body || identifier(v["SystemAddress"]) != system || text(v["Genus"]) != target.Genus || text(v["Species"]) != target.Species || text(v["Variant"]) != target.Variant {
+				return false, nil
+			}
+			organic++
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return false, err
+	}
+	want := 2
+	if target.Stage == "Analyse" {
+		want = 3
+	}
+	return next == target.Sequence+1 && organic == want, nil
 }

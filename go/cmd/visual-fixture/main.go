@@ -126,10 +126,23 @@ func main() {
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			if filepath.Base(*fixture) != "g2g" && filepath.Base(*fixture) != "g2h" {
+			if filepath.Base(*fixture) != "g2g" && filepath.Base(*fixture) != "g2h" && filepath.Base(*fixture) != "g2k" {
 				continue
 			}
 			kind := scanner.Text()
+			if filepath.Base(*fixture) == "g2k" && (kind == "status-stowed" || kind == "status-deployed") {
+				flags := 16777216
+				if kind == "status-deployed" {
+					flags |= 64
+				}
+				at := time.Now().UTC().Format(time.RFC3339Nano)
+				raw, _ := json.Marshal(map[string]any{"event": "Status", "timestamp": at, "Flags": flags, "Fuel": map[string]any{"FuelMain": time.Now().UnixNano() % 20, "FuelReservoir": 0.5}, "Cargo": 1})
+				if err := os.WriteFile(filepath.Join(journalDir, "Status.json"), raw, 0600); err != nil {
+					panic(err)
+				}
+				fmt.Println("STATUS_WRITTEN=" + at)
+				continue
+			}
 			if kind == "load" && *deferJournal {
 				raw, err := os.ReadFile(filepath.Join(*fixture, "replay.jsonl"))
 				if err != nil {

@@ -59,6 +59,8 @@ type maintenanceRequest struct {
 	reply        chan error
 }
 type Service struct {
+	statisticsKey      string
+	statisticsJSON     []byte
 	bioStatus          []byte
 	maintenance        chan maintenanceRequest
 	hasFreshLive       bool

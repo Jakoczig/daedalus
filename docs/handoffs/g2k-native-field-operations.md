@@ -34,3 +34,33 @@ real-game gold builds. Those builds, native file-dialog/clipboard gameplay,
 physical Linux/Proton/Wayland and paired-device acceptance remain manual. Live
 provider approval and production upload acceptance are not implied by G2J gameplay
 acceptance. No merge, release, deployment, legacy replacement or production upload.
+
+
+Review correction batch (review comment 6907617913, baseline `451cfd9`):
+- Historical BioScan spacing now requires a nonempty, verified exact session and
+  a witnessed Log→Sample prefix or Log→Sample→Analyse cycle. Missing points,
+  restarted/interrupted cycles, source/sequence gaps and body/session boundaries
+  withhold distance and remaining spacing. Proof is bounded to 4,096 journal
+  records and the existing 24-sample window; evidence outside either is unknown.
+- Static native power scenarios use FID, exact ship ID, fitted module evidence
+  and formula version, excluding Status and module health/ammunition. One encoded
+  in-memory entry avoids repeated SQLite reads; existing bounded persistent cache
+  survives restarts. Current observed deployment is overlaid after every cache
+  lookup. React refetches on fitted/deployment evidence, not Status timestamps.
+- New deterministic regressions failed against the reviewed implementation:
+  cross-session/incomplete BioScan cycles produced spacing, and 100 Status-only
+  changes created 100 extra cache writes. Corrected tests require zero extra
+  writes, valid within-cycle distances, On/priority/modifier invalidation and
+  fresh deployment on persistent-cache reuse. No migration or formula change.
+- Final CI adds the 1,000-update native statistics benchmark and an open Ship
+  Statistics browser workload: exact-timestamp waits, 12 live sidecar updates,
+  zero volatile refetches and exactly one deployment refetch. Windows local
+  synthetic workload: 6.24 s, 28.2 MiB Go fixture RSS, 0.75% one-core CPU,
+  10.8 MiB browser heap, 2.35% browser main-thread time. These short synthetic
+  figures exclude Wails/WebView overhead and are not gameplay guarantees.
+
+Final correction commit, exact-head Windows/Linux CI, downloadable corrected
+previews and independently verified SHA-256 manifests are recorded in the
+[PR #15 final verification report](https://github.com/Jakoczig/daedalus/pull/15).
+Manual acceptance remains the single checklist linked above, especially restart
+on the same biological body and live hardpoint changes with a paired laptop.
