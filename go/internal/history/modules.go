@@ -29,6 +29,9 @@ func moduleEnabled(q interface{ QueryRow(string, ...any) *sql.Row }, id string) 
 func (s *Store) BuiltinEnabled(id string) bool { return moduleEnabled(s.reader, id) }
 func (s *Store) BuiltinModules() []BuiltinModule {
 	out := []BuiltinModule{{ID: "itinerary", Title: "Imported neutron itinerary", Version: "arrival-v1", Credit: "Original Go; Neutron Dancer inspiration (dwomble)", License: "GPL-3.0; MIT reference", Dependencies: "Location/FSDJump; private route tables"}, {ID: "bgs", Title: "Local BGS Tally", Version: "journal-effects-v1", Credit: "Original Go; BGS-Tally inspiration (tezw21/aussig)", License: "GPL-3.0; MIT reference", Dependencies: "MissionCompleted.FactionEffects; trade/combat/colonisation/Powerplay"}, {ID: "bioscan", Title: "BioScan assistance", Version: "bioscan-fc6b85c-explodata-fd4e188-env-v1", Credit: "Jeremy Rimpo / Silarn; DAEDALUS Go implementation", License: "GPL-2.0-or-later reference, GPL-3.0 selection", Dependencies: "Scan/organic signals; correlated Status snapshots"}}
+	for _, id := range []string{"fleet", "carrier", "economy", "commander-operations"} {
+		out = append(out, BuiltinModule{ID: id, Title: "Native " + id, Version: "journal-operations-v1", Credit: "DAEDALUS contributors; Frontier journal contracts", License: "GPL-3.0-or-later", Dependencies: "Single journal pipeline; private SQLite v6"})
+	}
 	for i := range out {
 		out[i].BuiltIn = true
 		switch out[i].ID {
@@ -50,7 +53,7 @@ func (s *Store) BuiltinModules() []BuiltinModule {
 	return out
 }
 func (s *Store) SetBuiltinModule(id string, enabled bool) error {
-	if id != "itinerary" && id != "bgs" && id != "bioscan" {
+	if id != "itinerary" && id != "bgs" && id != "bioscan" && id != "fleet" && id != "carrier" && id != "economy" && id != "commander-operations" {
 		return errors.New("Only compiled-in field modules may be controlled")
 	}
 	s.mu.Lock()
@@ -65,6 +68,11 @@ func (s *Store) SetBuiltinModule(id string, enabled bool) error {
 	}
 	if id == "bgs" && enabled {
 		if e = backfillFieldTally(tx); e != nil {
+			return e
+		}
+	}
+	if enabled && (id == "fleet" || id == "carrier" || id == "economy" || id == "commander-operations") {
+		if e = backfillOperations(tx); e != nil {
 			return e
 		}
 	}

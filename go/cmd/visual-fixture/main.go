@@ -124,12 +124,49 @@ func main() {
 		panic(err)
 	}
 	go func() {
+		var marketAt string
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			if filepath.Base(*fixture) != "g2g" && filepath.Base(*fixture) != "g2h" && filepath.Base(*fixture) != "g2k" {
+			if filepath.Base(*fixture) != "g2g" && filepath.Base(*fixture) != "g2h" && filepath.Base(*fixture) != "g2k" && filepath.Base(*fixture) != "g2l" {
 				continue
 			}
 			kind := scanner.Text()
+			if filepath.Base(*fixture) == "g2l" && kind == "operations-goals-empty" {
+				raw, _ := json.Marshal(map[string]any{"event": "CommunityGoal", "timestamp": time.Now().UTC().Format(time.RFC3339Nano), "CurrentGoals": []any{}})
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)
+				if err != nil {
+					panic(err)
+				}
+				if _, err = f.Write(append(raw, '\n')); err != nil {
+					panic(err)
+				}
+				f.Close()
+				continue
+			}
+			if filepath.Base(*fixture) == "g2l" && kind == "operations-dock" {
+				marketAt = time.Now().UTC().Format(time.RFC3339Nano)
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)
+				if err != nil {
+					panic(err)
+				}
+				for _, row := range []map[string]any{{"event": "Location", "StarSystem": "Fixture Alpha", "SystemAddress": uint64(9007199254740993)}, {"event": "Docked", "MarketID": uint64(9007199254740993), "StationName": "Fixture Port", "StarSystem": "Fixture Alpha"}, {"event": "Market", "MarketID": uint64(9007199254740993), "StationName": "Fixture Port", "StarSystem": "Fixture Alpha"}} {
+					row["timestamp"] = marketAt
+					raw, _ := json.Marshal(row)
+					if _, err = f.Write(append(raw, '\n')); err != nil {
+						panic(err)
+					}
+				}
+				f.Close()
+				continue
+			}
+			if filepath.Base(*fixture) == "g2l" && kind == "operations-market" && marketAt != "" {
+				raw, _ := json.Marshal(map[string]any{"event": "Market", "timestamp": marketAt, "MarketID": uint64(9007199254740993), "StationName": "Fixture Port", "StarSystem": "Fixture Alpha", "Items": []any{map[string]any{"Name": "gold", "BuyPrice": 100, "SellPrice": 90, "Stock": 50, "Demand": 100}}})
+				if err := os.WriteFile(filepath.Join(journalDir, "Market.json"), raw, 0600); err != nil {
+					panic(err)
+				}
+				continue
+			}
+
 			if filepath.Base(*fixture) == "g2k" && (kind == "status-stowed" || kind == "status-deployed") {
 				flags := 16777216
 				if kind == "status-deployed" {

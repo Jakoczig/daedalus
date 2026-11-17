@@ -74,6 +74,9 @@ var domain = map[string]string{
 }
 
 func relevant(kind string) bool {
+	if operationKind(kind) {
+		return true
+	}
 	if kind == "Bounty" || kind == "FactionKillBond" || kind == "JetConeBoost" || kind == "JetConeDamage" || kind == "CodexEntry" {
 		return true
 	}
@@ -171,6 +174,9 @@ func (s *Store) normalize(tx *sql.Tx, source string, records []journal.Record, c
 		eventID, _ := res.LastInsertId()
 		if !fid.Valid {
 			continue
+		}
+		if err = normalizeOperations(tx, eventID, fid.String, session.String, address, e.Type, stamp, v); err != nil {
+			return err
 		}
 		if err = fieldTally(tx, eventID, fid.String, address, e.Type, stamp, v); err != nil {
 			return err

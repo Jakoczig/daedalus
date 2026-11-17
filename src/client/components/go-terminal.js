@@ -1,3 +1,4 @@
+import GoOperations, { operationPaths } from './go-operations'
 import { BGSTally, ImportedItinerary } from './go-field-operations'
 import { useState, useEffect } from 'react'
 import Layout from './layout'
@@ -26,14 +27,15 @@ export default function GoTerminal (props) {
   const [communityVersion, setCommunityVersion] = useState(0)
   const path = props.path === '/' || props.path === '/nav' ? '/nav/map' : props.path === '/ship' ? '/ship/status' : props.path === '/exploration' ? '/exploration/system' : props.path === '/eng' ? '/eng/blueprints' : props.path === '/cmdr' ? '/cmdr/overview' : props.path === '/mining' ? '/mining/status' : props.path === '/missions' ? '/missions/overview' : props.path
   const group = path.split('/')[1]; const page = path.split('/')[2] || ''
-  const menus = { nav: navigation.NavPanelNavItems, exploration: navigation.ExplorationPanelNavItems, ship: navigation.ShipPanelNavItems, eng: navigation.EngineeringPanelNavItems, cmdr: navigation.CmdrPanelNavItems, missions: navigation.MissionsPanelNavItems, mining: navigation.MiningPanelNavItems }
+  const menus = { nav: navigation.NavPanelNavItems, exploration: navigation.ExplorationPanelNavItems, ship: navigation.ShipPanelNavItems, eng: navigation.EngineeringPanelNavItems, cmdr: navigation.CmdrPanelNavItems, missions: navigation.MissionsPanelNavItems, mining: navigation.MiningPanelNavItems, trade: navigation.TradePanelNavItems }
   const items = menus[group] ? menus[group](page, {}).filter(i => i.url) : []
   if (group === 'nav' && props.stage === 'G2E') items.push({ name: 'Galaxy', icon: 'system-orbits', url: '/nav/galaxy', active: page === 'galaxy' })
   const { value: summary } = useGoProjection(props, 'getJournalSummary', 'journalSummaryChanged')
   const { value: ship } = useGoProjection(props, 'getGoShip', 'goShipChanged')
   if (group === 'cmdr' && props.stage === 'G2E') items.push({ name: 'Field / BGS', icon: 'scan', url: '/cmdr/field', active: page === 'field' })
   let content
-  if (path === '/cmdr/field' && props.stage === 'G2E') content = <BGSTally {...props} />
+  if (props.stage === 'G2E' && operationPaths.includes(path)) content = <GoOperations key={path} {...props} path={path} />
+  else if (path === '/cmdr/field' && props.stage === 'G2E') content = <BGSTally {...props} />
   else if (path === '/nav/galaxy' && props.stage === 'G2E') content = <><GoGalaxy context={flight?.navigation} route={plotted} {...props} /><details><summary>Imported itinerary · separate user plan</summary><ImportedItinerary {...props} /></details></>
   else if (props.stage === 'G2E' && parityPaths.includes(path)) content = <GoParity {...props} path={path} />
   else if (['/nav/map', '/nav/list', '/exploration/system', '/exploration/biologicals'].includes(path)) content = <GoTerminalSurvey {...props} communityVersion={communityVersion} path={path} />

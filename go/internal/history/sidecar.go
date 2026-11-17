@@ -12,12 +12,26 @@ func (s *Store) SaveSidecar(fid string, e journal.Event, kind string, raw json.R
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var id int64
-	if err := s.writer.QueryRow("SELECT event_id FROM journal_events WHERE source_id=? AND byte_offset=? AND line_hash=? AND commander_fid=? AND type=?", e.Position.FileID, e.Position.Offset, digest(e.Raw), fid, kind).Scan(&id); err != nil {
+	tx, err := s.writer.Begin()
+	if err != nil {
 		return err
 	}
-	_, err := s.writer.Exec("INSERT OR IGNORE INTO sidecar_snapshots(source_event_id,commander_fid,kind,content_hash,observed_at,raw_json) VALUES(?,?,?,?,?,?)", id, fid, kind, digest(raw), e.Timestamp.UTC().Format("2006-01-02T15:04:05.000000000Z"), string(raw))
-	return err
+	defer tx.Rollback()
+	var id int64
+	if err := tx.QueryRow("SELECT event_id FROM journal_events WHERE source_id=? AND byte_offset=? AND line_hash=? AND commander_fid=? AND type=?", e.Position.FileID, e.Position.Offset, digest(e.Raw), fid, kind).Scan(&id); err != nil {
+		return err
+	}
+	if err = validateStationSnapshot(tx, fid, id, kind, raw); err != nil {
+		return err
+	}
+	_, err = tx.Exec("INSERT OR IGNORE INTO sidecar_snapshots(source_event_id,commander_fid,kind,content_hash,observed_at,raw_json) VALUES(?,?,?,?,?,?)", id, fid, kind, digest(raw), e.Timestamp.UTC().Format("2006-01-02T15:04:05.000000000Z"), string(raw))
+	if err != nil {
+		return err
+	}
+	if err = saveMarket(tx, fid, id, kind, raw, "journal-sidecar", utc(), ""); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (s *Store) SourceHeader(source string) (journal.Event, error) {
 	var raw string

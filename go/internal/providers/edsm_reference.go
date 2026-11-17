@@ -72,7 +72,7 @@ func numberText(v any) string {
 	}
 	return ""
 }
-func (m *Manager) normalizeEDSMReference(ctx context.Context, kind, query string, raw []byte, now time.Time) (*Snapshot, error) {
+func (m *Manager) normalizeEDSMReference(ctx context.Context, kind, query string, raw []byte, now time.Time, commander ...string) (*Snapshot, error) {
 	snapshot := &Snapshot{Source: "edsm-reference / " + kind, Facts: []Fact{}}
 	fetched, expires := now.UTC().Format(time.RFC3339), now.Add(6*time.Hour).UTC().Format(time.RFC3339)
 	add := func(name, value string) {
@@ -204,6 +204,11 @@ func (m *Manager) normalizeEDSMReference(ctx context.Context, kind, query string
 	items, ok := data[key].([]any)
 	if !ok || len(items) > 2048 {
 		return nil, errors.New("Station inventory exceeds limit")
+	}
+	if kind == "market" && len(commander) > 0 {
+		if err := m.history.SaveExternalMarket(commander[0], station, data, fetched, expires); err != nil {
+			return nil, err
+		}
 	}
 	for i, item := range items {
 		if i >= 32 {

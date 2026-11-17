@@ -22,7 +22,7 @@ import (
 //go:embed schema.sql
 var schema string
 
-const schemaVersion = 5
+const schemaVersion = 6
 const maxCache = 32 << 20
 
 var ErrQuarantined = errors.New("Journal identity changed; cached history retained. Review quarantined source in Data/History")
@@ -78,6 +78,9 @@ func Open(dir string) (*Store, error) {
 		return fail(errors.New("Database integrity failed; original preserved"))
 	}
 	if err := migrate(db, dir); err != nil {
+		return fail(err)
+	}
+	if err := repairGoalMembership(db); err != nil {
 		return fail(err)
 	}
 	read, err := sql.Open("sqlite3", dsn(path)+"&_query_only=on")

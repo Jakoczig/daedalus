@@ -2,7 +2,7 @@ name: Go desktop foundation
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 
@@ -298,13 +298,35 @@ jobs:
             temp/g2k-statistics-live.txt
           if-no-files-found: error
           retention-days: 14
+      - name: G2L exact G2K lifecycle baseline and operations queries
+        run: |
+          node scripts/testing/g2l-baseline.cjs
+          cd temp/g2l-exact-g2k-baseline/go
+          go test ./internal/gamestate -run '^$' -bench '^BenchmarkG2JLifecycle$' -benchtime=1x -benchmem -count=1 | tee ../../g2l-g2k-lifecycle.txt
+          go build -o bin/g2l-baseline-fixture${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/visual-fixture
+          cd ../../../go
+          go test ./internal/history -run '^$' -bench '^BenchmarkG2LOperationsQueries$' -benchtime=10x -benchmem -count=1 | tee ../temp/g2l-queries.txt
+      - name: G2L owner operations and upload-disabled market browser smoke
+        run: node scripts/testing/g2l-visual.cjs
+      - name: Upload G2L fabricated evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: g2l-synthetic-evidence-${{ runner.os }}
+          path: |
+            temp/g2l-visual/*.png
+            temp/g2l-visual/report.json
+            temp/g2l-g2k-lifecycle.txt
+            temp/g2l-queries.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g2k-${{ runner.os }}-x64-experimental-unsigned-field-operations
+          name: daedalus-g2l-${{ runner.os }}-x64-experimental-unsigned-fleet-economy
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

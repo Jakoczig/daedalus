@@ -84,3 +84,17 @@ module controls. SQLite schema 5 preserves history with verified migration
 backup; read-only paired-display and publication boundaries remain intact.
 See [G2K handoff](handoffs/g2k-native-field-operations.md) and its preview matrix
 for limitations, exact-head evidence links and one gameplay/laptop checklist.
+
+
+## G2L — Fleet, Economy & Commander Operations
+
+Builds on physically accepted G2K (`fd72126`): additive SQLite v6 projections,
+private fleet/historical loadouts, owned-carrier operations, exact trade and market
+history, conservative mining receipts and CG/Powerplay/squadron/wing/NPC crew
+operations. Uses the same journal reader, serialized writer, authenticated service
+and source/consent controls. New private data stays local-owner-only. Original
+journal recovery is hash-verified and never publishes historical events. Existing
+visual rough edges are deferred by the maintainer. Provider approval/response-field
+and physical G2L acceptance limitations are recorded in the
+[G2L handoff](handoffs/g2l-fleet-economy-commander-operations.md) and
+[capability matrix/checklist](testing/g2l-fleet-economy-preview.md).

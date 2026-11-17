@@ -44,7 +44,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			return cached, nil
 		}
 	}
-	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
+	if ((id == "inara" && kind == "communitygoals" && s.config.CommunityGoals) || id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
 		raw, err := m.history.CachedReference(id, cacheKey, m.opts.Now())
 		if err != nil {
 			m.mu.Unlock()
@@ -213,7 +213,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			m.mu.Unlock()
 			return nil, errors.New("Read consent revoked")
 		}
-		parsed, err := m.normalizeEDSMReference(requestCtx, kind, query, raw, now)
+		parsed, err := m.normalizeEDSMReference(requestCtx, kind, query, raw, now, fid)
 		m.mu.Unlock()
 		if err != nil {
 			return nil, err
@@ -369,6 +369,9 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
 		return nil, errors.New("Read consent was revoked")
 	}
+	if id == "frontier" && kind == "communitygoals" {
+		add("Community goals", "Documented read endpoint; response-field normalization awaits verified authorized fixture. No account/journal state inferred.")
+	}
 	if m.history != nil && kind == "profile" {
 		if err := m.persistCommanderRead(requestCtx, id, kind, fid, commander, data, now); err != nil {
 			return nil, err
@@ -379,7 +382,7 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			return nil, err
 		}
 	}
-	if (id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
+	if ((id == "inara" && kind == "communitygoals" && s.config.CommunityGoals) || id == "spansh" || id == "elitebgs" || id == "canonn" || id == "raven" || id == "edsm-reference") && m.history != nil {
 		encoded, _ := json.Marshal(snapshot)
 		expires, _ := time.Parse(time.RFC3339, snapshot.ExpiresAt)
 		if err := m.history.SaveReference(requestCtx, id, cacheKey, encoded, now, expires); err != nil {
