@@ -34,13 +34,14 @@ type OperationRow struct {
 	Details json.RawMessage `json:"details"`
 }
 type OperationPage struct {
-	PreviewHash string            `json:"previewHash"`
-	Totals      map[string]string `json:"totals,omitempty"`
-	Current     []OperationRow    `json:"current,omitempty"`
-	Rows        []OperationRow    `json:"rows"`
-	Next        string            `json:"next"`
-	Notice      string            `json:"notice"`
-	Reference   []EffectiveFact   `json:"reference,omitempty"`
+	GoalMembership *GoalMembership   `json:"goalMembership,omitempty"`
+	PreviewHash    string            `json:"previewHash"`
+	Totals         map[string]string `json:"totals,omitempty"`
+	Current        []OperationRow    `json:"current,omitempty"`
+	Rows           []OperationRow    `json:"rows"`
+	Next           string            `json:"next"`
+	Notice         string            `json:"notice"`
+	Reference      []EffectiveFact   `json:"reference,omitempty"`
 }
 
 func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (OperationPage, error) {
@@ -186,6 +187,20 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 	if q.Kind == "fleet" || q.Kind == "goals" || q.Kind == "squadron" {
 		out.Reference, _ = s.EffectiveFacts(ctx, fid, "commander", time.Now())
 	}
+	members := map[string]bool{}
+	if q.Kind == "goals" {
+		value, err := s.goalMembership(ctx, fid)
+		if err != nil {
+			return out, err
+		}
+		out.GoalMembership = &value
+		for _, id := range value.IDs {
+			members[id] = true
+		}
+		for i := range out.Rows {
+			out.Rows[i].State = "historical_goal_event"
+		}
+	}
 	if q.Kind == "goals" || q.Kind == "powerplay" || q.Kind == "crew" || q.Kind == "squadron" {
 		current, err := s.reader.QueryContext(ctx, "SELECT cast(rowid AS TEXT),entity_id,field,observed_at,content_json FROM commander_current WHERE commander_fid=? AND category=? ORDER BY observed_at DESC,event_id DESC LIMIT 100", fid, q.Kind)
 		if err != nil {
@@ -205,6 +220,18 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 			}
 			r.Kind = q.Kind
 			r.State = "last_witnessed_not_live"
+			if q.Kind == "goals" {
+				switch {
+				case r.Title == goalSnapshotField:
+					r.State = "complete_subscription_snapshot"
+				case !out.GoalMembership.Known:
+					r.State = "membership_unknown_no_complete_snapshot"
+				case members[r.Entity]:
+					r.State = "subscribed_as_last_witnessed"
+				default:
+					r.State = "historical_goal"
+				}
+			}
 			r.Details = exactOperationJSON(raw)
 			out.Current = append(out.Current, r)
 		}

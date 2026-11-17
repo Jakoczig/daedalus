@@ -106,6 +106,13 @@ func normalizeOperations(tx *sql.Tx, id int64, fid, session, system, kind, at st
 	if !moduleEnabled(tx, module) {
 		return nil
 	}
+	// Membership is a full snapshot, independent of per-goal additive history.
+	// This also makes explicit retained-record backfill repair seen snapshots.
+	if kind == "CommunityGoal" {
+		if _, e := recordGoalSnapshot(tx, fid, at, id, v); e != nil {
+			return e
+		}
+	}
 	// A copied/reimported journal has the same header, line hash and byte offset.
 	// Retain both immutable sources, but account that physical record only once.
 	var header, source, hash string
@@ -157,7 +164,15 @@ func normalizeOperations(tx *sql.Tx, id int64, fid, session, system, kind, at st
 	if category != "" {
 		items := []any{v}
 		if kind == "CommunityGoal" {
-			items = list(v["CurrentGoals"])
+			var valid bool
+			items, _, valid = validGoalSnapshot(v)
+			if !valid {
+				return nil
+			}
+			if len(items) == 0 {
+				_, e = tx.Exec("INSERT OR IGNORE INTO commander_operations VALUES(?,0,?,'goals','','CommunityGoal',?,?)", id, fid, at, encoded(map[string]any{"CurrentGoals": []any{}}))
+				return e
+			}
 		}
 		for i, x := range items {
 			row, _ := x.(map[string]any)

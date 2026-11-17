@@ -131,6 +131,18 @@ func main() {
 				continue
 			}
 			kind := scanner.Text()
+			if filepath.Base(*fixture) == "g2l" && kind == "operations-goals-empty" {
+				raw, _ := json.Marshal(map[string]any{"event": "CommunityGoal", "timestamp": time.Now().UTC().Format(time.RFC3339Nano), "CurrentGoals": []any{}})
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)
+				if err != nil {
+					panic(err)
+				}
+				if _, err = f.Write(append(raw, '\n')); err != nil {
+					panic(err)
+				}
+				f.Close()
+				continue
+			}
 			if filepath.Base(*fixture) == "g2l" && kind == "operations-dock" {
 				marketAt = time.Now().UTC().Format(time.RFC3339Nano)
 				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)

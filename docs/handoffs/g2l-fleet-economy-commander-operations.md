@@ -70,3 +70,63 @@ Primary contracts: [journal Station Services](https://elite-journal.readthedocs.
 [Squadrons](https://elite-journal.readthedocs.io/en/latest/Squadrons.html),
 [Frontier CAPI endpoints](https://github.com/EDCD/FDevIDs/blob/master/Frontier%20API/FrontierDevelopments-CAPI-endpoints.md).
 No upstream implementation code copied or dependencies added.
+
+
+## Review correction — complete CommunityGoal snapshots
+
+Review: [6957005043](https://github.com/Jakoczig/daedalus/pull/16#issuecomment-6957005043).
+`CurrentGoals` is now validated as a bounded complete snapshot. A per-FID durable
+marker includes explicit empty lists; only strictly newer observation times replace
+membership. Missing/null/malformed/duplicate-ID/oversized arrays cannot clear it.
+All contribution, participation, discard and received-reward history remains.
+Current rows distinguish subscribed-as-last-witnessed, historical and unknown;
+expiry/bonus/completion never implies payment or automatic membership changes.
+The label is explicitly membership at the complete snapshot time, not a live claim.
+
+Existing reviewed v6 profiles receive a one-time, keyset-batched repair from
+retained CommunityGoal events, including old empty snapshots. This changes only
+derived current state and an operations-state marker: no migration/checksum,
+immutable history, original-source reread, checkpoint or upload permission changes.
+Subsequent warm opens check one marker rather than replaying journals. Explicit
+backfill and restart preserve newer snapshot evidence. Regressions cover A→empty,
+A+B→B, older replay, malformed/missing arrays, two FIDs, expiry, restart/old-profile
+repair and injected transaction rollback. React and real browser checks verify the
+known-empty display while historical reward records remain visible.
+
+## Controlled Windows import investigation
+
+[Full samples, environment, stage metrics and CPU summaries](../benchmarks/g2l-controlled-windows-review.json).
+Exact G2K `fd72126` and reviewed G2L `54a90b3`; immutable source archives plus an
+identical test-only mixed-workload overlay. Go 1.26.10 / GCC 16.2, same Windows 11
+PC, fresh process/profile per run, order AB/BA/AB, no concurrent build/test workload.
+Three paired runs for each workload (12 timing invocations), then one bounded
+four-run diagnostic pass in disposable instrumented copies only.
+
+| Cold import | G2K samples / median | G2L samples / median |
+|---|---|---|
+| Original 100k material workload | 5818, 6163, 6083 / **6083 ms** | 6449, 6496, 6727 / **6496 ms** |
+| 10k mixed fleet/carrier/trade/CG/crew | 1011, 1022, 1461 / **1022 ms** | 2285, 2623, 3479 / **2623 ms** |
+
+The original CI +87% material increase did not reproduce here. A smaller +6.8%
+median difference remains; its full cause is not established. This is one host
+and three pairs, not a statistical or cross-hardware conclusion. The mixed case
+is intentionally not feature-equivalent: G2K has no G2L operation projections.
+Diagnostic mixed normalization rose 483.5→1672 ms; 1102 ms was in the 8997 new
+operation projections. Journal decoding was 65.32→66.26 ms and durable commit
+710→400.4 ms. Material performed zero operation projections; durable commit was
+1839→1859 ms, normalization 2670→2812 ms. These diagnostic intervals overlap and
+material includes original warm/catch-up stages; do not add them or substitute
+for the uninstrumented cold samples. CPU profiles point primarily to SQLite/CGo,
+without evidence for a journal decoder or large transaction-durability regression.
+
+No speculative performance fix or SQLite/schema/durability tuning was applied.
+The CI host's original large variance is still not causally explained. Reproduce
+with `python scripts/testing/g2l-controlled-windows.py --prepare`, then `--run`
+with the printed isolated directory; `--profile` is a separate optional diagnostic
+only after a reproduced difference. Script GO/CC paths describe this workspace;
+adapt to equivalent pinned Windows tools on another machine. Generated profiles
+stay under ignored temp directories and are never packaged in previews.
+
+The final PR report records the correction commit, exact-head final CI and refreshed
+Windows/Linux artifact/executable SHA-256 verification. Physical G2L/laptop and live
+provider acceptance remain manual; no release/merge/deploy/production upload.

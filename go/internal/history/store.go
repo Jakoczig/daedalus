@@ -80,6 +80,9 @@ func Open(dir string) (*Store, error) {
 	if err := migrate(db, dir); err != nil {
 		return fail(err)
 	}
+	if err := repairGoalMembership(db); err != nil {
+		return fail(err)
+	}
 	read, err := sql.Open("sqlite3", dsn(path)+"&_query_only=on")
 	if err != nil {
 		return fail(err)

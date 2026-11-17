@@ -32,6 +32,12 @@ async function main () {
         report.pages.push({ name, url, overflow })
       }
     }
+    await navigate('/cmdr/community-goals', '2 subscribed goals as last witnessed')
+    host.child.stdin.write('operations-goals-empty\n')
+    await waitFor(() => evaluate(pageTextReady('0 subscribed goals as last witnessed')))
+    if (!await evaluate('document.body.textContent.includes("CommunityGoalReward")&&document.body.textContent.includes("historical goal")')) throw new Error('Empty complete CG snapshot lost history or left removed goals current')
+    await navigate('/cmdr/community-goals', '0 subscribed goals as last witnessed')
+    report.completeGoalSnapshotRetiresMembershipAndKeepsHistory = true
     await navigate('/ship/fleet', 'Fixture Explorer'); await measure('G2L open Fleet')
     const priorEvents = eventsRead; host.child.stdin.write('operations-dock\n'); await waitFor(() => eventsRead >= priorEvents + 3); host.child.stdin.write('operations-market\n')
     await navigate('/trade/commodities', 'Station commodity observations'); await waitFor(() => evaluate('Array.from(document.querySelectorAll("summary")).some(e=>e.textContent.includes("gold"))'))

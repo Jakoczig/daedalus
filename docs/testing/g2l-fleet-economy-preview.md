@@ -53,7 +53,9 @@ One consolidated acceptance checklist:
 3. Buy/sell a commodity with known basis; sell mined/mixed cargo. Compare exact
    expenditure/receipts and withheld unknown profit. Open station markets at two
    stations, compare dated quotes and confirm no uploads/provider requests occur.
-4. Observe two CGs, a received reward, Powerplay actions, squadron/crew/wing events.
+4. Observe two CGs, then unsubscribe from one and later all: the next complete
+   snapshot must show the reduced/zero last-witnessed subscription count while
+   prior contribution/reward history remains. Observe Powerplay/squadron/crew/wing events.
    Restart after playing with the app closed. Check retained history, pagination,
    commander isolation and explicit unknown fields. Test verified original-source
    recovery only on a private backup; changed/missing originals must fail safely.

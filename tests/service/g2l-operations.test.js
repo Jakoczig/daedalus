@@ -55,3 +55,14 @@ test('G2L owner uses only bounded local reads, preserves exact IDs and stops aft
   assert.ok(h.calls.includes('getGoOperations')); assert.ok(h.calls.includes('getGoDataStatus'))
   assert.ok(h.calls.every(n => ['getGoOperations', 'getGoDataStatus', 'getGoProviders'].includes(n)))
 })
+
+test('CG membership distinguishes known empty, unknown and historical goals without losing rewards', async () => {
+  for (const known of [false, true]) {
+    const h = harness('go-operations', { rows: [{ id: '1', entity: '9007199254740993', title: 'CommunityGoalReward', kind: 'CommunityGoalReward', at: '2026-01-01', state: 'historical_goal_event', details: { Reward: '100' } }], current: [{ id: '2', entity: '9007199254740993', title: 'progress_snapshot', at: '2026-01-01', state: known ? 'historical_goal' : 'membership_unknown_no_complete_snapshot', details: {} }], goalMembership: { known, ids: [], observedAt: '2026-01-02', notice: 'Complete snapshot; historical rewards retained' } })
+    h.props.path = '/cmdr/community-goals'; h.props.role = 'owner'; h.props.ready = true
+    h.html(); const html = await h.flush(); h.unmount()
+    assert.match(html, known ? /0 subscribed goals as last witnessed/ : /Subscribed goals unknown/)
+    assert.match(html, /CommunityGoalReward/); assert.match(html, /100/)
+    assert.match(html, known ? /historical goal/ : /membership unknown no complete snapshot/)
+  }
+})
