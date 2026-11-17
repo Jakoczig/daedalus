@@ -56,7 +56,22 @@ func (m *Manager) publishStationLocked(kind string) {
 	s := m.states["eddn"]
 	c, ok := m.station.Files[kind]
 	e, marked := m.station.Markers[kind]
-	if !ok || !marked || !c.Valid || c.Timestamp.IsZero() || !c.Timestamp.Equal(e.Timestamp) || m.history == nil || s == nil || !s.config.Upload || s.config.Paused || s.config.CommanderHash != m.identity || m.identity == "" || !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") {
+	if !ok || !marked || !c.Valid || c.Timestamp.IsZero() || !c.Timestamp.Equal(e.Timestamp) || m.history == nil || m.identity == "" {
+		return
+	}
+	age := m.opts.Now().Sub(c.Timestamp)
+	if age < -5*time.Second || age > 2*time.Minute {
+		return
+	}
+	v := object(c.Raw)
+	n, valid := v["MarketID"].(json.Number)
+	if !valid || string(n) != m.station.Market || text(v["StationName"]) != m.station.Name || text(v["StarSystem"]) != m.station.System {
+		return
+	}
+	if err := m.history.SaveSidecar(m.fid, e, kind, c.Raw); err != nil {
+		return
+	}
+	if !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") || s == nil || !s.config.Upload || s.config.Paused || s.config.CommanderHash != m.identity {
 		return
 	}
 	cat := map[string]string{"Market": "commodities", "Shipyard": "shipyard", "Outfitting": "outfitting"}[kind]
@@ -67,15 +82,6 @@ func (m *Manager) publishStationLocked(kind string) {
 		}
 	}
 	if !permitted {
-		return
-	}
-	age := m.opts.Now().Sub(c.Timestamp)
-	if age < -5*time.Second || age > 2*time.Minute {
-		return
-	}
-	v := object(c.Raw)
-	n, valid := v["MarketID"].(json.Number)
-	if !valid || string(n) != m.station.Market || text(v["StationName"]) != m.station.Name || text(v["StarSystem"]) != m.station.System {
 		return
 	}
 	candidate, err := m.history.Candidate(m.fid, "eddn", cat, e, journal.Live, false, m.opts.Now())

@@ -273,6 +273,16 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			} else {
 				response["message"] = s.providers.Layers()
 			}
+		case "getGoOperations", "exportGoOperations", "backfillGoOperationsSource":
+			if principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			if value, err := s.operationsRPC(readCtx, request.Name, request.Message); err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
 		case "getGoFieldView":
 			response["message"] = s.fieldView(principal.role == "owner")
 		case "getGoBioScan":

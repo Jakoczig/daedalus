@@ -1,0 +1,57 @@
+{"timestamp":"2026-01-01T00:00:00Z","event":"Fileheader","gameversion":"synthetic"}
+{"timestamp":"2026-01-01T00:00:01Z","event":"LoadGame","FID":"SYNTHETIC-G2B","Commander":"PRIVATE_SYNTHETIC"}
+{"timestamp":"2026-01-01T00:00:02Z","event":"NavRoute"}
+{"timestamp":"2026-01-01T00:00:03Z","event":"Location","StarSystem":"Fixture Alpha","SystemAddress":9007199254740993}
+{"timestamp":"2026-01-01T00:00:04Z","event":"FSDTarget","Name":"Fixture Beta","SystemAddress":9007199254740994,"RemainingJumpsInRoute":1}
+{"timestamp":"2026-01-01T00:00:05Z","event":"FSSDiscoveryScan","BodyCount":12,"Progress":0.25}
+{"timestamp":"2026-01-01T00:00:06Z","event":"Scan","SystemAddress":9007199254740993,"BodyID":9007199254740997,"BodyName":"Fixture Alpha 1","PlanetClass":"Rocky body","Landable":true,"SurfaceGravity":1.0,"WasMapped":false,"Materials":[{"Name":"PRIVATE_SENTINEL","Percent":1}],"AtmosphereType":"CarbonDioxide"}
+{"timestamp":"2026-01-01T00:00:07Z","event":"SAASignalsFound","SystemAddress":9007199254740993,"BodyID":9007199254740997,"Signals":[{"Type":"$SAA_SignalType_Biological;","Count":3}],"Genuses":[{"Genus":"$Codex_Ent_Bacterial_Genus_Name;","Genus_Localised":"Bacterium"}]}
+{"timestamp":"2026-01-01T00:00:08Z","event":"SAAScanComplete","SystemAddress":9007199254740993,"BodyID":9007199254740997}
+{"timestamp":"2026-01-01T00:00:09Z","event":"Scan","SystemAddress":9007199254740993,"BodyID":0,"BodyName":"Fixture Alpha","StarType":"G","Radius":696340000,"SurfaceTemperature":5700,"StellarMass":1,"Luminosity":"V","Age_MY":4600}
+{"timestamp":"2026-01-01T00:00:10Z","event":"Scan","SystemAddress":9007199254740993,"BodyID":9007199254740997,"BodyName":"Fixture Alpha 1","PlanetClass":"Rocky body","Radius":1000000,"SurfaceTemperature":250,"SurfacePressure":1013.25,"MassEM":0.1,"OrbitalPeriod":86400,"RotationPeriod":3600,"SemiMajorAxis":149597870700,"Parents":[{"Star":0}],"Composition":{"Rock":0.9,"Metal":0.1},"AtmosphereComposition":[{"Name":"CarbonDioxide","Percent":95}],"Rings":[{"Name":"Fixture Alpha 1 Ring","RingClass":"eRingClass_Rocky","InnerRad":2000000,"OuterRad":3000000}],"Latitude":23,"Commander":"PRIVATE_SYNTHETIC","AtmosphereType":"CarbonDioxide","SurfaceGravity":1.0,"Landable":true}
+{"timestamp":"2026-01-01T00:00:11Z","event":"ScanOrganic","SystemAddress":9007199254740993,"Body":9007199254740997,"Genus":"fixture-genus","Genus_Localised":"Bacterium","Species":"fixture-species","Species_Localised":"Fixture Bacterium","ScanType":"Log"}
+{"timestamp":"2026-01-01T00:00:12Z","event":"ScanOrganic","SystemAddress":9007199254740993,"Body":9007199254740997,"Genus":"fixture-genus","Genus_Localised":"Bacterium","Species":"fixture-species","Species_Localised":"Fixture Bacterium","ScanType":"Sample"}
+{"timestamp":"2026-01-01T00:00:13Z","event":"ScanOrganic","SystemAddress":9007199254740993,"Body":9007199254740997,"Genus":"fixture-genus","Genus_Localised":"Bacterium","Species":"fixture-species","Species_Localised":"Fixture Bacterium","ScanType":"Analyse"}
+{"timestamp":"2026-01-01T00:00:14Z","event":"Scan","SystemAddress":9007199254740993,"BodyID":8,"BodyName":"Fixture Alpha 1 a","PlanetClass":"Icy body","Radius":750000,"SurfaceGravity":2.9,"SurfaceTemperature":160,"DistanceFromArrivalLS":1200,"Landable":true,"Parents":[{"Planet":9007199254740997},{"Star":0}]}
+{"timestamp":"2026-01-01T00:00:15Z","event":"ScanOrganic","SystemAddress":9007199254740993,"Body":9007199254740997,"Genus":"fixture-tussock","Genus_Localised":"Tussock","Species":"fixture-tussock-species","Species_Localised":"Fixture Tussock","ScanType":"Log"}
+{"timestamp":"2026-01-01T00:00:16Z","event":"ScanOrganic","SystemAddress":9007199254740993,"Body":9007199254740997,"Genus":"fixture-tussock","Genus_Localised":"Tussock","Species":"fixture-tussock-species","Species_Localised":"Fixture Tussock","ScanType":"Sample"}
+{"timestamp":"2026-01-01T00:00:17Z","event":"Loadout","Ship":"asp","ShipID":123,"HullHealth":0.82,"FuelCapacity":{"Main":32,"Reserve":0.5},"CargoCapacity":64,"UnladenMass":280,"MaxJumpRange":45,"ShipName":"PRIVATE_SHIP","ShipIdent":"PRIVATE_IDENT","Modules":[{"Item":"PRIVATE_MODULE"}]}
+{"timestamp":"2026-01-01T00:00:18Z","event":"FSDJump","StarSystem":"Fixture Alpha","SystemAddress":9007199254740993,"FuelLevel":16}
+{"timestamp":"2026-01-01T00:00:19Z","event":"FSDTarget","Name":"Fixture Beta","SystemAddress":9007199254740994,"RemainingJumpsInRoute":1}
+{"event":"Loadout","Ship":"asp","ShipID":123,"HullHealth":0.82,"FuelCapacity":{"Main":32,"Reserve":0.5},"CargoCapacity":64,"UnladenMass":280,"MaxJumpRange":45,"ShipName":"PRIVATE_CUSTOM_NAME","Modules":[{"Slot":"FrameShiftDrive","Item":"int_hyperdrive_size5_class5","Health":0.9,"On":true,"Priority":1,"Engineering":{"BlueprintName":"FSD_LongRange","Level":5,"Quality":0.8,"ExperimentalEffect_Localised":"Mass Manager","Modifiers":[{"Label":"FSDOptimalMass","Value":1750,"OriginalValue":1000,"LessIsGood":false}]}},{"Slot":"MediumHardpoint1","Item":"hpt_mininglaser_fixed_medium","Health":1,"On":true,"Priority":2},{"Slot":"Slot01_Size3","Item":"int_shieldgenerator_size3_class5","Health":1,"On":true,"Priority":1}],"timestamp":"2026-01-01T00:00:20Z"}
+{"event":"Materials","Raw":[{"Name":"iron","Count":20},{"Name":"nickel","Count":15},{"Name":"chromium","Count":8}],"Manufactured":[{"Name":"chemicalmanipulators","Count":3}],"Encoded":[{"Name":"dataminedwake","Count":5}],"timestamp":"2026-01-01T00:00:21Z"}
+{"event":"Cargo","Vessel":"Ship","Count":6,"Inventory":[{"Name":"drones","Name_Localised":"Limpet","Count":4,"Stolen":0},{"Name":"platinum","Name_Localised":"Platinum","Count":2,"Stolen":0}],"timestamp":"2026-01-01T00:00:22Z"}
+{"event":"ShipLocker","Consumables":[{"Name":"healthpack","Name_Localised":"Medkit","Count":4}],"Items":[],"Components":[],"Data":[],"timestamp":"2026-01-01T00:00:23Z"}
+{"event":"Backpack","Consumables":[],"Items":[],"Components":[],"Data":[],"timestamp":"2026-01-01T00:00:24Z"}
+{"event":"Rank","Combat":3,"Trade":4,"Explore":5,"timestamp":"2026-01-01T00:00:25Z"}
+{"event":"Progress","Combat":45,"Trade":60,"Explore":25,"timestamp":"2026-01-01T00:00:26Z"}
+{"event":"Reputation","Empire":20,"Federation":30,"Alliance":15,"timestamp":"2026-01-01T00:00:27Z"}
+{"event":"MissionAccepted","MissionID":9007199254740993,"Name":"Mission_Delivery","LocalisedName":"Fixture delivery","Faction":"Fixture Cooperative","DestinationSystem":"Fixture Beta","Commodity":"platinum","Count":4,"Reward":250000,"Expiry":"2026-01-02T00:00:00Z","timestamp":"2026-01-01T00:00:28Z"}
+{"event":"Missions","Active":[{"MissionID":9007199254740993,"Name":"Mission_Delivery"}],"Failed":[],"Complete":[],"timestamp":"2026-01-01T00:00:29Z"}
+{"event":"ProspectedAsteroid","Content":"High","Content_Localised":"High material content","Remaining":85,"Materials":[{"Name":"platinum","Name_Localised":"Platinum","Proportion":32.5},{"Name":"painite","Proportion":12}],"timestamp":"2026-01-01T00:00:30Z"}
+{"event":"MiningRefined","Type":"platinum","Type_Localised":"Platinum","timestamp":"2026-01-01T00:00:31Z"}
+{"event":"Cargo","Vessel":"Ship","Count":7,"Inventory":[{"Name":"drones","Name_Localised":"Limpet","Count":4,"Stolen":0},{"Name":"platinum","Name_Localised":"Platinum","Count":3,"Stolen":0}],"timestamp":"2026-01-01T00:00:32Z"}
+{"event":"EngineerProgress","timestamp":"2026-01-01T00:00:33Z","Engineers":[{"Engineer":"Felicity Farseer","EngineerID":300100,"Progress":"Unlocked","Rank":5,"RankProgress":0.75}]}
+{"event":"MissionCompleted","timestamp":"2026-01-01T00:01:00Z","MissionID":9007199254740993,"Faction":"Fixture Cooperative","Reward":250000,"FactionEffects":[{"Faction":"Fixture Cooperative","Reputation":"++","Influence":[{"SystemAddress":9007199254740993,"Influence":"+++"},{"SystemAddress":9007199254740994,"Influence":"+"}]}]}
+{"event":"JetConeBoost","timestamp":"2026-01-01T00:01:01Z","BoostValue":6.0}
+{"event":"JetConeDamage","timestamp":"2026-01-01T00:01:02Z","Module":"FrameShiftDrive"}
+{"event":"ScanOrganic","timestamp":"2026-01-01T00:01:03Z","SystemAddress":9007199254740993,"Body":9007199254740997,"ScanType":"Log","Genus":"$Codex_Ent_Bacterial_Genus_Name;","Genus_Localised":"Bacterium","Species":"$Codex_Ent_Bacterial_01_Name;","Species_Localised":"Bacterium Aurasus"}
+{"event":"StoredShips","MarketID":9007199254740993,"StationName":"Fixture Port","StarSystem":"Fixture Alpha","ShipsHere":[{"ShipID":9007199254740993,"ShipType":"asp","Name":"Fixture Explorer","Value":20000000}],"ShipsRemote":[{"ShipID":9007199254740994,"ShipType":"asp","Name":"Fixture Hauler","StarSystem":"Fixture Beta","ShipMarketID":9007199254740994,"TransferPrice":15000,"TransferTime":300}],"timestamp":"2026-01-01T00:02:00Z"}
+{"event":"ShipyardTransfer","ShipID":9007199254740994,"ShipType":"asp","TransferPrice":15000,"TransferTime":300,"timestamp":"2026-01-01T00:02:01Z"}
+{"event":"StoredModules","Items":[{"Name":"int_hyperdrive_size5_class5","StorageSlot":123,"StarSystem":"Fixture Beta","MarketID":9007199254740994,"EngineerModifications":"FSD_LongRange","Level":5,"TransferTime":300}],"timestamp":"2026-01-01T00:02:02Z"}
+{"event":"CarrierStats","CarrierID":18446744073709551615,"Name":"Fixture Owned Carrier","Callsign":"FIX-001","FuelLevel":250,"Finance":{"CarrierBalance":9007199254740993,"ReserveBalance":1000000},"SpaceUsage":{"TotalCapacity":25000,"Cargo":500,"FreeSpace":10000},"Crew":[{"CrewRole":"Refuel","Enabled":true,"Activated":true}],"timestamp":"2026-01-01T00:02:03Z"}
+{"event":"CarrierJumpRequest","CarrierID":18446744073709551615,"SystemName":"Fixture Pending","SystemAddress":9007199254740994,"DepartureTime":"2026-01-01T00:20:00Z","timestamp":"2026-01-01T00:02:04Z"}
+{"event":"CarrierTradeOrder","CarrierID":18446744073709551615,"Commodity":"tritium","PurchaseOrder":100,"Price":50000,"timestamp":"2026-01-01T00:02:05Z"}
+{"event":"MarketBuy","MarketID":9007199254740993,"Type":"gold","Count":2,"BuyPrice":10,"TotalCost":20,"timestamp":"2026-01-01T00:02:06Z"}
+{"event":"MarketSell","MarketID":9007199254740993,"Type":"gold","Count":2,"SellPrice":30,"TotalSale":60,"AvgPricePaid":10,"timestamp":"2026-01-01T00:02:07Z"}
+{"event":"Cargo","Vessel":"Ship","Count":0,"Inventory":[],"timestamp":"2026-01-01T00:02:08Z"}
+{"event":"MiningRefined","Type":"platinum","timestamp":"2026-01-01T00:02:09Z"}
+{"event":"MarketSell","MarketID":9007199254740993,"Type":"platinum","Count":1,"SellPrice":250000,"TotalSale":250000,"AvgPricePaid":0,"timestamp":"2026-01-01T00:02:10Z"}
+{"event":"CommunityGoal","CurrentGoals":[{"CGID":18446744073709551615,"Title":"Fixture Community Goal","PlayerContribution":12,"CurrentTotal":30000,"SystemName":"Fixture Alpha","MarketName":"Fixture Port","IsComplete":false,"Expiry":"2026-01-08T00:00:00Z"},{"CGID":9007199254740993,"Title":"Fixture Second Goal","PlayerContribution":3}],"timestamp":"2026-01-01T00:02:11Z"}
+{"event":"CommunityGoalReward","CGID":9007199254740993,"Name":"Fixture Second Goal","Reward":1000,"timestamp":"2026-01-01T00:02:12Z"}
+{"event":"Powerplay","Power":"Fixture Power","Rank":3,"Merits":1234,"timestamp":"2026-01-01T00:02:13Z"}
+{"event":"PowerplayDeliver","Power":"Fixture Power","Type":"fixturecommodity","Count":20,"timestamp":"2026-01-01T00:02:14Z"}
+{"event":"SquadronStartup","SquadronName":"Fixture Squadron","CurrentRank":2,"timestamp":"2026-01-01T00:02:15Z"}
+{"event":"CrewHire","Name":"PRIVATE_FIXTURE_CREW","Cost":10000,"CombatRank":2,"timestamp":"2026-01-01T00:02:16Z"}
+{"event":"CrewAssign","Name":"PRIVATE_FIXTURE_CREW","Role":"Active","timestamp":"2026-01-01T00:02:17Z"}
+{"event":"WingJoin","Others":["PRIVATE_FIXTURE_WING"],"timestamp":"2026-01-01T00:02:18Z"}

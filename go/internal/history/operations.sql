@@ -1,0 +1,35 @@
+CREATE TABLE operation_sources(event_id INTEGER PRIMARY KEY REFERENCES journal_events(event_id),commander_fid TEXT NOT NULL,signature TEXT NOT NULL,UNIQUE(commander_fid,signature));
+CREATE TABLE fleet_ship_events(event_id INTEGER NOT NULL REFERENCES journal_events(event_id),ordinal INTEGER NOT NULL,commander_fid TEXT NOT NULL,ship_id TEXT NOT NULL,event_type TEXT NOT NULL,observed_at TEXT NOT NULL,metadata_json TEXT NOT NULL,PRIMARY KEY(event_id,ordinal));
+CREATE INDEX fleet_events_ship ON fleet_ship_events(commander_fid,ship_id,event_id DESC);
+CREATE TABLE fleet_ships(commander_fid TEXT NOT NULL,ship_id TEXT NOT NULL,model TEXT NOT NULL,name TEXT NOT NULL,state TEXT NOT NULL,system_name TEXT NOT NULL,market_id TEXT NOT NULL,observed_at TEXT NOT NULL,event_id INTEGER NOT NULL,metadata_json TEXT NOT NULL,PRIMARY KEY(commander_fid,ship_id));
+CREATE INDEX fleet_page ON fleet_ships(commander_fid,ship_id);
+CREATE TABLE stored_module_observations(event_id INTEGER NOT NULL,ordinal INTEGER NOT NULL,commander_fid TEXT NOT NULL,storage_slot TEXT NOT NULL,module_symbol TEXT NOT NULL,observed_at TEXT NOT NULL,metadata_json TEXT NOT NULL,PRIMARY KEY(event_id,ordinal));
+CREATE INDEX stored_modules_page ON stored_module_observations(commander_fid,event_id DESC,ordinal);
+CREATE TABLE carrier_owned(commander_fid TEXT NOT NULL,carrier_id TEXT NOT NULL,event_id INTEGER NOT NULL,observed_at TEXT NOT NULL,PRIMARY KEY(commander_fid,carrier_id));
+CREATE TABLE carrier_observations(event_id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,carrier_id TEXT NOT NULL,event_type TEXT NOT NULL,observed_at TEXT NOT NULL,content_json TEXT NOT NULL);
+CREATE INDEX carrier_events_page ON carrier_observations(commander_fid,carrier_id,event_id DESC);
+CREATE TABLE carrier_facts(commander_fid TEXT NOT NULL,carrier_id TEXT NOT NULL,field TEXT NOT NULL,value_json TEXT NOT NULL,observed_at TEXT NOT NULL,event_id INTEGER NOT NULL,PRIMARY KEY(commander_fid,carrier_id,field));
+CREATE TABLE trade_ledger(event_id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,session_id TEXT NOT NULL,system_address TEXT NOT NULL,market_id TEXT NOT NULL,commodity TEXT NOT NULL,action TEXT NOT NULL,units TEXT,unit_price TEXT,total_credits TEXT,avg_price_paid TEXT,gross_spread TEXT,flags TEXT NOT NULL,observed_at TEXT NOT NULL,source TEXT NOT NULL);
+CREATE INDEX trade_page ON trade_ledger(commander_fid,event_id DESC);
+CREATE INDEX trade_commodity ON trade_ledger(commander_fid,commodity,event_id DESC);
+CREATE INDEX trade_market ON trade_ledger(commander_fid,market_id,event_id DESC);
+CREATE TABLE mining_refined(event_id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,session_id TEXT NOT NULL,system_address TEXT NOT NULL,commodity TEXT NOT NULL,observed_at TEXT NOT NULL);
+CREATE INDEX mining_page ON mining_refined(commander_fid,event_id DESC);
+CREATE TABLE commander_operations(event_id INTEGER NOT NULL,ordinal INTEGER NOT NULL,commander_fid TEXT NOT NULL,category TEXT NOT NULL,entity_id TEXT NOT NULL,event_type TEXT NOT NULL,observed_at TEXT NOT NULL,content_json TEXT NOT NULL,PRIMARY KEY(event_id,ordinal));
+CREATE INDEX commander_operations_page ON commander_operations(commander_fid,category,event_id DESC,ordinal);
+CREATE INDEX commander_operations_entity ON commander_operations(commander_fid,category,entity_id,event_id DESC);
+CREATE TABLE market_observations(id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,market_id TEXT NOT NULL,system_name TEXT NOT NULL,station_name TEXT NOT NULL,kind TEXT NOT NULL,source_event_id INTEGER,observed_at TEXT NOT NULL,fetched_at TEXT NOT NULL,expires_at TEXT NOT NULL,source TEXT NOT NULL,content_hash TEXT NOT NULL,UNIQUE(commander_fid,source,market_id,content_hash));
+CREATE INDEX market_latest ON market_observations(commander_fid,market_id,source,observed_at DESC,id DESC);
+CREATE TABLE commodity_quotes(observation_id INTEGER NOT NULL REFERENCES market_observations(id),commodity TEXT NOT NULL,buy_price TEXT,sell_price TEXT,mean_price TEXT,demand TEXT,stock TEXT,PRIMARY KEY(observation_id,commodity));
+CREATE INDEX quote_search ON commodity_quotes(commodity,observation_id DESC);
+CREATE TABLE operations_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+
+CREATE TABLE mining_sessions(commander_fid TEXT NOT NULL,session_id TEXT NOT NULL,empty_baseline INTEGER NOT NULL,PRIMARY KEY(commander_fid,session_id));
+CREATE TABLE mining_inventory(commander_fid TEXT NOT NULL,session_id TEXT NOT NULL,commodity TEXT NOT NULL,units INTEGER NOT NULL,trusted INTEGER NOT NULL,PRIMARY KEY(commander_fid,session_id,commodity));
+CREATE TABLE trade_mining_summary(event_id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,session_id TEXT NOT NULL,commodity TEXT NOT NULL,units TEXT NOT NULL,receipts TEXT NOT NULL,observed_at TEXT NOT NULL,evidence TEXT NOT NULL);
+CREATE INDEX mining_sales_page ON trade_mining_summary(commander_fid,event_id DESC);
+CREATE TABLE commander_current(commander_fid TEXT NOT NULL,category TEXT NOT NULL,entity_id TEXT NOT NULL,field TEXT NOT NULL,content_json TEXT NOT NULL,observed_at TEXT NOT NULL,event_id INTEGER NOT NULL,PRIMARY KEY(commander_fid,category,entity_id,field));
+
+CREATE INDEX commander_current_page ON commander_current(commander_fid,category,observed_at DESC,event_id DESC);
+CREATE TABLE stored_module_snapshots(event_id INTEGER PRIMARY KEY,commander_fid TEXT NOT NULL,observed_at TEXT NOT NULL);
+CREATE INDEX stored_snapshot_latest ON stored_module_snapshots(commander_fid,observed_at DESC,event_id DESC);

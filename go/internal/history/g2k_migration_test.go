@@ -39,7 +39,7 @@ func TestG2JToG2KMigrationPreservesHistoryAndVerifiesBackup(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer s.Close()
-	if s.Stats().Schema != 5 {
+	if s.Stats().Schema != schemaVersion {
 		t.Fatal(s.Stats())
 	}
 	people, e := s.Commanders()
