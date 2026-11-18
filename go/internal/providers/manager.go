@@ -195,8 +195,12 @@ func (m *Manager) Configure(id string, c Config) error {
 		}
 		c.CommanderHash = m.identity
 	}
-	if m.history != nil && m.fid != "" {
-		if err := m.history.CancelCandidates(m.fid, id); err != nil {
+	selectedFID := m.accountFID
+	if selectedFID == "" {
+		selectedFID = m.fid
+	}
+	if m.history != nil && selectedFID != "" {
+		if err := m.history.CancelCandidates(selectedFID, id); err != nil {
 			return errors.New("Could not cancel durable queue")
 		}
 	}

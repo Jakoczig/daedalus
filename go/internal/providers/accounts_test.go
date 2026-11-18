@@ -139,3 +139,23 @@ func TestLegacyUploadConsentStaysWithItsOriginalCommander(t *testing.T) {
 		t.Fatal("original A publication permission was abandoned")
 	}
 }
+
+func TestHistoryRestoreUsesPinnedAccountInsteadOfCachedReaderAccount(t *testing.T) {
+	db, e := history.Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	m := New(context.Background(), t.TempDir(), Options{Vault: &testVault{}, Manual: true})
+	defer m.Close()
+	m.PinAccount("FIXTURE-B")
+	if e = m.AttachHistory(db, history.ProviderSeed{FID: "FIXTURE-A", Name: "A"}); e != nil {
+		t.Fatal(e)
+	}
+	if m.accountFID != "FIXTURE-B" || m.fid != "FIXTURE-A" {
+		t.Fatal("provider namespace did not remain selected B while reader restores A")
+	}
+	if e = m.ActivateAccount("FIXTURE-A", false); e == nil {
+		t.Fatal("stale caller replaced the pinned provider account")
+	}
+}

@@ -93,6 +93,9 @@ func (m *Manager) ActivateAccount(fid string, adoptLegacy bool) error {
 	defer m.vaultMu.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.pinnedAccount != "" && m.pinnedAccount != fid {
+		return errors.New("Commander selection changed; retry in the selected profile")
+	}
 	if m.accountFID == fid {
 		return nil
 	}
@@ -217,7 +220,7 @@ func (m *Manager) activateObservedAccount(fid string) {
 	defer m.vaultMu.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.accountFID == fid {
+	if (m.pinnedAccount != "" && m.pinnedAccount != fid) || m.accountFID == fid {
 		return
 	}
 	if e := m.activateAccountLocked(fid, false); e != nil {

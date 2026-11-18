@@ -70,15 +70,8 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 			s.remote.selectAccount(fid)
 		}
 	}, StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
-		if s.providers != nil {
-			_ = s.providers.AttachHistory(db, seed)
-			if s.remote != nil {
-				s.remote.selectAccount(seed.FID)
-			}
-			if accounts.Multiple && accounts.Selected != "" {
-				_ = s.providers.ActivateAccount(accounts.Selected, false)
-			}
-		}
+		s.restoreProviderHistory(db, seed)
+
 		if s.community != nil {
 			_ = s.community.AttachHistory(db)
 		}
@@ -175,4 +168,14 @@ func (s *Server) ownerJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, s.game.Details())
+}
+
+// Restoring provider history cannot select a viewer account. Only the journal
+// service's selected projection owns display scope, including cached startup.
+func (s *Server) restoreProviderHistory(db *history.Store, seed history.ProviderSeed) {
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	if s.providers != nil {
+		_ = s.providers.AttachHistory(db, seed)
+	}
 }

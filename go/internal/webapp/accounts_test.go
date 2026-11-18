@@ -3,6 +3,7 @@ package webapp
 import (
 	"context"
 	"encoding/json"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"github.com/coder/websocket"
 	"strings"
 	"testing"
@@ -78,4 +79,15 @@ func TestPairedAccountGrantCannotFollowGlobalProfile(t *testing.T) {
 		t.Error("original grant lost or reassigned")
 	}
 	s.remote.mu.Unlock()
+}
+
+func TestHistoryRestoreCannotTemporarilySelectAnotherViewerAccount(t *testing.T) {
+	s, _, _, _, _ := remoteFixture(t)
+	s.remote.selectAccount("SYNTHETIC-SELECTED-B")
+	s.restoreProviderHistory(nil, history.ProviderSeed{FID: "SYNTHETIC-READER-A"})
+	s.remote.mu.Lock()
+	defer s.remote.mu.Unlock()
+	if s.remote.state.Account != tokenHash("SYNTHETIC-SELECTED-B") {
+		t.Fatal("history restore replaced the selected viewer account with the cached reader account")
+	}
 }

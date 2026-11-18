@@ -79,7 +79,11 @@ func (m *Manager) AttachHistory(db *history.Store, seed history.ProviderSeed) er
 		for _, s := range m.states {
 			s.config = Config{}
 		}
-		if err := m.activateAccountLocked(seed.FID, state.ActiveAccount == ""); err != nil {
+		selected := seed.FID
+		if m.pinnedAccount != "" {
+			selected = m.pinnedAccount
+		}
+		if err := m.activateAccountLocked(selected, state.ActiveAccount == "" && selected == seed.FID); err != nil {
 			return err
 		}
 	}
@@ -128,13 +132,17 @@ func (m *Manager) outcomeLocked(batch []queued, status, reason string) {
 	}
 }
 func (m *Manager) cancelPublicationLocked() {
+	selectedFID := m.accountFID
+	if selectedFID == "" {
+		selectedFID = m.fid
+	}
 	for id, s := range m.states {
 		s.cancel()
 		s.ctx, s.cancel = context.WithCancel(m.ctx)
 		s.generation++
 		s.queue = nil
-		if m.history != nil && m.fid != "" {
-			_ = m.history.CancelCandidates(m.fid, id)
+		if m.history != nil && selectedFID != "" {
+			_ = m.history.CancelCandidates(selectedFID, id)
 		}
 	}
 }

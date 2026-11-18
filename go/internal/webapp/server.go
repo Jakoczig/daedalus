@@ -16,6 +16,7 @@ import (
 )
 
 type Server struct {
+	accountMu                 sync.Mutex
 	copyWaypoint              func(string) error
 	saveFieldCSV              func(string, string) error
 	providers                 *providers.Manager

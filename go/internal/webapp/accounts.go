@@ -25,6 +25,8 @@ func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessag
 		return v, e
 	}
 	if name == "setGoAccounts" {
+		s.accountMu.Lock()
+		defer s.accountMu.Unlock()
 		var q struct {
 			Multiple bool   `json:"multiple"`
 			Selected string `json:"selected"`
