@@ -45,7 +45,7 @@ func newProjectionState() projectionState {
 }
 func (s *Service) projectionLocked() Projections {
 	fid := s.displayFIDLocked()
-	if s.cachedProjection != nil && s.summary.ImportInProgress && fid == s.active {
+	if s.cachedProjection != nil && s.summary.ImportInProgress && fid != "" && fid == s.cachedProjectionFID {
 		p := cloneProjection(*s.cachedProjection)
 		p.Source = s.selectedSummaryLocked()
 		p.Ship.Evidence = "cached"
@@ -280,4 +280,9 @@ func (s *Service) Workspace() WorkspaceView {
 		return WorkspaceView{}
 	}
 	return *p.Workspace
+}
+
+func (s *Service) holdProjectionLocked(p Projections) {
+	s.cachedProjectionFID = s.displayFIDLocked()
+	s.cachedProjection = &p
 }

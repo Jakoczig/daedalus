@@ -62,34 +62,35 @@ type maintenanceRequest struct {
 	reply        chan error
 }
 type Service struct {
-	accounts           AccountSettings
-	statisticsKey      string
-	statisticsJSON     []byte
-	bioStatus          []byte
-	maintenance        chan maintenanceRequest
-	hasFreshLive       bool
-	activeSource       string
-	store              *history.Store
-	databaseError      string
-	lastPersistPublish time.Time
-	restored           bool
-	cachedProjection   *Projections
-	navigationContext  *navcontext.Model
-	mu                 sync.Mutex
-	views              projectionState
-	opts               Options
-	summary            Summary
-	details            SourceDetails
-	commanders         map[string]commanderState
-	order              []string
-	unknown            commanderState
-	active             string
-	stopped            bool
-	subscribers        map[chan Summary]struct{}
-	selectSource       chan selection
-	done               chan struct{}
-	closed             bool
-	running            atomic.Bool
+	accounts            AccountSettings
+	statisticsKey       string
+	statisticsJSON      []byte
+	bioStatus           []byte
+	maintenance         chan maintenanceRequest
+	hasFreshLive        bool
+	activeSource        string
+	store               *history.Store
+	databaseError       string
+	lastPersistPublish  time.Time
+	restored            bool
+	cachedProjection    *Projections
+	cachedProjectionFID string
+	navigationContext   *navcontext.Model
+	mu                  sync.Mutex
+	views               projectionState
+	opts                Options
+	summary             Summary
+	details             SourceDetails
+	commanders          map[string]commanderState
+	order               []string
+	unknown             commanderState
+	active              string
+	stopped             bool
+	subscribers         map[chan Summary]struct{}
+	selectSource        chan selection
+	done                chan struct{}
+	closed              bool
+	running             atomic.Bool
 }
 
 func NewService(opts Options) (*Service, error) {
@@ -259,7 +260,7 @@ func (s *Service) Run(ctx context.Context) error {
 					v := s.projectionLocked()
 					s.summary = savedSummary
 					v.Source = savedSummary
-					s.cachedProjection = &v
+					s.holdProjectionLocked(v)
 				}
 				s.mu.Unlock()
 			}

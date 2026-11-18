@@ -1,6 +1,6 @@
 # ERIDION G2M-A — identity, Frontier return and commander/ship refinement
 
-Base: G2L `5f0bee9fb5df8ea243c54dadcc7edcc02581efef`. Branch: `go/g2m-a-eridion-identity-frontier`, stacked draft targeting `go/g2l-fleet-economy-commander-operations`. The final draft PR description is the exact-head verification ledger (commit, both CI runs, artifacts and independently checked hashes).
+Base: G2L `5f0bee9fb5df8ea243c54dadcc7edcc02581efef`. Branch: `go/g2m-a-eridion-identity-frontier`, stacked draft targeting `go/g2l-fleet-economy-commander-operations`. [Draft PR #17](https://github.com/Jakoczig/eridion/pull/17). Initial implementation commit: `0c8712b1b181d7d98faf39ab2428fd0814ef130a`; the cache-owner correction follows in the same draft. The final draft PR description is the exact-head verification ledger (commit, both CI runs, artifacts and independently checked hashes).
 
 ## Implemented
 
@@ -26,6 +26,8 @@ Atomic manifest creation resumes after an interrupted temporary write; diagnosti
 Back up both the identity-manifest directory and the adopted native storage directory. SQLite export remains a database export, not a credential/certificate/portrait backup. Native `daedalus.sqlite`, cookie name and Linux vault cryptographic identifiers remain compatibility names. The Node/legacy profile is never adopted.
 
 Existing personal API keys migrate only if their commander matches verified cached journal identity (or already has an explicit verified FID association). Legacy OAuth tokens without an established association remain encrypted but unavailable to an arbitrary selected account: reconnect Frontier. This avoids assigning account A's credentials to the last-seen account B. Empty offline profiles do not create an OS vault or require an unlocked Secret Service.
+
+Cached projection ownership is explicit: catch-up/replay for B cannot authorize an older cached view from A. A selected profile can still recover its own cached view while another account replays. The deterministic regression failed before this correction and passes with the explicit FID check.
 
 ## Verification and practical limits
 

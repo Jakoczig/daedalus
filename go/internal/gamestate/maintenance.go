@@ -41,7 +41,7 @@ func (s *Service) rebuildDerived(ctx context.Context) error {
 		return err
 	}
 	previous := s.projectionLocked()
-	s.cachedProjection = &previous
+	s.holdProjectionLocked(previous)
 	s.resetProjectionsLocked()
 	s.commanders = map[string]commanderState{}
 	s.order = nil
