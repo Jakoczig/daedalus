@@ -29,7 +29,7 @@ var labels map[string]string
 func initData() {
 	modules = map[string]Module{}
 	labels = map[string]string{}
-	for _, filename := range []string{"outfitting.csv", "material.csv", "microresources.csv", "commodity.csv"} {
+	for _, filename := range []string{"shipyard.csv", "outfitting.csv", "material.csv", "microresources.csv", "commodity.csv"} {
 		b, _ := data.ReadFile(filename)
 		rows, err := csv.NewReader(strings.NewReader(string(b))).ReadAll()
 		if err != nil || len(rows) == 0 {
@@ -140,4 +140,13 @@ func ModuleDisplayName(symbol string) string {
 		return "Unidentified module"
 	}
 	return strings.Join(parts, " ")
+}
+
+// ShipDisplayName is a label only; it never substitutes another hull's stats.
+func ShipDisplayName(symbol string) string {
+	once.Do(initData)
+	if v := labels[strings.ToLower(symbol)]; v != "" {
+		return v
+	}
+	return ModuleDisplayName(symbol)
 }

@@ -48,11 +48,11 @@ test('G2L viewer screens do not request private operations or providers', async 
   assert.match(h.html(), /LOCAL OWNER ONLY/); await h.flush(); assert.deepEqual(h.calls, [])
 })
 test('G2L owner uses only bounded local reads, preserves exact IDs and stops after unmount', async () => {
-  const h = harness('go-operations', { rows: [{ id: '1', entity: '18446744073709551615', title: 'Fixture Explorer', at: '2026-01-01', state: 'last_known', kind: 'Fleet', details: { grossSpread: '9007199254740993' } }], next: '', notice: 'Observed journal' })
+  const h = harness('go-operations', { rows: [{ id: '1', entity: '18446744073709551615', title: 'Fixture Explorer', at: '2026-01-01', state: 'last_known', kind: 'Fleet', details: { shipName: 'Fixture Explorer', modelLabel: 'Asp Explorer', Value: '9007199254740993' } }], next: '', notice: 'Observed journal' })
   h.props.path = '/ship/fleet'; h.props.role = 'owner'; h.props.ready = true
   h.html(); const html = await h.flush(); h.unmount()
-  assert.match(html, /18446744073709551615/); assert.match(html, /9007199254740993/)
-  assert.ok(h.calls.includes('getGoOperations')); assert.ok(h.calls.includes('getGoDataStatus'))
+  assert.match(html, /18446744073709551615/); assert.match(html.replace(/[ ,\u00a0]/g, ''), /9007199254740993/)
+  assert.ok(h.calls.includes('getGoOperations')); assert.ok(!h.calls.includes('getGoDataStatus'), 'Fleet must not request other commander identities')
   assert.ok(h.calls.every(n => ['getGoOperations', 'getGoDataStatus', 'getGoProviders'].includes(n)))
 })
 
@@ -62,7 +62,7 @@ test('CG membership distinguishes known empty, unknown and historical goals with
     h.props.path = '/cmdr/community-goals'; h.props.role = 'owner'; h.props.ready = true
     h.html(); const html = await h.flush(); h.unmount()
     assert.match(html, known ? /0 subscribed goals as last witnessed/ : /Subscribed goals unknown/)
-    assert.match(html, /CommunityGoalReward/); assert.match(html, /100/)
-    assert.match(html, known ? /historical goal/ : /membership unknown no complete snapshot/)
+    assert.match(html, /Received reward 100/); assert.match(html, /9007199254740993/)
+    assert.match(html, /Historical participation/)
   }
 })

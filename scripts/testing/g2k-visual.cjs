@@ -38,7 +38,7 @@ async function main () {
       report.pages.push({ name, width, height, overflow, csvImported: true, utcNotTick: true })
     }
     await navigate('/exploration/biologicals', 'Fixture Alpha 1'); await evaluate('document.querySelector(".go-bio-card").click()'); await waitFor(() => evaluate('document.body.innerText.includes("bioscan-fc6b85c")')); await evaluate('document.querySelector(".go-inspector .go-field-ops").scrollIntoView({block:"start"})'); await screenshot('bioscan')
-    await navigate('/ship/stats', 'effective-fitted-power-sum-v2'); await screenshot('canonical-native-statistics')
+    await navigate('/ship/stats', 'Ship Statistics'); await evaluate('Array.from(document.querySelectorAll(\'.go-ship-statistics details\')).find(e=>e.querySelector(\'summary\')?.textContent.includes(\'Witnessed final engineering\')).open=true'); await waitFor(() => evaluate(pageTextReady('effective-fitted-power-sum-v2'))); await screenshot('canonical-native-statistics')
     // Keep Ship Statistics open while the real sidecar monitor publishes fresh
     // Status snapshots. Wait for each exact timestamp instead of sleeping races.
     let written = ''; host.child.stdout.on('data', data => { const all = data.toString().match(/STATUS_WRITTEN=([^\r\n]+)/g); if (all) written = all[all.length - 1].slice(15) })

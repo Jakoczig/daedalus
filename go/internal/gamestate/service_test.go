@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 )
 
 func sourceFile(dir string) string { return filepath.Join(dir, "Journal.20260101.01.log") }

@@ -14,8 +14,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 )
 
 const MaxHops = 2048

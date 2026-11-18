@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io/fs"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 )
 
 type sourcePreference struct {

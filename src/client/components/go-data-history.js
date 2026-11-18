@@ -17,10 +17,10 @@ function HistoryWorkspace ({ sendEvent }) {
   const [publicationAck, setPublicationAck] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-  const refresh = async () => { const v = await sendEvent('getGoDataStatus'); setStatus(v); setFID(previous => previous || v.commanders?.[0]?.fid || ''); return v }
+  const refresh = async () => { const v = await sendEvent('getGoDataStatus'); setStatus(v); setFID(v.commanders?.[0]?.fid || ''); return v }
   useEffect(() => {
     let active = true
-    const load = async () => { try { const v = await sendEvent('getGoDataStatus'); if (active) { setStatus(v); setFID(previous => previous || v.commanders?.[0]?.fid || '') } } catch { if (active) setNotice('Database status unavailable; history has not been reset.') } }
+    const load = async () => { try { const v = await sendEvent('getGoDataStatus'); if (active) { setStatus(v); setFID(v.commanders?.[0]?.fid || '') } } catch { if (active) setNotice('Database status unavailable; history has not been reset.') } }
     load()
     sendEvent('getGoProviders').then(v => { if (active) setProviders(v.filter(p => p.capability.upload?.length)) }).catch(() => {})
     const timer = setInterval(load, 3000)
@@ -54,7 +54,7 @@ function HistoryWorkspace ({ sendEvent }) {
       <dl className='go-history-health'><div><dt>Database</dt><dd>{database?.State || 'not ready'} · {database?.DatabaseBytes == null ? 'size unknown' : (database.DatabaseBytes / 1048576).toFixed(1) + ' MiB (DB + WAL)'} · schema {database?.Schema ?? '—'}</dd></div><div><dt>Events / sources</dt><dd>{database?.Events ?? '—'} / {database?.Files ?? '—'}</dd></div><div><dt>Committed journal bytes</dt><dd>{database?.Bytes ?? '—'} · last offset {database?.LastOffset ?? '—'}</dd></div><div><dt>Last stored event</dt><dd>{database?.LastEvent || 'unknown'}</dd></div></dl>
       {status?.notice && <p role='alert'>{status.notice}</p>}
       {status?.restorePending && <p role='alert'>Verified restore pending. Quit and restart the native application. Provider uploads will require renewed consent.</p>}
-      <div className='go-history-queries'><label>Commander <select aria-label='History commander' value={fid} onChange={e => setFID(e.target.value)}><option value=''>Select commander</option>{status?.commanders?.map(c => <option key={c.fid} value={c.fid}>{c.name || c.fid}</option>)}</select></label><label>History <select aria-label='History category' value={kind} onChange={e => setKind(e.target.value)}>{pages.map(p => <option key={p}>{p}</option>)}</select></label></div>
+      <div className='go-history-queries'><span>{status?.commanders?.[0]?.name || 'Selected commander'}</span><label>History <select aria-label='History category' value={kind} onChange={e => setKind(e.target.value)}>{pages.map(p => <option key={p}>{p}</option>)}</select></label></div>
       <div className='go-history-rows'>{page?.rows?.map(r => <details key={r.id}><summary>{r.type} · {r.observedAt || 'time unknown'} · {r.systemName || r.systemAddress || 'location not reported'}</summary><pre>{r.json}</pre>{r.truncated && <p>Preview truncated ({r.rawBytes} original bytes). The complete record remains in the private database export.</p>}</details>)}</div>
       {page && !page.rows.length && <p>No retained observations in this category for the selected commander.</p>}
       {page?.next && <button type='button' disabled={busy} onClick={() => sendEvent('queryGoHistory', { fid, kind, before: page.next, limit: 25 }).then(setPage).catch(() => setNotice('Next page unavailable'))}>Older records</button>}

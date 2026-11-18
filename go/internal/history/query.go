@@ -3,7 +3,7 @@ package history
 import (
 	"context"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"strconv"
 	"strings"
 	"time"
@@ -138,4 +138,10 @@ func (s *Store) SaveCache(ctx context.Context, raw []byte) error {
 	defer s.mu.Unlock()
 	_, err := s.writer.ExecContext(ctx, "INSERT INTO app_state VALUES('reducers-v1',?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,content_hash=excluded.content_hash,updated_at=excluded.updated_at", raw, digest(raw), utc())
 	return err
+}
+
+func (s *Store) OwnedFleetCount(ctx context.Context, fid string) (int, error) {
+	var n int
+	e := s.reader.QueryRowContext(ctx, "SELECT count(*) FROM fleet_ships WHERE commander_fid=? AND state<>'sold'", fid).Scan(&n)
+	return n, e
 }

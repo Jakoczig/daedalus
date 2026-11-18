@@ -5,23 +5,24 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/providers"
 	"io"
 	"io/fs"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/desktop"
-	"github.com/Jakoczig/daedalus/go/internal/frontend"
-	"github.com/Jakoczig/daedalus/go/internal/webapp"
+	"github.com/Jakoczig/eridion/go/internal/desktop"
+	"github.com/Jakoczig/eridion/go/internal/frontend"
+	"github.com/Jakoczig/eridion/go/internal/webapp"
 )
 
 type launcher func(context.Context, string, func()) error
 
 func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out io.Writer) error {
-	flags := flag.NewFlagSet("daedalus", flag.ContinueOnError)
+	flags := flag.NewFlagSet("eridion", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	smoke := flags.Bool("smoke-test", false, "verify offline service without a window")
 	nativeSmoke := flags.Bool("desktop-smoke-test", false, "open native window, require React authentication and RPC, then close")
@@ -36,10 +37,27 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	paritySmoke := flags.Bool("parity-smoke-test", false, "verify explicit synthetic native parity workspace")
 	nativeCompanionSmoke := flags.Bool("desktop-companion-smoke-test", false, "verify launcher, optional dashboard closure and shared-service shutdown")
 	nativeParitySmoke := flags.Bool("desktop-parity-smoke-test", false, "verify native React G2E parity workspace and shutdown")
+	diagnostic := flags.String("frontier-diagnostic", "", "One explicit read-only Frontier structural diagnostic; starts no desktop/service")
+	diagnosticOutput := flags.String("diagnostic-output", "", "Private sanitized diagnostic output outside the existing profile")
+	ownerReadOnly := flags.Bool("owner-read-only", false, "Authorize a single read with this OS owner's existing Frontier consent")
 	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
 	journalDir := flags.String("journal-dir", "", "local owner journal directory override")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
-		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
+		return errors.New("usage: eridion [--smoke-test | --desktop-smoke-test]")
+	}
+	if *diagnostic == "" && (*ownerReadOnly || *diagnosticOutput != "") {
+		return errors.New("Explicit --frontier-diagnostic endpoint required; no service or request started")
+	}
+	if *diagnostic != "" {
+		for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke, *navigationSmoke, *nativeNavigationSmoke, *explorationSmoke, *nativeExplorationSmoke, *terminalSmoke, *nativeTerminalSmoke, *paritySmoke, *nativeParitySmoke, *nativeCompanionSmoke} {
+			if enabled {
+				return errors.New("Diagnostic and smoke modes cannot be combined")
+			}
+		}
+		if !*ownerReadOnly || *dataDir == "" || *diagnosticOutput == "" {
+			return errors.New("Frontier diagnostic requires explicit --owner-read-only, --data-dir and --diagnostic-output; no service or request started")
+		}
+		return providers.AuditNativeFrontier(ctx, *dataDir, *diagnosticOutput, *diagnostic)
 	}
 	modes := 0
 	for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke, *navigationSmoke, *nativeNavigationSmoke, *explorationSmoke, *nativeExplorationSmoke, *terminalSmoke, *nativeTerminalSmoke, *paritySmoke, *nativeParitySmoke, *nativeCompanionSmoke} {
@@ -65,7 +83,10 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		if err != nil {
 			return errors.New("cannot locate private Go profile")
 		}
-		*dataDir = filepath.Join(config, "daedalus-go")
+		*dataDir, err = privatefs.IdentityProfile(config)
+		if err != nil {
+			return err
+		}
 	}
 	controller := &desktop.Controller{}
 	if modes == 0 || *nativeCompanionSmoke {

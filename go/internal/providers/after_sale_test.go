@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 )
 
 // No current Scan recipient has a verified delayed-upload contract. A proven

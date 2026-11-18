@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
-	"github.com/Jakoczig/daedalus/go/internal/remotetls"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/remotetls"
 )
 
 func TestDamagedRemoteStateKeepsLocalOwnerAvailable(t *testing.T) {

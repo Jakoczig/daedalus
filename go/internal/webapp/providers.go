@@ -4,19 +4,62 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/providers"
+	"github.com/Jakoczig/eridion/go/internal/providers"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 func (s *Server) providerRPC(ctx context.Context, name string, raw json.RawMessage) (any, error) {
+	if s.game != nil {
+		if fid := s.game.FieldCommander(); fid != "" {
+			if e := s.providers.ActivateAccount(fid, false); e != nil {
+				return nil, e
+			}
+		}
+	}
+
 	if name == "previewGoHistorical" || name == "confirmGoHistorical" {
 		var selection providers.HistorySelection
 		if strictDecode(raw, &selection) != nil {
 			return nil, errors.New("Invalid historical selection")
 		}
+		if selection.FID != s.game.FieldCommander() {
+			return nil, errors.New("Switch the global commander profile before reviewing another account")
+		}
 		return s.providers.Historical(ctx, selection, name == "confirmGoHistorical")
 	}
 	switch name {
+	case "setGoFrontierClient":
+		var q struct {
+			ClientID string `json:"clientId"`
+		}
+		if strictDecode(raw, &q) != nil {
+			return nil, errors.New("Invalid Frontier client settings")
+		}
+		if e := s.providers.ConfigureFrontierClient(q.ClientID); e != nil {
+			return nil, e
+		}
+		return map[string]bool{"saved": true}, nil
+	case "completeGoFrontierReturn":
+		var q struct {
+			URL string `json:"url"`
+		}
+		if strictDecode(raw, &q) != nil || len(q.URL) > 4096 {
+			return nil, errors.New("Invalid authorization return")
+		}
+		u, e := url.Parse(q.URL)
+		if e != nil || u.Scheme != "http" || u.Host != strings.TrimPrefix(s.url, "http://") || u.Path != "/owner/frontier-callback" || u.User != nil || u.Fragment != "" {
+			return nil, errors.New("Paste only the fixed local return URL from the ERIDION authorization page")
+		}
+		v := u.Query()
+		if len(v["state"]) != 1 || len(v["code"]) != 1 || v.Get("error") != "" {
+			return nil, errors.New("Invalid authorization return")
+		}
+		if e = s.providers.CompleteAuthorization(ctx, s.url+"/owner/frontier-callback", v.Get("state"), v.Get("code")); e != nil {
+			return nil, e
+		}
+		return map[string]bool{"connected": true}, nil
 	case "getGoProviders":
 		return s.providers.Status(), nil
 	case "connectGoFrontier":
@@ -74,6 +117,9 @@ func (s *Server) frontierCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	if len(q["state"]) == 1 && len(q["error"]) == 1 && q.Get("error") != "" {
+		_ = s.providers.CancelAuthorization(s.url+"/owner/frontier-callback", q.Get("state"))
+	}
 	if len(q["state"]) != 1 || len(q["code"]) != 1 || q.Get("error") != "" {
 		http.Error(w, "Authorization declined or invalid. Start again in owner settings.", 400)
 		return
@@ -82,5 +128,5 @@ func (s *Server) frontierCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Authorization failed. Check approval, callback registration and vault, then start again.", 400)
 		return
 	}
-	_, _ = w.Write([]byte("Frontier connected. Return to DAEDALUS owner settings. Tokens were not sent to this page."))
+	_, _ = w.Write([]byte("Frontier connected. Return to ERIDION owner settings. Tokens were not sent to this page."))
 }

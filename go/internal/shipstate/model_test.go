@@ -2,7 +2,7 @@ package shipstate
 
 import (
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"strings"
 	"testing"
 )

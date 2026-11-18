@@ -1,7 +1,7 @@
 // Package paritystate projects bounded, explicit journal and sidecar facts.
 package paritystate
 
-import "github.com/Jakoczig/daedalus/go/internal/shipstate"
+import "github.com/Jakoczig/eridion/go/internal/shipstate"
 
 type View struct {
 	Evidence     string         `json:"evidence"`

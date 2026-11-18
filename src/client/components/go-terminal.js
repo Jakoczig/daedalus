@@ -17,6 +17,7 @@ import useGoProjection from './go-projection'
 import * as navigation from '../lib/navigation-items'
 import { Icon, Badge, Clock, show } from './go-terminal-widgets'
 export default function GoTerminal (props) {
+  useEffect(() => { if (typeof document !== 'undefined') document.title = 'ERIDION · ERID' }, [])
   const [settings, setSettings] = useState(false)
   const [display, setDisplay] = useState({ visible: false })
   const { value: flight } = useGoProjection({ ...props, connected: props.connected && props.stage === 'G2E' }, 'getGoNavigationContext', 'goNavigationContextChanged')
@@ -66,7 +67,7 @@ export default function GoTerminal (props) {
     <div className='go-terminal' data-display-role={props.role} onPointerDownCapture={manual} onKeyDownCapture={event => { if (event.key === 'Enter' || event.key === ' ') manual(event) }}>
       <header>
         <hr className='small' />
-        <h1 className='text-info go-terminal__brand'><Icon name='logo' /> DAEDALUS <span className='hidden-small'>Terminal</span></h1>
+        <h1 className='text-info go-terminal__brand'><Icon name='logo' /> ERIDION <span className='hidden-small'>Terminal</span></h1>
         <div className='go-terminal__status'>
           <Clock />
           <span className={props.connected && props.ready ? 'text-success' : 'text-danger'} role='status'><Icon name='signal' /> {props.connected ? (props.ready ? 'SERVICE READY' : 'CONNECTING') : 'DISCONNECTED'}</span>
@@ -75,7 +76,7 @@ export default function GoTerminal (props) {
         </div>
         <PrimaryNavigation />
       </header>
-      <div className='go-terminal__telemetry'><span><Icon name='location-filled' /> {summary?.currentSystem || 'Awaiting local journal'}</span><span className='text-muted'>{summary?.stage ? 'G2K' : props.stage || 'G2D'} · {summary?.cached ? 'LAST KNOWN / ' : ''}{summary?.stage || summary?.sourceState || 'waiting'} · local-first · explicit provider consent</span><span><Icon name='ship' /> {ship?.shipType || 'Ship unknown'} · Fuel {show(ship?.fuelMainT, 'T')}</span></div>
+      <div className='go-terminal__telemetry'><span><Icon name='location-filled' /> {summary?.currentSystem || 'Awaiting local journal'}</span><span className='text-muted'>{summary?.stage ? 'G2M-A' : props.stage || 'G2D'} · {summary?.cached ? 'LAST KNOWN / ' : ''}{summary?.stage || summary?.sourceState || 'waiting'} · local-first · explicit provider consent</span><span><Icon name='ship' /> {ship?.shipType || 'Ship unknown'} · Fuel {show(ship?.fuelMainT, 'T')}</span></div>
       <Layout connected={props.connected} ready={props.ready} className='go-terminal__layout'>
         <Panel temporaryLabels navigation={items} className='go-terminal__panel'><div className='go-content'>{display.visible ? <section className='go-fsd' aria-label='Automatic FSD display'><div className='go-page__heading'><h2>{display.finished ? 'Jump ended' : flight?.navigation?.mode === 'charge' ? 'Hyperdrive charging' : 'Hyperspace jump'}</h2><button onClick={() => setDisplay(previous => transition(previous, { ...controllerInput, manual: true }))}>Return to previous screen</button></div><div className='go-fsd-columns'><GoTerminalRoute {...props} compact context={flight?.navigation} /><GoGalaxy context={flight?.navigation} route={plotted} {...props} compact /></div></section> : content}</div></Panel>
       </Layout>

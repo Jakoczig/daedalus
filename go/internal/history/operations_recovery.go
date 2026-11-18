@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"os"
 )
 

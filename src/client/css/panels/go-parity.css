@@ -88,3 +88,19 @@
 .go-terminal .go-module-inspector th,.go-terminal .go-module-inspector td { padding:.5rem .25rem; font-size:.75rem; white-space:normal; overflow-wrap:anywhere; }
 .go-terminal .go-module-card strong { font-size:1.15rem; }
 .go-terminal .go-module-cards { grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); }
+
+/* ERIDION account, commander and collection cards reuse the native palette. */
+.go-account-cards, .go-goal-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; }
+.go-account-cards button { display: flex; flex-direction: column; align-items: flex-start; padding: 14px; gap: 7px; }
+.go-account-cards button[aria-pressed=true] { outline: 2px solid var(--color-primary, #f29b39); }
+.go-commander-identity { display: flex; align-items: center; gap: 22px; margin-bottom: 20px; }
+.go-commander-identity img, .go-commander-portrait { width: 128px; height: 128px; object-fit: contain; flex: 0 0 auto; border: 1px solid currentColor; }
+.go-commander-portrait { display: grid; place-items: center; font-size: 60px; }
+.go-commander-identity h2 { font-size: clamp(24px, 3vw, 38px); }
+.go-avatar-picker { display: block; max-width: 340px; font-size: 12px; }
+.go-avatar-picker input { max-width: 100%; }
+.go-goal-card { padding: 16px; border: 1px solid #444; background: rgba(255,255,255,.025); }
+.go-fleet-card { border: 1px solid #444; margin: 10px 0; padding: 12px; }
+.go-fleet-card > summary { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.4fr; gap: 10px; cursor: pointer; font-size: 15px; }
+.go-fleet-card > summary strong { color: #f6ad4b; }.go-fleet-card > summary small { grid-column: 1 / -1; }
+@media (max-width: 760px) { .go-fleet-card > summary { grid-template-columns: 1fr 1fr; }.go-commander-identity { gap: 12px; }.go-commander-identity img, .go-commander-portrait { width: 84px; height: 84px; }.go-commander-overview .go-rank-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }

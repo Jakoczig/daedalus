@@ -1,6 +1,6 @@
 package paritystate
 
-import "github.com/Jakoczig/daedalus/go/internal/shipstate"
+import "github.com/Jakoczig/eridion/go/internal/shipstate"
 
 func copyPtr[T any](p *T) *T {
 	if p == nil {

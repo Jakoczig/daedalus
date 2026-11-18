@@ -3,7 +3,7 @@ package history
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 )
 
 func (s *Store) SaveSidecar(fid string, e journal.Event, kind string, raw json.RawMessage) error {

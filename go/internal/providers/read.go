@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"slices"
 
@@ -35,6 +36,10 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	if m.closed || (m.opts.RequireHistory && m.history == nil) || s == nil || !s.config.Read || s.config.Paused || cap.Gate != "" || !slices.Contains(cap.Read, kind) {
 		m.mu.Unlock()
 		return nil, errors.New("Provider read consent/approval required")
+	}
+	if (id == "frontier" || id == "inara" || id == "edsm") && m.accountFID != "" && m.accountFID != m.fid {
+		m.mu.Unlock()
+		return nil, errors.New("Selected account differs from the verified journal account; connect the selected commander first")
 	}
 	if id == "edastro" && kind == "gec" && m.layers.FetchedAt != "" {
 		expires, err := time.Parse(time.RFC3339, m.layers.ExpiresAt)
@@ -160,6 +165,9 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			endpoint = "https://edastro.com/api/starsystem?q=" + url.QueryEscape(query)
 		}
 	case "frontier":
+		if kind != "profile" && (cred.Commander == "" || cred.Commander != commander || cred.JournalFID != fid) {
+			return nil, errors.New("Read and verify the selected commander's Frontier profile before other account endpoints")
+		}
 		if cred.AccessToken == "" || cred.RefreshToken == "" {
 			return nil, errors.New("Connect an approved Frontier application first")
 		}
@@ -177,7 +185,11 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		bearer = cred.AccessToken
 	}
 	raw, status, err := m.request(requestCtx, method, endpoint, ct, body, bearer)
-	if err != nil || status != 200 {
+	noCarrier := id == "frontier" && kind == "fleetcarrier" && status == http.StatusNoContent && err == nil
+	if noCarrier {
+		raw = []byte(`{"owned":false}`)
+	}
+	if err != nil || (status != 200 && !noCarrier) {
 		m.mu.Lock()
 		if generation == s.generation {
 			s.lastError = "Read failed; no server response or secret logged"
@@ -245,10 +257,16 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		snapshot.commanderHash = identity
 	}
 	if id == "frontier" && kind == "profile" {
-		if profile, ok := data["commander"].(map[string]any); ok && text(profile["name"]) == commander && commander != "" {
-			snapshot.commanderHash = identity
+		profile, ok := data["commander"].(map[string]any)
+		if !ok || commander == "" || text(profile["name"]) != commander {
+			return nil, errors.New("Frontier commander identity mismatch; account state was not accepted")
 		}
+		if err := m.verifyFrontierAccount(generation, commander); err != nil {
+			return nil, err
+		}
+		snapshot.commanderHash = identity
 	}
+
 	if id == "edsm" {
 		if a, ok := data["logs"].([]any); ok {
 			for _, x := range a {
@@ -343,6 +361,9 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		}
 	}
 	if id == "frontier" {
+		if noCarrier {
+			add("Fleet carrier", "No owned fleet carrier")
+		}
 		for _, key := range []string{"commander", "ship", "lastSystem", "lastStarport", "carrier"} {
 			if o, ok := data[key].(map[string]any); ok {
 				for _, field := range []string{"name", "id", "credits", "docked", "value", "cargo", "capacity", "health", "callsign", "currentStarSystem", "fuel", "balance"} {
@@ -369,8 +390,25 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
 		return nil, errors.New("Read consent was revoked")
 	}
-	if id == "frontier" && kind == "communitygoals" {
-		add("Community goals", "Documented read endpoint; response-field normalization awaits verified authorized fixture. No account/journal state inferred.")
+	if id == "frontier" && kind != "profile" {
+		if kind != "fleetcarrier" || noCarrier {
+			normalized, e := normalizeCAPISnapshot(kind, fid, data, now)
+			if e != nil {
+				return nil, e
+			}
+			if m.history != nil {
+				if e = m.history.SaveExternal(requestCtx, normalized); e != nil {
+					return nil, e
+				}
+			}
+			if kind == "communitygoals" {
+				entries, _ := data["activeCommunityGoals"].([]any)
+				add("Active global goals", len(entries))
+				add("Personal participation", "Not provided by this verified response format; journal membership/contributions/rewards retained")
+			}
+		} else {
+			add("Carrier limitation", "Owner-carrier response remains a bounded supplemental summary; ownership reconciliation requires verified owner fixture")
+		}
 	}
 	if m.history != nil && kind == "profile" {
 		if err := m.persistCommanderRead(requestCtx, id, kind, fid, commander, data, now); err != nil {

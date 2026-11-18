@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 )
 
 const routeFixture = `{"timestamp":"2026-01-01T00:00:02Z","event":"NavRoute","Route":[{"StarSystem":"Fixture Alpha","SystemAddress":9007199254740993,"StarPos":[0,0,0],"StarClass":"G"},{"StarSystem":"Fixture Beta","SystemAddress":9007199254740994,"StarPos":[3,4,0],"StarClass":"M"}]}`

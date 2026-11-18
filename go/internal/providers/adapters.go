@@ -3,7 +3,7 @@ package providers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"math"
 	"net/url"
 	"strconv"

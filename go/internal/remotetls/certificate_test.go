@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 )
 
 func TestCertificateTrustAndRenewal(t *testing.T) {

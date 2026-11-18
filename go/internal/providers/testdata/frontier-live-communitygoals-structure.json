@@ -1,0 +1,17 @@
+{
+  "activeCommunityGoals": [
+    {
+      "activityType": "Fixture value",
+      "bulletin": "Fixture value",
+      "expiry": "Fixture value",
+      "id": 9007199254740993,
+      "market_name": "Fixture value",
+      "news": "Fixture value",
+      "objective": "Fixture value",
+      "qty": 100,
+      "starsystem_name": "Fixture value",
+      "target_qty": 100,
+      "title": "Fixture value"
+    }
+  ]
+}

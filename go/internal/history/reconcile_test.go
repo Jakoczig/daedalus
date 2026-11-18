@@ -3,7 +3,7 @@ package history
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"testing"
 	"time"
 )

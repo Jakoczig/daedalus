@@ -7,9 +7,11 @@ import (
 )
 
 type ProviderDisk struct {
-	Providers map[string]json.RawMessage `json:"providers"`
-	Ledger    map[string]int64           `json:"ledger"`
-	Uploader  string                     `json:"uploader"`
+	Accounts      map[string]map[string]json.RawMessage `json:"accounts,omitempty"`
+	ActiveAccount string                                `json:"activeAccount,omitempty"`
+	Providers     map[string]json.RawMessage            `json:"providers"`
+	Ledger        map[string]int64                      `json:"ledger"`
+	Uploader      string                                `json:"uploader"`
 }
 
 func (s *Store) LoadProviderConsent(initial []byte) ([]byte, error) {
@@ -53,13 +55,12 @@ func (s *Store) LoadProviderConsent(initial []byte) ([]byte, error) {
 		if digest(b) != hash {
 			return nil, errors.New("Provider ledger checksum mismatch")
 		}
-		var ledger struct {
-			Ledger   map[string]int64 `json:"ledger"`
-			Uploader string           `json:"uploader"`
-		}
+		var ledger ProviderDisk
 		if err = json.Unmarshal(b, &ledger); err != nil {
 			return nil, err
 		}
+		disk.Accounts = ledger.Accounts
+		disk.ActiveAccount = ledger.ActiveAccount
 		disk.Ledger = ledger.Ledger
 		disk.Uploader = ledger.Uploader
 	}
@@ -75,8 +76,18 @@ func (s *Store) saveConsentLocked(raw []byte) error {
 		return errors.New("Consent budget exceeded")
 	}
 	var disk ProviderDisk
-	if json.Unmarshal(raw, &disk) != nil || len(disk.Providers) > 32 || len(disk.Ledger) > 4096 {
+	if json.Unmarshal(raw, &disk) != nil || len(disk.Providers) > 32 || len(disk.Ledger) > 4096 || len(disk.Accounts) > 64 {
 		return errors.New("Invalid provider state")
+	}
+	for account, providers := range disk.Accounts {
+		if len(account) != 64 || len(providers) > 32 {
+			return errors.New("Invalid account consent")
+		}
+		for id, cfg := range providers {
+			if len(id) > 32 || len(cfg) > 16384 || !json.Valid(cfg) {
+				return errors.New("Invalid account provider configuration")
+			}
+		}
 	}
 	tx, err := s.writer.Begin()
 	if err != nil {

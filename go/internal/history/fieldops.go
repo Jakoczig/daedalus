@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/fieldops"
+	"github.com/Jakoczig/eridion/go/internal/fieldops"
 	"strconv"
 	"strings"
 	"time"

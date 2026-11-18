@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
-	"github.com/Jakoczig/daedalus/go/internal/remotetls"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/remotetls"
 	"github.com/coder/websocket"
 )
 
@@ -36,6 +36,7 @@ type remoteManager struct {
 	epoch         uint64
 	connections   map[*websocket.Conn]string
 	closed, fault bool
+	legacyGrants  bool
 	notice        string
 	attempts      int
 	attemptStart  time.Time
@@ -54,7 +55,7 @@ func newRemote(s *Server, assets fs.FS, dir string) (*remoteManager, error) {
 		// never be overwritten on shutdown or trusted for viewer recovery.
 		m.fault = true
 		m.state = remoteState{Version: 1}
-		m.notice = "Remote displays disabled: configuration or TLS identity is missing, damaged or has unsafe permissions. Local desktop remains available. Close DAEDALUS, back up the dedicated Go profile, then repair its remote.json/TLS files and permissions from a trusted backup or follow the documented explicit profile-reset procedure. Restart and pair devices again after repair. Damaged files have not been replaced."
+		m.notice = "Remote displays disabled: configuration or TLS identity is missing, damaged or has unsafe permissions. Local desktop remains available. Close ERIDION, back up the dedicated Go profile, then repair its remote.json/TLS files and permissions from a trusted backup or follow the documented explicit profile-reset procedure. Restart and pair devices again after repair. Damaged files have not been replaced."
 	}
 	return m, nil
 }
@@ -213,7 +214,7 @@ func (m *remoteManager) statusLocked() map[string]any {
 	}
 	devices := make([]map[string]any, 0, len(m.state.Devices))
 	for _, d := range m.state.Devices {
-		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires})
+		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires, "active": d.Account == m.state.Account && !(m.legacyGrants && m.state.Account == ""), "requiresPairing": d.Account == "" && (m.legacyGrants || m.state.Account != "")})
 	}
 	return map[string]any{"enabled": m.http != nil && !m.fault, "recoveryRequired": m.fault, "url": m.url, "address": m.state.Address, "addresses": addresses, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
 }

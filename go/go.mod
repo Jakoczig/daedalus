@@ -1,4 +1,4 @@
-module github.com/Jakoczig/daedalus/go
+module github.com/Jakoczig/eridion/go
 
 go 1.26.0
 

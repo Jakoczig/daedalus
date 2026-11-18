@@ -21,7 +21,7 @@ async function main () {
   const measure = async name => { const a = sample(host.child.pid); const first = await c.call('Performance.getMetrics'); await delay(3200); const z = sample(host.child.pid); const last = await c.call('Performance.getMetrics'); const m = (v, n) => v.metrics.find(x => x.name === n).value; report.resources.push({ name, milliseconds: z.at - a.at, goRSSBytes: z.rss, goCPUPercentOneCore: (z.cpu - a.cpu) / ((z.at - a.at) / 1000) * 100, browserHeapBytes: m(last, 'JSHeapUsedSize'), browserMainThreadPercent: (m(last, 'TaskDuration') - m(first, 'TaskDuration')) / (m(last, 'Timestamp') - m(first, 'Timestamp')) * 100 }) }
   try {
     host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2l')); origin = host.url
-    const pages = [['/ship/fleet', 'Fixture Explorer'], ['/ship/carrier', 'Owned carrier operations'], ['/trade/commodities', 'Station commodity observations'], ['/trade/routes', 'Two-market quoted comparison'], ['/mining/statistics', 'platinum'], ['/cmdr/community-goals', 'CommunityGoalReward'], ['/missions/powerplay', 'PowerplayDeliver'], ['/cmdr/wing', 'CrewAssign'], ['/trade/ptn', 'External community reference'], ['/trade/fcoc', 'External community reference']]
+    const pages = [['/ship/fleet', 'Fixture Explorer'], ['/ship/carrier', 'Owned carrier operations'], ['/trade/commodities', 'Station commodity observations'], ['/trade/routes', 'Two-market quoted comparison'], ['/mining/statistics', 'platinum'], ['/cmdr/community-goals', 'Received reward'], ['/missions/powerplay', 'PowerplayDeliver'], ['/cmdr/wing', 'CrewAssign'], ['/trade/ptn', 'External community reference'], ['/trade/fcoc', 'External community reference']]
     for (const [name, width, height] of [['desktop', 1366, 768], ['launcher', 680, 580]]) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
       for (const [url, text] of pages) {
@@ -35,7 +35,7 @@ async function main () {
     await navigate('/cmdr/community-goals', '2 subscribed goals as last witnessed')
     host.child.stdin.write('operations-goals-empty\n')
     await waitFor(() => evaluate(pageTextReady('0 subscribed goals as last witnessed')))
-    if (!await evaluate('document.body.textContent.includes("CommunityGoalReward")&&document.body.textContent.includes("historical goal")')) throw new Error('Empty complete CG snapshot lost history or left removed goals current')
+    if (!await evaluate('document.body.textContent.includes("1000")&&document.body.textContent.includes("Received reward")&&document.body.textContent.includes("Historical contributions and rewards are retained")')) throw new Error('Empty complete CG snapshot lost history or left removed goals current')
     await navigate('/cmdr/community-goals', '0 subscribed goals as last witnessed')
     report.completeGoalSnapshotRetiresMembershipAndKeepsHistory = true
     await navigate('/ship/fleet', 'Fixture Explorer'); await measure('G2L open Fleet')

@@ -14,17 +14,19 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
-	"github.com/Jakoczig/daedalus/go/internal/remotetls"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/remotetls"
 )
 
 type device struct {
+	Account string    `json:"account,omitempty"`
 	ID      string    `json:"id"`
 	Name    string    `json:"name"`
 	Expires time.Time `json:"expires"`
 	Hash    string    `json:"hash"`
 }
 type remoteState struct {
+	Account string   `json:"account,omitempty"`
 	Version int      `json:"version"`
 	Enabled bool     `json:"enabled"`
 	Active  bool     `json:"active"`
@@ -89,15 +91,19 @@ func (m *remoteManager) load() error {
 	if err != nil {
 		return err
 	}
-	if json.Unmarshal(raw, &m.state) != nil || m.state.Version != 1 || len(m.state.Devices) > 32 {
+	if json.Unmarshal(raw, &m.state) != nil || (m.state.Version != 1 && m.state.Version != 2) || len(m.state.Devices) > 32 || (m.state.Version == 2 && len(m.state.Account) != 64) {
 		return errors.New("invalid remote settings")
 	}
+	m.legacyGrants = m.state.Version == 1 && m.state.Account == "" && len(m.state.Devices) > 0
 	seen := map[string]bool{}
 	for _, d := range m.state.Devices {
-		if len(d.Hash) != 64 || len(d.ID) != 32 || !validName(d.Name) || seen[d.ID] {
+		if len(d.Hash) != 64 || len(d.ID) != 32 || !validName(d.Name) || seen[d.ID] || (d.Account != "" && len(d.Account) != 64) {
 			return errors.New("invalid device state")
 		}
 		seen[d.ID] = true
+		if d.Account == "" {
+			m.notice = "Legacy display grants need a verified single-account association or new owner-issued pairing. Ambiguous grants remain stored but inactive; re-pair or revoke them in Remote Displays."
+		}
 	}
 	if m.state.Enabled && (!validAddress(m.state.Address) || m.state.Port < 0 || m.state.Port > 65535 || (m.state.Port < 1024 && !(m.state.Port == 0 && net.ParseIP(m.state.Address).IsLoopback()))) {
 		return errors.New("invalid saved remote endpoint")
@@ -132,12 +138,15 @@ func (m *remoteManager) saveLocked() error {
 	return privatefs.Write(m.dir, "remote.json", raw)
 }
 func (m *remoteManager) findLocked(token string) (device, bool) {
-	if len(token) != 64 || m.fault || m.closed || !m.state.Enabled {
+	// The journal-free legacy shell has no commander projections to disclose.
+	// Starting the journal-enabled app always requires identity proof instead.
+	shellOnly := m.server != nil && m.server.game == nil
+	if len(token) != 64 || m.fault || m.closed || !m.state.Enabled || (m.legacyGrants && m.state.Account == "" && !shellOnly) {
 		return device{}, false
 	}
 	hash := tokenHash(token)
 	for _, d := range m.state.Devices {
-		if d.Hash == hash && m.now().Before(d.Expires) {
+		if d.Hash == hash && d.Account == m.state.Account && m.now().Before(d.Expires) {
 			return d, true
 		}
 	}
@@ -184,10 +193,49 @@ func (m *remoteManager) pairLocked(code, name string) (string, error) {
 		return "", err
 	}
 	m.pairing = nil
-	m.state.Devices = append(m.state.Devices, device{ID: id, Name: name, Expires: now.Add(12 * time.Hour), Hash: tokenHash(token)})
+	m.state.Devices = append(m.state.Devices, device{Account: m.state.Account, ID: id, Name: name, Expires: now.Add(12 * time.Hour), Hash: tokenHash(token)})
 	if err = m.saveLocked(); err != nil {
 		m.failLocked()
 		return "", errors.New("cannot persist device access")
 	}
 	return token, nil
+}
+
+// Called before selected-account projections are published. Existing grants
+// remain stored for their original profile; switching cannot expand a grant.
+func (m *remoteManager) selectAccount(fid string, verifiedSingle ...bool) {
+	if fid == "" {
+		return
+	}
+	scope := tokenHash(fid)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.fault || m.closed || m.state.Account == scope {
+		return
+	}
+	initialBinding := m.state.Account == ""
+	legacySafe := !m.legacyGrants || (len(verifiedSingle) == 1 && verifiedSingle[0])
+	if initialBinding && legacySafe {
+		for i := range m.state.Devices {
+			if m.state.Devices[i].Account == "" {
+				m.state.Devices[i].Account = scope
+			}
+		}
+	}
+	m.state.Version = 2
+	m.state.Account = scope
+	// Only current-process grants or a proven single-account legacy profile can
+	// inherit initial binding. Unknown legacy ownership is never inferred by FID order.
+	if initialBinding && !legacySafe {
+		m.notice = "Legacy paired devices are inactive because their original commander is ambiguous. Generate a new pairing code for the selected commander; old trust metadata is retained and may be revoked."
+	}
+	if !initialBinding || !legacySafe {
+		m.pairing = nil
+		for conn := range m.connections {
+			conn.CloseNow()
+		}
+	}
+	if e := m.saveLocked(); e != nil {
+		m.failLocked()
+	}
 }

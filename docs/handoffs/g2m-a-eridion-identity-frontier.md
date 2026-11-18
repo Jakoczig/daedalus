@@ -1,0 +1,74 @@
+# ERIDION G2M-A — identity, Frontier return and commander/ship refinement
+
+Base: G2L `5f0bee9fb5df8ea243c54dadcc7edcc02581efef`. Branch: `go/g2m-a-eridion-identity-frontier`, stacked draft targeting `go/g2l-fleet-economy-commander-operations`. [Draft PR #17](https://github.com/Jakoczig/eridion/pull/17). Initial implementation commit: `0c8712b1b181d7d98faf39ab2428fd0814ef130a`; the cache-owner correction follows in the same draft. The final draft PR description is the exact-head verification ledger (commit, both CI runs, artifacts and independently checked hashes).
+
+## Implemented
+
+| Capability | Status / boundary |
+| --- | --- |
+| ERIDION / ERID identity | Native Wails titles, terminal/launcher/document title, Go module/import paths, new certificates, provider software label and preview executable names; legacy app and cryptographic compatibility identifiers preserved |
+| Native profile migration | Versioned atomic identity manifest adopts existing native storage **in place**; same SQLite, checkpoints, backups, vault path, TLS keys, pairing grants and exclusive profile lock |
+| Global commander selection | Multiple accounts OFF by default; owner launcher/settings cards; explicit selection stays pinned while another journal account is ingested; shared pages/database queries, including BGS, use selected FID |
+| Credential/consent separation | Per-FID namespaces inside the same OS vault and transactional SQLite consent state; generations cancel in-flight work on change; legacy credentials without verifiable association retained encrypted and quarantined |
+| Viewer permissions | Grants bind to original profile; changing selection closes sockets and prevents recovery under another account. Remote state v2 makes older native versions fail closed rather than ignore account scoping |
+| Frontier authorization | Public approved client UUID, private local UUID override, exact registered HTTPS redirect, PKCE S256, five-minute single-use complete state binding; website source + strict loopback return and owner-only manual fallback |
+| Frontier account reads | Existing bounded `/profile`, `/market`, `/shipyard`, `/fleetcarrier`; profile-name association required before other account endpoints. Numeric CAPI IDs are not treated as journal FIDs |
+| Commander | Identity/portrait, current ship/model/system, exact credits when witnessed, ranks/progress/reputation, owned-fleet count, squadron/Powerplay evidence; Session unchanged |
+| Ship/Fleet/CG | Human ship labels from existing bundled FDevIDs; explicit unknown module class; stored modules under Modules; concise statistics with optional diagnostics; expandable fleet/history and dedicated subscribed-goal cards retaining historical rewards |
+| Source priority / uploads | Existing journal-first, demonstrably-newer associated Frontier, validated calculation and necessary approved gap-fill rules retained. Fetch time never proves newer observations. No new upload permission or production request |
+
+## Exact profile/account migration and recovery
+
+Default new profile: OS user configuration directory / `eridion-go`. If `daedalus-go` already exists, `eridion-go/identity-v1.json` contains version 1 and the fixed storage name `daedalus-go`. This is logical adoption, **not a database copy or physical directory rename**. The original absolute path keeps Linux Secret Service key lookup and old/new native exclusive locking intact. No keys, databases or permissions are regenerated. Explicit `--data-dir` keeps using the explicitly supplied native directory.
+
+Atomic manifest creation resumes after an interrupted temporary write; diagnostic remnants remain. Invalid/ambiguous manifests or a missing adopted profile stop startup with recovery instructions instead of creating an empty database. Restore the original storage directory and valid manifest from backup, then restart. An unmodified G2L native executable can still find the original directory, but remote v2 deliberately remains disabled there; use a full pre-upgrade backup for a true downgrade. Never hand-edit encrypted vault files or reset TLS merely to clear a warning.
+
+Back up both the identity-manifest directory and the adopted native storage directory. SQLite export remains a database export, not a credential/certificate/portrait backup. Native `daedalus.sqlite`, cookie name and Linux vault cryptographic identifiers remain compatibility names. The Node/legacy profile is never adopted.
+
+Legacy upload consents retain their original recorded hashed-FID owner even when the last cached journal account is different; they are neither granted to that other account nor dropped from the original profile.
+
+Existing personal API keys migrate only if their commander matches verified cached journal identity (or already has an explicit verified FID association). Legacy OAuth tokens without an established association remain encrypted but unavailable to an arbitrary selected account: reconnect Frontier. This avoids assigning account A's credentials to the last-seen account B. Empty offline profiles do not create an OS vault or require an unlocked Secret Service.
+
+Cached projection ownership is explicit: catch-up/replay for B cannot authorize an older cached view from A. A selected profile can still recover its own cached view while another account replays. The deterministic regression failed before this correction and passes with the explicit FID check.
+
+## Verification and practical limits
+
+Focused failing-then-passing tests cover manifest adoption/interruption/recovery/locking, account pinning, durable namespaces, ambiguous legacy credentials, empty offline vault, PKCE/HTTPS redirect/expiry/replaced and cancelled state, in-flight token rejection, portraits and viewer isolation. Existing regression gates remain mandatory. Browser smoke covers Commander, CG, Fleet, Modules and Statistics at 1366×768 and 680×580 with loopback-only request interception and a second synthetic journal account.
+
+Final Windows/Linux native, race, legacy/security, browser and artifact results are recorded in the draft PR verification block. Synthetic measurements are not live game or whole-process gameplay benchmarks. The CI evidence artifact contains screenshots, browser resource measurements and exact G2L/current lifecycle samples; single-pass timings are not a statistical speedup claim. Prior G2L browser screenshots in its accepted CI evidence provide the before reference; G2M-A artifacts provide the after views.
+
+Pending owner acceptance: separately deploy the HTTPS website, real Frontier login/refresh/revoke and browser fallback on Windows/Linux, fresh/previous real profile migration, multiple real accounts, portraits and paired-laptop profile isolation. No live provider login or production upload was attempted. Frontier community-goal normalization awaits a verified authorized schema; Inara developer/CG authorization remains deferred. Stored ships without witnessed builds have unknown performance; no guessed shield/DPS/speed curves or new ship images are bundled. No owner-carrier physical test is claimed.
+
+## Deferred G2M-B — recorded, not implemented
+
+Rename Map→System, List→System List, Neutron Plotter→Spansh Plotter. Move small CSV access to the bottom of the unified Route screen; use supported official Spansh website/import, no guessed API. Integrate upstream BGS Tally contextually instead of a standalone main page. Remove Controls from primary navigation while preserving useful Galaxy information.
+
+Galaxy layout: large top-down **X/Z**, immediately below it a **very thin, wide X/Y** matching the main width, immediately right a **tall, narrow Z/Y** matching the main height. Three independent projections with aligned shared zoom and markers, never rotated copies or equal-sized cards. EDAstro CC BY-NC-SA 3.0 reference is layout inspiration only; do not bundle without a licensing decision.
+
+## Consolidated acceptance checklist
+
+1. Back up the native profile; open ERIDION and confirm history/routes/consents and existing CA trust survive. Verify a second instance cannot become owner.
+2. With Multiple accounts OFF, witness the normal commander. Enable it, choose A, then play B: confirm an explicit mismatch and no silent switch; switch deliberately and check Fleet/CG/ship data and own credentials.
+3. Pair the laptop to A; switch to B and confirm A's session stops. Pair B independently; verify neither display can open owner/provider/portrait/account operations.
+4. Check Commander, module inspector, stored modules, Fleet and Statistics with an actual engineered ship. Unknown/unwitnessed figures must remain unknown; Session/Cargo/Inventory/Ship Status should match prior behavior.
+5. After separate website deployment, log into Frontier on the gaming PC, verify profile identity before other reads, test cancel/expiry/manual return and revocation. Keep uploads OFF. Review goal subscription removal/empty snapshots and historical reward retention.
+
+Final visual regression updates keep the original safety assertions: unknown modules must display an explicit `?` rather than Class 0; Frontier has its approved public client while read consent remains OFF and Connect stays disabled until consent; engineering diagnostics are explicitly expanded before live-Status assertions. No checks or timeouts were removed or relaxed.
+
+Linux startup-order correction: first verified-account discovery preserves a grant issued by the owner during the current process without dropping its valid socket or pairing attempt. Persisted legacy grants require the additional association proof below. Every later account change still clears the pairing attempt, invalidates old-account recovery and closes active sockets. A deterministic failing-then-passing test exercises first binding and subsequent isolation; the existing raw-data and revocation assertions remain unchanged.
+
+Persisted multiple-account startup is also covered: restoring reader A cannot temporarily change viewer scope B, and the provider vault/consent restore uses the pinned account rather than the cached reader. Stale activation requests are rejected; owner account switches and provider restore serialize their configuration transition. Both startup regressions were observed failing before the correction.
+
+
+## External-review corrections (reviewed baseline `f5f8183`)
+
+Legacy pairing now fails closed before account discovery in the journal-enabled app: loaded v1 tokens cannot recover sessions until association is established. The journal-free legacy shell keeps its existing harmless restart behavior; enabling journals requires the association check on the new process. Automatic preservation requires exactly one verified FID in the complete pre-import SQLite commander set, Multiple accounts OFF, and the selected/reduced commander matching that sole FID. First replay order and owner selection alone are not association evidence. Ambiguous grants retain their original hashed token/trust metadata with an empty, inactive scope across restart; they are never rebound later. Remote Displays labels them inactive and instructs the owner to issue a fresh pairing code for the selected commander or revoke them. New pairing and subsequent account changes retain the existing authorization/revocation boundaries. No CA or profile reset is needed.
+
+Provider activation now stages destination credentials/configuration and persists canonical consent before publishing the vault scope, provider FID or configs. A failed consent transaction leaves the previous namespace, secrets and permissions coherent while owner selection/pin roll back. Cancelled request generations, pending OAuth and publication queues are deliberately not resurrected. Retry works in the same process; observed mismatched journal accounts remain unable to read or upload through the retained namespace. A completed encrypted legacy credential migration can remain durable before a consent failure, but never publishes its scope until consent succeeds.
+
+Deterministic regressions cover: the previously failing ambiguous legacy-grant binding and consent-save fault; complete persisted A/B history with B first active; explicit multi-account versus sole-account proof; original token denied before proof; quarantined metadata surviving restart and later owner selection; explicit re-pairing, read-only viewer RPC and revocation; legitimate single-account token recovery/restart; SQLite trigger-injected consent failure with namespace/config/credential preservation and cancelled generations; owner UI/pin rollback and successful B retry/A restore without restart. Existing account isolation, PKCE, profile/TLS recovery and legacy regressions remain mandatory. Final correction commit, exact-head CI runs and refreshed independently verified previews are recorded in the PR description after CI finishes.
+
+Manual acceptance remains native profile migration, two actual commander accounts and paired hardware, plus separately deployed/owner-authorized Frontier login/refresh/revocation. This correction does not deploy the website, invoke live authorization, change scopes/permissions, or implement G2M-B. The prior Windows cold-import spike remains a performance watch; no speculative SQLite tuning was applied.
+
+
+The subsequent [owner-authorized live Frontier audit](g2m-a-frontier-live-audit.md) records actual successful endpoint reads, privacy-safe structural fixtures, Fleet/station/CG corrections and remaining physical acceptance. The maintainer has deployed the HTTPS callback site and reports working OAuth; earlier website-not-deployed statements describe the original handoff, not this later update.

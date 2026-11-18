@@ -3,15 +3,16 @@ package webapp
 import (
 	"context"
 	"encoding/json"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/gamestate"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/providers"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/gamestate"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/providers"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 )
 
 type Options struct {
@@ -57,10 +58,20 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	if s.g2e {
 		persistentDir = opts.StorageDir
 	}
-	s.game, _ = gamestate.NewService(gamestate.Options{StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
-		if s.providers != nil {
-			_ = s.providers.AttachHistory(db, seed)
+	var accounts gamestate.AccountSettings
+	if raw, e := privatefs.Read(opts.StorageDir, "accounts-v1.json"); e == nil {
+		_ = json.Unmarshal(raw, &accounts)
+	}
+	if accounts.Multiple && s.providers != nil {
+		s.providers.PinAccount(accounts.Selected)
+	}
+	s.game, _ = gamestate.NewService(gamestate.Options{DisplayAccount: func(fid string, verifiedSingle bool) {
+		if s.remote != nil {
+			s.remote.selectAccount(fid, verifiedSingle)
 		}
+	}, StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
+		s.restoreProviderHistory(db, seed)
+
 		if s.community != nil {
 			_ = s.community.AttachHistory(db)
 		}
@@ -157,4 +168,14 @@ func (s *Server) ownerJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, s.game.Details())
+}
+
+// Restoring provider history cannot select a viewer account. Only the journal
+// service's selected projection owns display scope, including cached startup.
+func (s *Server) restoreProviderHistory(db *history.Store, seed history.ProviderSeed) {
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	if s.providers != nil {
+		_ = s.providers.AttachHistory(db, seed)
+	}
 }

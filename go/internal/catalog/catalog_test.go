@@ -36,3 +36,12 @@ func TestModuleSymbolNormalizationAndUnknownFighter(t *testing.T) {
 		t.Fatal("normalization lost verified reference")
 	}
 }
+
+func TestShipLabelsReuseBundledFDevIDsWithoutPerformanceAliases(t *testing.T) {
+	if got := ShipDisplayName("asp"); got != "Asp Explorer" {
+		t.Fatal(got)
+	}
+	if _, ok := ModuleBySymbol("unverified_new_module_variant"); ok {
+		t.Fatal("unknown module assigned reference statistics")
+	}
+}

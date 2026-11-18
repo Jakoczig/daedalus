@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	sqlite "github.com/mattn/go-sqlite3"
 	"net/url"
 	"os"

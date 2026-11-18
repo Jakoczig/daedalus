@@ -7,14 +7,16 @@ import (
 	"time"
 )
 
-var InaraApplicationName string // set only after application whitelisting
-var FrontierClientID string     // set only after Frontier developer approval
-const software = "DAEDALUS"
+var InaraApplicationName string                               // set only after application whitelisting
+var FrontierClientID = "3a7cd51a-f629-4fec-b0c7-967bb7e2fa53" // public client identifier; never a shared secret
+const FrontierRedirectURI = "https://eridion.fitoserver.org/auth/frontier/callback"
+const software = "ERIDION"
 const version = "2.2.0"
 
 var ids = []string{"edsm", "inara", "edastro", "eddn", "frontier", "spansh", "elitebgs", "raven", "canonn", "edsm-reference"}
 
 type Credential struct {
+	JournalFID   string    `json:"journalFid,omitempty"`
 	APIKey       string    `json:"apiKey,omitempty"`
 	Commander    string    `json:"commander,omitempty"`
 	AccessToken  string    `json:"accessToken,omitempty"`

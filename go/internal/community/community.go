@@ -7,9 +7,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/explorestate"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/explorestate"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"math"
 	"net/http"
@@ -275,7 +275,7 @@ func (m *Manager) get(ctx context.Context, path, name string, out any) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "DAEDALUS-Go-Preview/1 (read-only system lookup)")
+	req.Header.Set("User-Agent", "ERIDION-Go-Preview/1 (read-only system lookup)")
 	req.Header.Set("Accept", "application/json")
 	res, err := m.client.Do(req)
 	if err != nil {

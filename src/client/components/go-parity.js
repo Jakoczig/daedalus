@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic'
 import useGoProjection from './go-projection'
 import GoProviderReference from './go-provider-reference'
+import GoCommanderOverview from './go-commander-overview'
 import GoShipStatistics from './go-ship-statistics'
 import GoParityShip from './go-parity-ship'
 import GoParityActivity, { GoMiningRings } from './go-parity-activity'
@@ -14,7 +15,8 @@ export default function GoParity (props) {
   if (error) return <p role='alert'>{error}</p>
   if (props.path === '/mining/rings') return <GoMiningRings {...props} />
   if (props.path.startsWith('/eng/')) return <GoEngineering key={props.path} path={props.path} workspace={value} />
+  if (props.path === '/cmdr/overview') return <GoCommanderOverview {...props} workspace={value} />
   if (props.path === '/ship/stats') return <><GoShipStatistics {...props} workspace={value} /><GoProviderReference {...props} /></>
-  if (props.path.startsWith('/ship/')) return <GoParityShip key={props.path} path={props.path} workspace={value} />
+  if (props.path.startsWith('/ship/')) return <GoParityShip {...props} key={props.path} path={props.path} workspace={value} />
   return <><GoParityActivity key={props.path} path={props.path} workspace={value} />{props.path.startsWith('/cmdr/') && <GoProviderReference {...props} />}</>
 }

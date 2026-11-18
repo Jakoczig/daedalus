@@ -3,7 +3,7 @@ package history
 import (
 	"context"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/fieldops"
+	"github.com/Jakoczig/eridion/go/internal/fieldops"
 	"testing"
 )
 

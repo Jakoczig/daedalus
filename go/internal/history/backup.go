@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/url"
 	"os"

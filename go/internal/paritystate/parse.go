@@ -1,7 +1,7 @@
 package paritystate
 
 import (
-	"github.com/Jakoczig/daedalus/go/internal/catalog"
+	"github.com/Jakoczig/eridion/go/internal/catalog"
 	"strings"
 )
 

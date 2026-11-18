@@ -2,7 +2,9 @@ package gamestate
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"os"
 	"strings"
 	"sync"
@@ -11,10 +13,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/navcontext"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/navcontext"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 )
 
 // Summary is the entire public transport projection. Never add paths, identity,
@@ -31,6 +33,7 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
+	DisplayAccount  func(string, bool)
 	ProviderSidecar func(sidecar.Change)
 	OnHistoryReady  func(*history.Store, history.ProviderSeed)
 	StorageDir      string
@@ -59,33 +62,36 @@ type maintenanceRequest struct {
 	reply        chan error
 }
 type Service struct {
-	statisticsKey      string
-	statisticsJSON     []byte
-	bioStatus          []byte
-	maintenance        chan maintenanceRequest
-	hasFreshLive       bool
-	activeSource       string
-	store              *history.Store
-	databaseError      string
-	lastPersistPublish time.Time
-	restored           bool
-	cachedProjection   *Projections
-	navigationContext  *navcontext.Model
-	mu                 sync.Mutex
-	views              projectionState
-	opts               Options
-	summary            Summary
-	details            SourceDetails
-	commanders         map[string]commanderState
-	order              []string
-	unknown            commanderState
-	active             string
-	stopped            bool
-	subscribers        map[chan Summary]struct{}
-	selectSource       chan selection
-	done               chan struct{}
-	closed             bool
-	running            atomic.Bool
+	accounts            AccountSettings
+	legacyPairingFID    string
+	statisticsKey       string
+	statisticsJSON      []byte
+	bioStatus           []byte
+	maintenance         chan maintenanceRequest
+	hasFreshLive        bool
+	activeSource        string
+	store               *history.Store
+	databaseError       string
+	lastPersistPublish  time.Time
+	restored            bool
+	cachedProjection    *Projections
+	cachedProjectionFID string
+	navigationContext   *navcontext.Model
+	mu                  sync.Mutex
+	views               projectionState
+	opts                Options
+	summary             Summary
+	details             SourceDetails
+	commanders          map[string]commanderState
+	order               []string
+	unknown             commanderState
+	active              string
+	stopped             bool
+	subscribers         map[chan Summary]struct{}
+	selectSource        chan selection
+	done                chan struct{}
+	closed              bool
+	running             atomic.Bool
 }
 
 func NewService(opts Options) (*Service, error) {
@@ -96,9 +102,19 @@ func NewService(opts Options) (*Service, error) {
 	if opts.StorageDir != "" {
 		initialStage = "RESTORING_CACHE"
 	}
-	return &Service{maintenance: make(chan maintenanceRequest), navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{Stage: initialStage, SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
+	var accounts AccountSettings
+	if opts.StorageDir != "" {
+		if raw, e := privatefs.Read(opts.StorageDir, "accounts-v1.json"); e == nil {
+			_ = json.Unmarshal(raw, &accounts)
+		}
+	}
+	return &Service{accounts: accounts, maintenance: make(chan maintenanceRequest), navigationContext: navcontext.New(), views: newProjectionState(), opts: opts, summary: Summary{Stage: initialStage, SourceState: "waiting", ImportInProgress: true}, details: SourceDetails{Override: opts.Directory, Sidecars: map[string]string{}}, commanders: map[string]commanderState{}, subscribers: map[chan Summary]struct{}{}, selectSource: make(chan selection), done: make(chan struct{})}, nil
 }
-func (s *Service) Snapshot() Summary { s.mu.Lock(); defer s.mu.Unlock(); return s.summary }
+func (s *Service) Snapshot() Summary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.selectedSummaryLocked()
+}
 func (s *Service) Details() SourceDetails {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,17 +126,20 @@ func (s *Service) Details() SourceDetails {
 	return d
 }
 func (s *Service) publishLocked() {
+	if s.opts.DisplayAccount != nil {
+		s.opts.DisplayAccount(s.displayFIDLocked(), !s.accounts.Multiple && s.legacyPairingFID != "" && s.legacyPairingFID == s.displayFIDLocked() && len(s.commanders) == 1)
+	}
 	s.publishProjectionsLocked()
 	for ch := range s.subscribers {
 		select {
-		case ch <- s.summary:
+		case ch <- s.selectedSummaryLocked():
 		default:
 			select {
 			case <-ch:
 			default:
 			}
 			select {
-			case ch <- s.summary:
+			case ch <- s.selectedSummaryLocked():
 			default:
 			}
 		}
@@ -135,7 +154,7 @@ func (s *Service) Subscribe(ctx context.Context) (<-chan Summary, func()) {
 		return ch, func() {}
 	}
 	s.subscribers[ch] = struct{}{}
-	ch <- s.summary
+	ch <- s.selectedSummaryLocked()
 	s.mu.Unlock()
 	var once sync.Once
 	finished := make(chan struct{})
@@ -226,6 +245,11 @@ func (s *Service) Run(ctx context.Context) error {
 		if err == nil {
 			s.mu.Lock()
 			s.store = db
+			// Decide legacy trust only from the complete pre-import database, never
+			// the first commander encountered while replaying A/B journal files.
+			if people, e := db.Commanders(); e == nil && len(people) == 1 {
+				s.legacyPairingFID = people[0].FID
+			}
 			s.summary.Stage = "RESTORING_CACHE"
 			s.mu.Unlock()
 			raw, e := db.Cache()
@@ -242,7 +266,7 @@ func (s *Service) Run(ctx context.Context) error {
 					v := s.projectionLocked()
 					s.summary = savedSummary
 					v.Source = savedSummary
-					s.cachedProjection = &v
+					s.holdProjectionLocked(v)
 				}
 				s.mu.Unlock()
 			}
@@ -566,7 +590,7 @@ func (s *Service) applyEventLocked(event journal.Event, phase journal.Phase) {
 func (s *Service) SystemIdentity() (string, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.summary.ImportInProgress || s.summary.SourceState != "live" || s.active == "" {
+	if s.summary.ImportInProgress || s.summary.SourceState != "live" || s.active == "" || s.displayFIDLocked() != s.active {
 		return "", ""
 	}
 	c := s.commanders[s.active]

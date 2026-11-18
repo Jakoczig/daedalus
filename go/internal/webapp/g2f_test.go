@@ -3,7 +3,7 @@ package webapp
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/community"
+	"github.com/Jakoczig/eridion/go/internal/community"
 	"io"
 	"net/http"
 	"os"

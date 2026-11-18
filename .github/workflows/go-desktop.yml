@@ -1,8 +1,8 @@
-name: Go desktop foundation
+name: ERIDION Go desktop
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 
@@ -320,13 +320,33 @@ jobs:
             temp/g2l-queries.txt
           if-no-files-found: error
           retention-days: 14
+      - name: G2M-A exact G2L lifecycle comparison
+        run: |
+          node scripts/testing/g2ma-baseline.cjs
+          cd temp/g2ma-exact-g2l-baseline/go
+          go test ./internal/gamestate -run '^$' -bench '^BenchmarkG2JLifecycle$' -benchtime=1x -benchmem -count=1 | tee ../../g2ma-g2l-lifecycle.txt
+          go build -o bin/g2ma-baseline-fixture${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/visual-fixture
+      - name: G2M-A commander, fleet, goals and account browser smoke
+        run: node scripts/testing/g2ma-visual.cjs
+      - name: Upload G2M-A synthetic verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eridion-g2ma-synthetic-evidence-${{ runner.os }}
+          path: |
+            temp/g2ma-visual/*.png
+            temp/g2ma-visual/report.json
+            temp/g2ma-g2l-lifecycle.txt
+            temp/g2j-lifecycle.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: daedalus-g2l-${{ runner.os }}-x64-experimental-unsigned-fleet-economy
+          name: eridion-g2m-a-${{ runner.os }}-x64-experimental-unsigned-preview
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

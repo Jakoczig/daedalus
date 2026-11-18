@@ -3,7 +3,7 @@ package community
 import (
 	"context"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/http"
 	"strings"
