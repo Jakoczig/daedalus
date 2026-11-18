@@ -2,8 +2,10 @@ package providers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/Jakoczig/eridion/go/internal/history"
+	"path/filepath"
 	"testing"
 )
 
@@ -157,5 +159,61 @@ func TestHistoryRestoreUsesPinnedAccountInsteadOfCachedReaderAccount(t *testing.
 	}
 	if e = m.ActivateAccount("FIXTURE-A", false); e == nil {
 		t.Fatal("stale caller replaced the pinned provider account")
+	}
+}
+
+func TestAccountConsentFailureRetainsNamespaceAndRetry(t *testing.T) {
+	dir := t.TempDir()
+	db, e := history.Open(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	v := &testVault{}
+	m := New(context.Background(), dir, Options{Vault: v, Manual: true})
+	defer m.Close()
+	if e = m.AttachHistory(db, history.ProviderSeed{FID: "FIXTURE-A", Name: "A"}); e != nil {
+		t.Fatal(e)
+	}
+	if e = m.SetCredential("edsm", Credential{APIKey: "A-PRIVATE", Commander: "A"}); e != nil {
+		t.Fatal(e)
+	}
+	if e = m.Configure("edsm", Config{Read: true}); e != nil {
+		t.Fatal(e)
+	}
+	oldCtx := m.states["edsm"].ctx
+	generation := m.states["edsm"].generation
+	m.states["edsm"].queue = []queued{{key: "cancel-me", generation: generation}}
+	sqlDB, e := sql.Open("sqlite3", filepath.Join(dir, "daedalus.sqlite"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer sqlDB.Close()
+	if _, e = sqlDB.Exec(`CREATE TRIGGER fail_consent BEFORE INSERT ON app_state WHEN NEW.key='provider-ledger' BEGIN SELECT RAISE(FAIL,'injected consent failure'); END`); e != nil {
+		t.Fatal(e)
+	}
+	if e = m.ActivateAccount("FIXTURE-B", false); e == nil {
+		t.Fatal("injected save succeeded")
+	}
+	if m.accountFID != "FIXTURE-A" || m.opts.Vault.(*scopedVault).scope != hash("FIXTURE-A")+"/" || m.secrets["edsm"].APIKey != "A-PRIVATE" || !m.states["edsm"].config.Read {
+		t.Fatal("failed activation left namespace, credential or consent inconsistent")
+	}
+	if oldCtx.Err() == nil || m.states["edsm"].generation <= generation || len(m.states["edsm"].queue) != 0 {
+		t.Fatal("failed switch resurrected a canceled generation/queue")
+	}
+	if _, e = sqlDB.Exec(`DROP TRIGGER fail_consent`); e != nil {
+		t.Fatal(e)
+	}
+	if e = m.ActivateAccount("FIXTURE-B", false); e != nil {
+		t.Fatal("retry", e)
+	}
+	if m.accountFID != "FIXTURE-B" || m.secrets["edsm"].APIKey != "" || m.states["edsm"].config.Read {
+		t.Fatal("retry did not isolate B")
+	}
+	if e = m.ActivateAccount("FIXTURE-A", false); e != nil {
+		t.Fatal(e)
+	}
+	if m.secrets["edsm"].APIKey != "A-PRIVATE" || !m.states["edsm"].config.Read || len(m.states["edsm"].queue) != 0 {
+		t.Fatal("A state not restored or queue resurrected")
 	}
 }

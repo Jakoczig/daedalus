@@ -61,3 +61,12 @@ test('owner shows a prominent six-character code with a clear five-minute deadli
   assert.match(html, /5 minutes/)
   assert.match(html, /2026-11-12T19:05:00Z/)
 })
+
+test('ambiguous legacy grants remain visible with explicit re-pairing instructions', () => {
+  const mod = load({ enabled: true, devices: [{ id: 'legacy', name: 'Old laptop', expires: '2026-11-19', active: false, requiresPairing: true }] })
+  const html = renderToStaticMarkup(React.createElement(mod.default))
+  assert.match(html, /Inactive legacy grant/)
+  assert.match(html, /generate a new pairing code/)
+  assert.match(html, /Revoke/)
+  assert.doesNotMatch(html, /Session expires/)
+})

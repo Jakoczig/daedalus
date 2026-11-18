@@ -164,7 +164,13 @@ func (m *Manager) validConfig(id string, c Config) error {
 	return nil
 }
 func (m *Manager) saveLocked() error {
-	b, _ := m.saveDiskLocked()
+	b, e := m.saveDiskLocked()
+	if e != nil {
+		return e
+	}
+	return m.persistConsentLocked(b)
+}
+func (m *Manager) persistConsentLocked(b []byte) error {
 	if m.history != nil {
 		return m.history.SaveProviderConsent(b)
 	}

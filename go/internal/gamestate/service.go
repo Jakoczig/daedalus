@@ -33,7 +33,7 @@ type Summary struct {
 	EventsRead       uint64 `json:"eventsRead"`
 }
 type Options struct {
-	DisplayAccount  func(string)
+	DisplayAccount  func(string, bool)
 	ProviderSidecar func(sidecar.Change)
 	OnHistoryReady  func(*history.Store, history.ProviderSeed)
 	StorageDir      string
@@ -63,6 +63,7 @@ type maintenanceRequest struct {
 }
 type Service struct {
 	accounts            AccountSettings
+	legacyPairingFID    string
 	statisticsKey       string
 	statisticsJSON      []byte
 	bioStatus           []byte
@@ -126,7 +127,7 @@ func (s *Service) Details() SourceDetails {
 }
 func (s *Service) publishLocked() {
 	if s.opts.DisplayAccount != nil {
-		s.opts.DisplayAccount(s.displayFIDLocked())
+		s.opts.DisplayAccount(s.displayFIDLocked(), !s.accounts.Multiple && s.legacyPairingFID != "" && s.legacyPairingFID == s.displayFIDLocked() && len(s.commanders) == 1)
 	}
 	s.publishProjectionsLocked()
 	for ch := range s.subscribers {
@@ -244,6 +245,11 @@ func (s *Service) Run(ctx context.Context) error {
 		if err == nil {
 			s.mu.Lock()
 			s.store = db
+			// Decide legacy trust only from the complete pre-import database, never
+			// the first commander encountered while replaying A/B journal files.
+			if people, e := db.Commanders(); e == nil && len(people) == 1 {
+				s.legacyPairingFID = people[0].FID
+			}
 			s.summary.Stage = "RESTORING_CACHE"
 			s.mu.Unlock()
 			raw, e := db.Cache()

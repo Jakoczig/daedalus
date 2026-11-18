@@ -99,33 +99,41 @@ func (m *Manager) ActivateAccount(fid string, adoptLegacy bool) error {
 	if m.accountFID == fid {
 		return nil
 	}
-	if e := m.activateAccountLocked(fid, adoptLegacy); e != nil {
-		for _, s := range m.states {
-			s.cancel()
-			s.generation++
-			s.config = Config{}
-			s.queue = nil
-		}
-		m.secrets = map[string]Credential{}
-		return e
-	}
-	return nil
+	return m.activateAccountLocked(fid, adoptLegacy)
 }
+
+// Stage the destination namespace and consent before publishing either. Cancelled
+// generations and upload candidates are intentionally never rolled back.
 func (m *Manager) activateAccountLocked(fid string, adoptLegacy bool) error {
-	if m.accountConfigs == nil {
-		m.accountConfigs = map[string]map[string]storedConfig{}
+	accounts := map[string]map[string]storedConfig{}
+	for k, v := range m.accountConfigs {
+		accounts[k] = v
 	}
 	if m.accountFID != "" {
-		m.accountConfigs[hash(m.accountFID)] = m.configsLocked()
+		accounts[hash(m.accountFID)] = m.configsLocked()
 	}
-	configs := m.accountConfigs[hash(fid)]
+	configs := accounts[hash(fid)]
 	if configs == nil && adoptLegacy && m.accountFID == "" {
 		configs = m.configsLocked()
 	}
-	if len(m.accountConfigs) >= 64 && configs == nil {
+	if len(accounts) >= 64 && configs == nil {
 		return errors.New("Account profile limit reached")
 	}
+	staged := map[string]storedConfig{}
+	for id := range m.states {
+		staged[id] = storedConfig{}
+	}
+	for id, c := range configs {
+		if m.states[id] != nil && m.validConfig(id, c.Config) == nil {
+			staged[id] = c
+		}
+	}
+	accounts[hash(fid)] = staged
 	scope := hash(fid) + "/"
+	secrets := map[string]Credential{}
+	// Cancel before any persistence can block, including direct activation callers.
+	m.oauth = nil
+	m.cancelPublicationLocked()
 	if v, ok := m.opts.Vault.(*scopedVault); ok {
 		if adoptLegacy && v.scope == "" {
 			next := map[string]Credential{}
@@ -147,25 +155,33 @@ func (m *Manager) activateAccountLocked(fid string, adoptLegacy bool) error {
 					return errors.New("Cannot migrate account credentials; original vault retained")
 				}
 			}
+			// A completed encrypted legacy migration is durable even if consent fails;
+			// the active scope/secrets stay unchanged and a retry finds these same keys.
 			v.all = next
 		}
-		v.scope = scope
-		m.secrets = map[string]Credential{}
 		for k, c := range v.all {
 			if strings.HasPrefix(k, scope) {
-				m.secrets[strings.TrimPrefix(k, scope)] = c
+				secrets[strings.TrimPrefix(k, scope)] = c
 			}
 		}
 	}
+	raw, e := json.Marshal(providerDisk{staged, m.ledger, m.uploader, accounts, hash(fid)})
+	if e != nil {
+		return e
+	}
+	if e = m.persistConsentLocked(raw); e != nil {
+		return e
+	}
+	// Nothing below can fail: publish one consistent namespace under both locks.
+	if v, ok := m.opts.Vault.(*scopedVault); ok {
+		v.scope = scope
+	}
+	m.secrets = secrets
+	m.accountConfigs = accounts
 	m.accountFID = fid
-	m.oauth = nil
 	m.layers = Layers{}
 	m.station = stationSession{}
 	for id, s := range m.states {
-		s.cancel()
-		s.ctx, s.cancel = context.WithCancel(m.ctx)
-		s.generation++
-		s.queue = nil
 		s.snapshot = nil
 		s.config = Config{}
 		s.lastSuccess = ""
@@ -173,12 +189,12 @@ func (m *Manager) activateAccountLocked(fid string, adoptLegacy bool) error {
 		s.sent = 0
 		s.dropped = 0
 		s.counts = map[string]uint64{}
-		if c, ok := configs[id]; ok && m.validConfig(id, c.Config) == nil {
+		if c, ok := staged[id]; ok {
 			c.Config.CommanderHash = c.Identity
 			s.config = c.Config
 		}
 	}
-	return m.saveLocked()
+	return nil
 }
 
 // PinAccount prevents a different live journal account from changing provider
@@ -224,12 +240,6 @@ func (m *Manager) activateObservedAccount(fid string) {
 		return
 	}
 	if e := m.activateAccountLocked(fid, false); e != nil {
-		m.notice = "Provider account activation failed; external access disabled. Journal history is retained."
-		for _, s := range m.states {
-			s.cancel()
-			s.generation++
-			s.queue = nil
-			s.config = Config{}
-		}
+		m.notice = "Provider account activation failed; previous account retained. Retry selecting the account after repairing consent storage. Mismatched-account external access remains disabled; journal history is retained."
 	}
 }

@@ -1,8 +1,11 @@
 package gamestate
 
 import (
+	"context"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"github.com/Jakoczig/eridion/go/internal/shipstate"
 	"testing"
+	"time"
 )
 
 func TestSelectedCommanderDoesNotFollowOtherJournalSession(t *testing.T) {
@@ -52,5 +55,60 @@ func TestCachedProjectionCannotInheritAnotherReplayCommanderAuthorization(t *tes
 	s.accounts = AccountSettings{Multiple: true, Selected: "SYNTHETIC-A"}
 	if p := s.projectionLocked(); p.Ship.ShipType != "ACCOUNT-A-SHIP" {
 		t.Fatal("explicit selected A cannot recover its own cached view while B replays")
+	}
+}
+
+func TestLegacyPairingProofUsesCompletePersistedCommanderSet(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		two, multiple, safe bool
+	}{{"single-account", false, false, true}, {"two-recorded-first-active-B", true, false, false}, {"explicit-multiple", false, true, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, profile := t.TempDir(), t.TempDir()
+			appendEvent(t, dir, `{"event":"LoadGame","timestamp":"2026-01-01T00:00:01Z","FID":"SYNTHETIC-A"}`)
+			n := uint64(1)
+			if tc.two {
+				appendEvent(t, dir, `{"event":"LoadGame","timestamp":"2026-01-01T00:00:02Z","FID":"SYNTHETIC-B"}`)
+				n++
+			}
+			first, stop := durableService(t, profile, dir)
+			waitState(t, first, func(v Summary) bool { return v.EventsRead == n && !v.ImportInProgress })
+			fid := first.FieldCommander()
+			if tc.multiple {
+				if e := first.SetAccounts(true, fid); e != nil {
+					t.Fatal(e)
+				}
+			}
+			stop()
+			seen := make(chan bool, 20)
+			next, e := NewService(Options{StorageDir: profile, Directory: dir, EnableParity: true, Discovery: journal.DiscoveryOptions{Roots: []string{}}, PollInterval: 5 * time.Millisecond, DisplayAccount: func(got string, safe bool) {
+				if got == fid {
+					select {
+					case seen <- safe:
+					default:
+					}
+				}
+			}})
+			if e != nil {
+				t.Fatal(e)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() { done <- next.Run(ctx) }()
+			defer func() {
+				cancel()
+				if e := <-done; e != nil {
+					t.Error(e)
+				}
+			}()
+			select {
+			case safe := <-seen:
+				if safe != tc.safe {
+					t.Fatalf("legacy association proof=%v want %v", safe, tc.safe)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("no restored account publication")
+			}
+		})
 	}
 }

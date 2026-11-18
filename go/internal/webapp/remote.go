@@ -36,6 +36,7 @@ type remoteManager struct {
 	epoch         uint64
 	connections   map[*websocket.Conn]string
 	closed, fault bool
+	legacyGrants  bool
 	notice        string
 	attempts      int
 	attemptStart  time.Time
@@ -213,7 +214,7 @@ func (m *remoteManager) statusLocked() map[string]any {
 	}
 	devices := make([]map[string]any, 0, len(m.state.Devices))
 	for _, d := range m.state.Devices {
-		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires})
+		devices = append(devices, map[string]any{"id": d.ID, "name": d.Name, "expires": d.Expires, "active": d.Account == m.state.Account && !(m.legacyGrants && m.state.Account == ""), "requiresPairing": d.Account == "" && (m.legacyGrants || m.state.Account != "")})
 	}
 	return map[string]any{"enabled": m.http != nil && !m.fault, "recoveryRequired": m.fault, "url": m.url, "address": m.state.Address, "addresses": addresses, "port": m.state.Port, "devices": devices, "ca": string(m.bundle.CAPEM), "fingerprint": m.bundle.Fingerprint, "notice": m.notice}
 }

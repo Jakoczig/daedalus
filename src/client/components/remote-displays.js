@@ -76,7 +76,7 @@ function Device ({ device, act, pending }) {
       <label>Device name <input maxLength={80} value={name} onChange={event => setName(event.target.value)} /></label>
       <button disabled={pending} onClick={() => act('rename', { deviceId: device.id, name: name.trim() })}>Rename</button>
       <button disabled={pending} onClick={() => act('revoke', { deviceId: device.id })}>Revoke</button>
-      <span> Session expires {device.expires}</span>
+      <span>{device.requiresPairing ? 'Inactive legacy grant — generate a new pairing code for this commander, or revoke.' : device.active === false ? 'Inactive for the selected commander.' : 'Session expires ' + device.expires}</span>
     </li>
   )
 }

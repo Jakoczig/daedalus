@@ -65,9 +65,9 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	if accounts.Multiple && s.providers != nil {
 		s.providers.PinAccount(accounts.Selected)
 	}
-	s.game, _ = gamestate.NewService(gamestate.Options{DisplayAccount: func(fid string) {
+	s.game, _ = gamestate.NewService(gamestate.Options{DisplayAccount: func(fid string, verifiedSingle bool) {
 		if s.remote != nil {
-			s.remote.selectAccount(fid)
+			s.remote.selectAccount(fid, verifiedSingle)
 		}
 	}, StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
 		s.restoreProviderHistory(db, seed)
