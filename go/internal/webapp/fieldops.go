@@ -72,7 +72,9 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 	}
 	fid := s.game.FieldCommander()
 	if r.FID != "" {
-		fid = r.FID
+		if r.FID != fid {
+			return nil, errors.New("Switch the global commander profile before querying another account")
+		}
 	}
 	if len(fid) > 128 || len(r.System) > 20 || len(r.Faction) > 256 {
 		return nil, errors.New("Invalid field filters")

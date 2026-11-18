@@ -74,8 +74,8 @@ async function main () {
         if (page === 'modules') {
           await waitFor(() => evaluate('!!document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"]\')'))
           await evaluate('document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"]\').click()')
-          await waitFor(() => evaluate('document.querySelector(\'.go-module-inspector\')?.textContent.includes(\'actual class unknown / not verified\')'))
-          if (!await evaluate('document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"] .go-module-class\').textContent.startsWith(\'0\')')) throw new Error('Unverified module class is not placeholder zero')
+          await waitFor(() => evaluate('document.querySelector(\'.go-module-inspector\')?.textContent.includes(\'Module class has not been verified\')'))
+          if (!await evaluate('document.querySelector(\'[aria-label="Inspect Fighter Hangar Mk II"] .go-module-class\').textContent.startsWith(\'?\')')) throw new Error('Unverified module class must remain explicitly unknown')
           await screenshot('fighter-module-' + viewport)
 
           const selected = await evaluate('new Promise(resolve=>{const t=performance.now();const b=Array.from(document.querySelectorAll(".go-module-card")).find(b=>b.textContent.includes("Frame Shift Drive"));if(!b)return resolve(null);b.click();requestAnimationFrame(()=>requestAnimationFrame(()=>resolve({ms:performance.now()-t,text:document.querySelector(".go-module-inspector")?.innerText})))})')

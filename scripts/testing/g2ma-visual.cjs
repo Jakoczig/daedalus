@@ -20,9 +20,11 @@ async function main () {
   const measure = async name => { await c.call('HeapProfiler.collectGarbage'); const a = sample(host.child.pid); const first = await c.call('Performance.getMetrics'); await delay(3200); const z = sample(host.child.pid); const last = await c.call('Performance.getMetrics'); const m = (v, n) => v.metrics.find(x => x.name === n).value; report.resources.push({ name, milliseconds: z.at - a.at, goRSSBytes: z.rss, goCPUPercentOneCore: (z.cpu - a.cpu) / ((z.at - a.at) / 1000) * 100, browserHeapBytes: m(last, 'JSHeapUsedSize'), browserMainThreadPercent: (m(last, 'TaskDuration') - m(first, 'TaskDuration')) / (m(last, 'Timestamp') - m(first, 'Timestamp')) * 100 }) }
   const rpc = (name, message = {}) => evaluate(`new Promise((resolve,reject)=>{const w=new WebSocket(location.origin.replace('http:','ws:'));const timer=setTimeout(()=>{w.close();reject(new Error('owner RPC timed out'))},5000);w.onopen=()=>w.send(JSON.stringify({requestId:'g2ma',name:${JSON.stringify(name)},message:${JSON.stringify(message)}}));w.onmessage=e=>{const r=JSON.parse(e.data);if(r.requestId==='g2ma'){clearTimeout(timer);w.close();r.error?reject(new Error(r.error)):resolve(r.message)}};w.onerror=()=>{clearTimeout(timer);reject(new Error('owner socket failed'))}})`)
   try {
+    await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
     host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2l')); origin = host.url
     await navigate('/ship/status', 'SHIP')
     await waitFor(async () => !(await rpc('getJournalSummary')).importInProgress)
+    await measure('G2M-A fresh common Ship Status')
     const pages = [['/cmdr/overview', 'PRIVATE_SYNTHETIC'], ['/cmdr/community-goals', 'Fixture Community Goal'], ['/ship/fleet', 'Fixture Explorer'], ['/ship/modules', 'Ship internals'], ['/ship/stats', 'Ship Statistics']]
     for (const [name, width, height] of [['desktop', 1366, 768], ['compact', 680, 580]]) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
@@ -34,21 +36,22 @@ async function main () {
         const shot = await c.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, name + url.replaceAll('/', '-') + '.png'), Buffer.from(shot.data, 'base64')); report.pages.push({ name, url, overflow })
       }
     }
-    await navigate('/ship/status', 'SHIP'); await measure('G2M-A common Ship Status')
     const accounts = await rpc('getGoAccounts'); if (accounts.settings.multiple) throw new Error('Multiple accounts enabled by default')
     await rpc('setGoAccounts', { multiple: true, selected: 'SYNTHETIC-G2B' })
     host.child.stdin.write('accounts-other-session\n')
     await waitFor(async () => (await rpc('getGoAccounts')).cards.some(c => c.fid === 'SYNTHETIC-OTHER'))
     const selected = await rpc('getGoCommanderOverview'); if (selected.name !== 'PRIVATE_SYNTHETIC' || !selected.journalMismatch) throw new Error('Journal silently changed chosen commander')
     try { await rpc('getGoOperations', { kind: 'fleet', fid: 'SYNTHETIC-OTHER' }); throw new Error('Foreign account query accepted') } catch (e) { if (e.message === 'Foreign account query accepted') throw e }
+    try { await rpc('getGoBGSTally', { fid: 'SYNTHETIC-OTHER' }); throw new Error('Foreign tally query accepted') } catch (e) { if (e.message === 'Foreign tally query accepted') throw e }
     await rpc('setGoAccounts', { multiple: true, selected: 'SYNTHETIC-OTHER' }); const other = await rpc('getGoCommanderOverview'); if (other.name !== 'Other Fixture Commander') throw new Error('Explicit profile switch failed')
     await navigate('/cmdr/overview', 'Other Fixture Commander'); if (await evaluate('document.body.innerText.includes("PRIVATE_SYNTHETIC")')) throw new Error('Previous identity remained visible')
     report.globalAccountIsolation = true
     await host.stop(); host = null
     const executable = path.join(root, 'temp/g2ma-exact-g2l-baseline/go/bin/g2ma-baseline-fixture' + (process.platform === 'win32' ? '.exe' : ''))
+    await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })
     host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2l'), false, { executable }); origin = host.url
-    await navigate('/ship/status', 'SHIP'); await waitFor(async () => !(await rpc('getJournalSummary')).importInProgress); await measure('Exact G2L common Ship Status, identical current assets')
-    await delay(300); report.rendererHeapBytes = Object.fromEntries((await c.call('Performance.getMetrics')).metrics.map(m => [m.name, m.value])).JSHeapUsedSize
+    await navigate('/ship/status', 'SHIP'); await waitFor(async () => !(await rpc('getJournalSummary')).importInProgress); await measure('Exact G2L fresh common Ship Status, identical current assets')
+    await delay(300); report.measurementMethod = 'Fresh fixture per backend at 1366×768; identical Ship Status assets and fabricated journals; no prior private-page queries; explicit renderer GC; one 3.2-second idle sample each. Not whole Wails or a statistical performance claim.'
     if (report.errors.length || report.outsideRequests.length) throw new Error('Runtime error or unexpected network')
     report.passed = true
   } finally { if (host) await host.stop(); await b.stop(); await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2)) }

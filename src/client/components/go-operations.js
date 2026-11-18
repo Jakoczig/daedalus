@@ -46,7 +46,7 @@ export default function GoOperations (props) {
   if (initial === 'goals') return <GoCommunityGoals page={page} />
   if (initial === 'fleet' && kind === 'fleet') return <GoFleet page={page} sendEvent={props.sendEvent} />
   const exportPage = async () => {
-    try { const value = await props.sendEvent('exportGoOperations', { ...JSON.parse(query), acknowledge: ack, previewHash: preview?.hash }); const url = URL.createObjectURL(new Blob([value.csv], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'daedalus-private-' + kind + '.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch { setNotice('Private export unavailable. Preview and acknowledge first.') }
+    try { const value = await props.sendEvent('exportGoOperations', { ...JSON.parse(query), acknowledge: ack, previewHash: preview?.hash }); const url = URL.createObjectURL(new Blob([value.csv], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'eridion-private-' + kind + '.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch { setNotice('Private export unavailable. Preview and acknowledge first.') }
   }
   return (
     <section className='go-page go-field-ops' aria-label={title}>

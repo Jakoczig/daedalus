@@ -8,7 +8,7 @@ Base: G2L `5f0bee9fb5df8ea243c54dadcc7edcc02581efef`. Branch: `go/g2m-a-eridion-
 | --- | --- |
 | ERIDION / ERID identity | Native Wails titles, terminal/launcher/document title, Go module/import paths, new certificates, provider software label and preview executable names; legacy app and cryptographic compatibility identifiers preserved |
 | Native profile migration | Versioned atomic identity manifest adopts existing native storage **in place**; same SQLite, checkpoints, backups, vault path, TLS keys, pairing grants and exclusive profile lock |
-| Global commander selection | Multiple accounts OFF by default; owner launcher/settings cards; explicit selection stays pinned while another journal account is ingested; shared pages/database queries use selected FID |
+| Global commander selection | Multiple accounts OFF by default; owner launcher/settings cards; explicit selection stays pinned while another journal account is ingested; shared pages/database queries, including BGS, use selected FID |
 | Credential/consent separation | Per-FID namespaces inside the same OS vault and transactional SQLite consent state; generations cancel in-flight work on change; legacy credentials without verifiable association retained encrypted and quarantined |
 | Viewer permissions | Grants bind to original profile; changing selection closes sockets and prevents recovery under another account. Remote state v2 makes older native versions fail closed rather than ignore account scoping |
 | Frontier authorization | Public approved client UUID, private local UUID override, exact registered HTTPS redirect, PKCE S256, five-minute single-use complete state binding; website source + strict loopback return and owner-only manual fallback |
@@ -52,3 +52,5 @@ Galaxy layout: large top-down **X/Z**, immediately below it a **very thin, wide 
 3. Pair the laptop to A; switch to B and confirm A's session stops. Pair B independently; verify neither display can open owner/provider/portrait/account operations.
 4. Check Commander, module inspector, stored modules, Fleet and Statistics with an actual engineered ship. Unknown/unwitnessed figures must remain unknown; Session/Cargo/Inventory/Ship Status should match prior behavior.
 5. After separate website deployment, log into Frontier on the gaming PC, verify profile identity before other reads, test cancel/expiry/manual return and revocation. Keep uploads OFF. Review goal subscription removal/empty snapshots and historical reward retention.
+
+Final visual regression updates keep the original safety assertions: unknown modules must display an explicit `?` rather than Class 0; Frontier has its approved public client while read consent remains OFF and Connect stays disabled until consent; engineering diagnostics are explicitly expanded before live-Status assertions. No checks or timeouts were removed or relaxed.
