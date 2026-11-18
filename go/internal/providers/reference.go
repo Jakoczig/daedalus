@@ -3,7 +3,7 @@ package providers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"net/url"
 	"strconv"
 	"strings"

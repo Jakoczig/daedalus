@@ -3,7 +3,7 @@ package gamestate
 import (
 	"context"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"os"
 	"path/filepath"
 	"runtime"

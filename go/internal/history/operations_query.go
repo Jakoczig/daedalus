@@ -65,7 +65,7 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 	args := []any{}
 	switch q.Kind {
 	case "fleet":
-		query = `SELECT cast(rowid AS TEXT),ship_id,'Fleet',observed_at,state,model||' '||name,json_set(metadata_json,'$.system',system_name,'$.marketId',market_id) FROM fleet_ships WHERE commander_fid=? AND rowid<cast(? AS INTEGER) AND (?='' OR model LIKE '%'||?||'%' OR name LIKE '%'||?||'%') ORDER BY rowid DESC LIMIT ?`
+		query = `SELECT cast(rowid AS TEXT),ship_id,'Fleet',observed_at,state,model||' '||name,json_set(metadata_json,'$.system',system_name,'$.marketId',market_id,'$.model',model,'$.shipName',name) FROM fleet_ships WHERE commander_fid=? AND rowid<cast(? AS INTEGER) AND (?='' OR model LIKE '%'||?||'%' OR name LIKE '%'||?||'%') ORDER BY rowid DESC LIMIT ?`
 		args = []any{fid, before, q.Commodity, q.Commodity, q.Commodity, q.Limit + 1}
 	case "loadouts":
 		query = `SELECT cast(id AS TEXT),ship_id,'Loadout',coalesce(observed_at,''),'historical_witnessed','Exact witnessed fitted modules',raw_json FROM ship_loadout_snapshots WHERE commander_fid=? AND ship_id=? AND id<cast(? AS INTEGER) ORDER BY id DESC LIMIT ?`

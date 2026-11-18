@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Badge, Icon } from './go-terminal-widgets'
+import GoCommunityGoals from './go-community-goals'
+import GoFleet from './go-fleet'
 import GoProviderReference from './go-provider-reference'
 
 const routes = {
@@ -23,12 +25,11 @@ function Evidence ({ value, depth = 0 }) {
   return <dl>{Object.entries(value).slice(0, 128).map(([key, v]) => <div key={key}><dt>{key}</dt><dd><Evidence value={v} depth={depth + 1} /></dd></div>)}</dl>
 }
 export default function GoOperations (props) {
-  const [title, initial, modes] = routes[props.path] || routes['/ship/fleet']
-  const [kind, setKind] = useState(initial); const [fid, setFID] = useState(''); const [commanders, setCommanders] = useState([])
+  const [title, initial, modes] = props.initialKind === 'modules' ? ['Stored modules', 'modules', ['modules', 'module-events']] : routes[props.path] || routes['/ship/fleet']
+  const [kind, setKind] = useState(initial)
   const [commodity, setCommodity] = useState(''); const [market, setMarket] = useState(''); const [otherMarket, setOtherMarket] = useState(''); const [id, setID] = useState(''); const [before, setBefore] = useState('')
   const [page, setPage] = useState(null); const [notice, setNotice] = useState(''); const [revision, setRevision] = useState(0); const [ack, setAck] = useState(false); const [preview, setPreview] = useState(null)
-  const query = JSON.stringify({ kind, fid, commodity: commodity.toLowerCase(), market, otherMarket, id, before, limit: 30 })
-  useEffect(() => { let active = true; if (props.role === 'owner' && props.connected && props.ready && initial !== 'external') props.sendEvent('getGoDataStatus').then(v => { if (active) setCommanders(v.commanders || []) }).catch(() => {}); return () => { active = false } }, [props.role, props.connected, props.ready, props.sendEvent, initial])
+  const query = JSON.stringify({ kind, commodity: commodity.toLowerCase(), market, otherMarket, id, before, limit: 30 })
   useEffect(() => {
     let active = true; let pending = false; let timer
     setPage(null); setPreview(null); setAck(false)
@@ -42,6 +43,8 @@ export default function GoOperations (props) {
   if (props.role !== 'owner') return <section className='go-page'><h2>{title}</h2><Badge>LOCAL OWNER ONLY</Badge><p>Fleet, carrier finances, prices, transactions and other commanders’ names are private. Paired displays remain read-only; this private history is not transmitted.</p></section>
   if (initial === 'external') return <section className='go-page'><h2>{title}</h2><p>External community reference only. DAEDALUS has no verified consumable PTN/FCOC feed. No scraping or automatic external request.</p><a href={props.path.endsWith('/ptn') ? 'https://pilotstradenetwork.com/' : 'https://inara.cz/elite/squadron/7636/'} target='_blank' rel='noreferrer'>Open community website</a></section>
   if (!props.connected || !props.ready) return <p role='status'>Operations disconnected. Waiting for authenticated recovery.</p>
+  if (initial === 'goals') return <GoCommunityGoals page={page} />
+  if (initial === 'fleet' && kind === 'fleet') return <GoFleet page={page} sendEvent={props.sendEvent} />
   const exportPage = async () => {
     try { const value = await props.sendEvent('exportGoOperations', { ...JSON.parse(query), acknowledge: ack, previewHash: preview?.hash }); const url = URL.createObjectURL(new Blob([value.csv], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'daedalus-private-' + kind + '.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch { setNotice('Private export unavailable. Preview and acknowledge first.') }
   }
@@ -50,7 +53,6 @@ export default function GoOperations (props) {
       <div className='go-page__heading'><h2><Icon name='ship' /> {title}</h2><Badge>LOCAL JOURNAL · PRIVATE</Badge></div>
       <p>{page?.notice || 'Loading indexed history…'}</p>
       <div className='go-history-actions'>
-        <label>Commander <select value={fid} onChange={change(setFID)}><option value=''>Active journal commander</option>{commanders.map(c => <option key={c.fid} value={c.fid}>{c.name || c.fid}</option>)}</select></label>
         <label>View <select aria-label='Operations view' value={kind} onChange={change(setKind)}>{modes.map(k => <option key={k} value={k}>{labels[k]}</option>)}</select></label>
         <label>{kind === 'fleet' ? 'Ship model / name' : 'Commodity symbol'} <input aria-label='Commodity or ship filter' value={commodity} maxLength={128} onChange={change(setCommodity)} placeholder='Blank = all observed' /></label>
         {['commodities', 'comparison', 'trades'].includes(kind) && <label>Market ID <input value={market} maxLength={20} onChange={change(setMarket)} /></label>}

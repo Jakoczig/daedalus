@@ -3,7 +3,7 @@ package history
 import (
 	"database/sql"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"strconv"
 	"time"
 )

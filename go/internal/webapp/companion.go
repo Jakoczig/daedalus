@@ -3,7 +3,7 @@ package webapp
 import (
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"os"
 	"slices"
 	"sync"

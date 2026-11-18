@@ -3,8 +3,9 @@ package webapp
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/gamestate"
-	"github.com/Jakoczig/daedalus/go/internal/paritystate"
+	"github.com/Jakoczig/eridion/go/internal/catalog"
+	"github.com/Jakoczig/eridion/go/internal/gamestate"
+	"github.com/Jakoczig/eridion/go/internal/paritystate"
 	"net/http"
 	"reflect"
 	"strings"
@@ -265,7 +266,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			if principal.role != "owner" || s.game == nil {
 				response["error"] = "Local owner required"
 			} else {
-				response["message"] = map[string]string{"shipName": s.game.Ship().ShipName}
+				response["message"] = map[string]string{"shipName": s.game.Ship().ShipName, "shipType": catalog.ShipDisplayName(s.game.Ship().ShipType)}
 			}
 		case "getGoGalaxyLayers":
 			if s.providers == nil {
@@ -317,7 +318,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			} else {
 				response["message"] = value
 			}
-		case "previewGoHistorical", "confirmGoHistorical", "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier":
+		case "previewGoHistorical", "confirmGoHistorical", "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier", "completeGoFrontierReturn", "setGoFrontierClient":
 			if principal.role != "owner" {
 				response["error"] = "Owner permission required"
 				break
@@ -356,6 +357,17 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				break
 			}
 			response["message"] = s.systemView(readCtx, q.Name, request.Name == "lookupGoSystem")
+		case "getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar":
+			if principal.role != "owner" {
+				response["error"] = "Local owner required"
+				break
+			}
+			value, err := s.accountRPC(readCtx, request.Name, request.Message)
+			if err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
 		case "getGoLauncher", "setGoCompanion", "desktopAction":
 			if principal.role != "owner" || s.companion == nil {
 				response["error"] = "Local owner required"

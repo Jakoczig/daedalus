@@ -5,7 +5,7 @@ package paritystate
 import (
 	"bytes"
 	"encoding/gob"
-	shipstate "github.com/Jakoczig/daedalus/go/internal/shipstate"
+	shipstate "github.com/Jakoczig/eridion/go/internal/shipstate"
 	time "time"
 )
 

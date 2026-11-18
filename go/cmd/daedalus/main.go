@@ -5,23 +5,23 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"io/fs"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/desktop"
-	"github.com/Jakoczig/daedalus/go/internal/frontend"
-	"github.com/Jakoczig/daedalus/go/internal/webapp"
+	"github.com/Jakoczig/eridion/go/internal/desktop"
+	"github.com/Jakoczig/eridion/go/internal/frontend"
+	"github.com/Jakoczig/eridion/go/internal/webapp"
 )
 
 type launcher func(context.Context, string, func()) error
 
 func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out io.Writer) error {
-	flags := flag.NewFlagSet("daedalus", flag.ContinueOnError)
+	flags := flag.NewFlagSet("eridion", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	smoke := flags.Bool("smoke-test", false, "verify offline service without a window")
 	nativeSmoke := flags.Bool("desktop-smoke-test", false, "open native window, require React authentication and RPC, then close")
@@ -39,7 +39,7 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 	dataDir := flags.String("data-dir", "", "private Go profile directory (legacy profile is never used)")
 	journalDir := flags.String("journal-dir", "", "local owner journal directory override")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
-		return errors.New("usage: daedalus [--smoke-test | --desktop-smoke-test]")
+		return errors.New("usage: eridion [--smoke-test | --desktop-smoke-test]")
 	}
 	modes := 0
 	for _, enabled := range []bool{*smoke, *nativeSmoke, *journalSmoke, *nativeJournalSmoke, *navigationSmoke, *nativeNavigationSmoke, *explorationSmoke, *nativeExplorationSmoke, *terminalSmoke, *nativeTerminalSmoke, *paritySmoke, *nativeParitySmoke, *nativeCompanionSmoke} {
@@ -65,7 +65,10 @@ func run(ctx context.Context, args []string, assets fs.FS, launch launcher, out 
 		if err != nil {
 			return errors.New("cannot locate private Go profile")
 		}
-		*dataDir = filepath.Join(config, "daedalus-go")
+		*dataDir, err = privatefs.IdentityProfile(config)
+		if err != nil {
+			return err
+		}
 	}
 	controller := &desktop.Controller{}
 	if modes == 0 || *nativeCompanionSmoke {

@@ -1,7 +1,7 @@
 package paritystate
 
 import (
-	"github.com/Jakoczig/daedalus/go/internal/shipstate"
+	"github.com/Jakoczig/eridion/go/internal/shipstate"
 	"reflect"
 	"testing"
 )

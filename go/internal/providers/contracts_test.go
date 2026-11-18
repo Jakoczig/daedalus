@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/http"
 	"net/url"
@@ -134,8 +134,8 @@ func TestG2HQueueBoundsIdentityAndLiveVersion(t *testing.T) {
 	}
 	m.Observe(event(t, `{"event":"LoadGame","FID":"SYNTHETIC-B","Commander":"Other"}`), journal.Live)
 	m.Observe(event(t, jump), journal.Live)
-	if len(m.states["eddn"].queue) != 64 {
-		t.Fatal("other commander queued")
+	if len(m.states["eddn"].queue) != 0 || m.states["eddn"].config.Upload {
+		t.Fatal("other commander inherited queued events or upload consent")
 	}
 	m.Configure("eddn", Config{})
 	if len(m.states["eddn"].queue) != 0 {
@@ -153,7 +153,7 @@ func TestG2HOAuthPKCEStateRedirectExpiryAndOneUse(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		form, _ := url.ParseQuery(string(b))
 		sum := sha256.Sum256([]byte(form.Get("code_verifier")))
-		if base64.RawURLEncoding.EncodeToString(sum[:]) != expectedChallenge || form.Get("redirect_uri") != "http://127.0.0.1:12345/owner/frontier-callback" {
+		if base64.RawURLEncoding.EncodeToString(sum[:]) != expectedChallenge || form.Get("redirect_uri") != "https://eridion.fitoserver.org/auth/frontier/callback" {
 			t.Fatal("PKCE binding")
 		}
 		return reply(`{"access_token":"ACCESS_SECRET","refresh_token":"REFRESH_SECRET","token_type":"Bearer","expires_in":3600}`, 200), nil
@@ -169,7 +169,7 @@ func TestG2HOAuthPKCEStateRedirectExpiryAndOneUse(t *testing.T) {
 	auth, _ := url.Parse(u)
 	q := auth.Query()
 	expectedChallenge = q.Get("code_challenge")
-	if q.Get("scope") != "auth capi" || q.Get("code_challenge_method") != "S256" {
+	if q.Get("redirect_uri") != "https://eridion.fitoserver.org/auth/frontier/callback" || !strings.HasPrefix(q.Get("state"), "erid1.12345.") || q.Get("scope") != "auth capi" || q.Get("code_challenge_method") != "S256" {
 		t.Fatal("scopes/PKCE")
 	}
 	redirect := "http://127.0.0.1:12345/owner/frontier-callback"
@@ -328,7 +328,7 @@ func TestG2HSupplementalSnapshotsDoNotFollowAnotherCommander(t *testing.T) {
 		t.Fatal("matching snapshot not attributed")
 	}
 	m.Observe(event(t, `{"event":"LoadGame","FID":"SYNTHETIC-B","Commander":"Other"}`), journal.Live)
-	if m.Status()[0].Snapshot.ActiveCommander {
+	if snapshot := m.Status()[0].Snapshot; snapshot != nil && snapshot.ActiveCommander {
 		t.Fatal("supplemental snapshot leaked commander attribution")
 	}
 }
@@ -354,5 +354,31 @@ func TestG2HVaultSetupCannotBlockJournalPipeline(t *testing.T) {
 	case <-observed:
 	case <-time.After(time.Second):
 		t.Fatal("credential vault blocked the shared reader")
+	}
+}
+
+func TestLiveAccountSwitchCannotWaitForVaultUnlock(t *testing.T) {
+	v := &blockingVault{make(chan struct{}), make(chan struct{})}
+	m := New(context.Background(), t.TempDir(), Options{Vault: v, Manual: true})
+	defer m.Close()
+	finished := make(chan struct{})
+	go func() {
+		_ = m.SetCredential("edsm", Credential{APIKey: "fixture", Commander: "Fixture"})
+		close(finished)
+	}()
+	<-v.started
+	defer func() { close(v.release); <-finished }()
+	observed := make(chan struct{})
+	go func() {
+		m.Observe(event(t, `{"event":"LoadGame","FID":"SYNTHETIC-B","Commander":"Other"}`), journal.Live)
+		close(observed)
+	}()
+	select {
+	case <-observed:
+	case <-time.After(time.Second):
+		t.Fatal("live account switch blocked the journal reader on the OS vault")
+	}
+	if m.fid != "SYNTHETIC-B" {
+		t.Fatal("live identity lost while vault pending")
 	}
 }

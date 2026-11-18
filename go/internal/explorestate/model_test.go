@@ -3,7 +3,7 @@ package explorestate
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"strings"
 	"sync/atomic"
 	"testing"

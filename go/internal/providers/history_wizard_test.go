@@ -3,8 +3,8 @@ package providers
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"strings"
 	"testing"
 	"time"

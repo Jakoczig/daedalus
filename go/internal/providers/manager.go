@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/http"
 	"os"
@@ -24,6 +24,8 @@ import (
 )
 
 type Manager struct {
+	accountFID, pinnedAccount                      string
+	accountConfigs                                 map[string]map[string]storedConfig
 	hostCooldown                                   map[string]time.Time
 	station                                        stationSession
 	history                                        *history.Store
@@ -60,6 +62,7 @@ func New(parent context.Context, dir string, opts Options) *Manager {
 	if opts.Vault == nil {
 		opts.Vault = newVault(dir)
 	}
+	opts.Vault = &scopedVault{backing: opts.Vault}
 	client := &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	if opts.Client != nil {
 		client.Transport = opts.Client.Transport
@@ -76,15 +79,18 @@ func New(parent context.Context, dir string, opts Options) *Manager {
 		c, k := context.WithCancel(ctx)
 		m.states[id] = &providerState{wake: make(chan struct{}, 1), ctx: c, cancel: k, counts: map[string]uint64{}}
 	}
-	var disk struct {
-		Providers map[string]storedConfig `json:"providers"`
-		Ledger    map[string]int64        `json:"ledger"`
-		Uploader  string                  `json:"uploader"`
-	}
+	var disk providerDisk
 	if b, e := privatefs.Read(dir, "providers.json"); e == nil {
-		if json.Unmarshal(b, &disk) != nil || len(disk.Ledger) > 4096 {
+		if json.Unmarshal(b, &disk) != nil || len(disk.Ledger) > 4096 || len(disk.Accounts) > 64 {
 			m.notice = "Invalid provider state: all external access disabled; preserve providers.json for diagnosis."
 		} else {
+			m.accountConfigs = disk.Accounts
+			if m.accountConfigs == nil {
+				m.accountConfigs = map[string]map[string]storedConfig{}
+			}
+			if disk.ActiveAccount != "" {
+				m.accountConfigs[disk.ActiveAccount] = disk.Providers
+			}
 			m.ledger = disk.Ledger
 			if m.ledger == nil {
 				m.ledger = map[string]int64{}
@@ -158,15 +164,7 @@ func (m *Manager) validConfig(id string, c Config) error {
 	return nil
 }
 func (m *Manager) saveLocked() error {
-	configs := map[string]storedConfig{}
-	for id, s := range m.states {
-		configs[id] = storedConfig{Config: s.config, Identity: s.config.CommanderHash}
-	}
-	b, _ := json.Marshal(struct {
-		Providers map[string]storedConfig `json:"providers"`
-		Ledger    map[string]int64        `json:"ledger"`
-		Uploader  string                  `json:"uploader"`
-	}{configs, m.ledger, m.uploader})
+	b, _ := m.saveDiskLocked()
 	if m.history != nil {
 		return m.history.SaveProviderConsent(b)
 	}
@@ -189,6 +187,9 @@ func (m *Manager) Configure(id string, c Config) error {
 		return err
 	}
 	if c.Upload {
+		if m.accountFID != "" && m.accountFID != m.fid {
+			return errors.New("Selected account differs from live journal; upload consent cannot be changed here")
+		}
 		if m.identity == "" {
 			return errors.New("Start the game and witness a commander before consenting to uploads")
 		}
@@ -242,6 +243,7 @@ func (m *Manager) SetCredential(id string, c Credential) error {
 	for k, v := range m.secrets {
 		next[k] = v
 	}
+	c.JournalFID = m.accountFID
 	next[id] = c
 	m.mu.Unlock()
 	vaultErr := m.opts.Vault.Save(next)
@@ -375,6 +377,14 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 	if v == nil {
 		return
 	}
+	if e.Type == "LoadGame" && e.FID != "" && phase == journal.Live {
+		m.mu.Lock()
+		pin := m.pinnedAccount
+		m.mu.Unlock()
+		if pin == "" || pin == e.FID {
+			m.activateObservedAccount(e.FID)
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -431,7 +441,7 @@ func (m *Manager) Observe(e journal.Event, phase journal.Phase) {
 			m.address = v["SystemAddress"]
 		}
 	}
-	if (m.opts.RequireHistory && m.history == nil) || phase != journal.Live || m.identity == "" || !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") {
+	if (m.opts.RequireHistory && m.history == nil) || phase != journal.Live || (m.pinnedAccount != "" && m.pinnedAccount != m.fid) || (m.accountFID != "" && m.accountFID != m.fid) || m.identity == "" || !strings.HasPrefix(m.gameVersion, "4.") || strings.ContainsAny(strings.ToLower(m.gameVersion), "abcdefghijklmnopqrstuvwxyz") {
 		return
 	}
 	age := m.opts.Now().Sub(e.Timestamp)

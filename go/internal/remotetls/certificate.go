@@ -17,7 +17,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 )
 
 type Bundle struct {
@@ -108,7 +108,7 @@ func Load(dir string, ip net.IP, now time.Time) (Bundle, error) {
 		if err != nil {
 			return result, err
 		}
-		root := &x509.Certificate{SerialNumber: id, Subject: pkix.Name{CommonName: "DAEDALUS private display CA"}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign, MaxPathLenZero: true}
+		root := &x509.Certificate{SerialNumber: id, Subject: pkix.Name{CommonName: "ERIDION private display CA"}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign, MaxPathLenZero: true}
 		saved.CA, err = certificate(root, root, &k.PublicKey, k)
 		if err != nil {
 			return result, err
@@ -162,7 +162,7 @@ func Load(dir string, ip net.IP, now time.Time) (Bundle, error) {
 		if until.After(root.NotAfter) {
 			until = root.NotAfter
 		}
-		leaf := &x509.Certificate{SerialNumber: id, Subject: pkix.Name{CommonName: "DAEDALUS secure displays"}, NotBefore: now.Add(-time.Minute), NotAfter: until, IPAddresses: []net.IP{ip}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, BasicConstraintsValid: true}
+		leaf := &x509.Certificate{SerialNumber: id, Subject: pkix.Name{CommonName: "ERIDION secure displays"}, NotBefore: now.Add(-time.Minute), NotAfter: until, IPAddresses: []net.IP{ip}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, BasicConstraintsValid: true}
 		saved.Leaf, err = certificate(leaf, root, &k.PublicKey, signer)
 		if err != nil {
 			return result, err

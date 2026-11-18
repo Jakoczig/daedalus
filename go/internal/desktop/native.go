@@ -42,7 +42,7 @@ func newNativeHost(stop func()) (windowHost, error) {
 	}
 	host := &nativeHost{}
 	host.app = application.New(application.Options{
-		Name:        "DAEDALUS Companion Preview",
+		Name:        "ERIDION Companion Preview",
 		Description: "Native local-first companion",
 		Windows:     application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
 		Linux:       application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
@@ -104,7 +104,7 @@ func (h *nativeHost) Open(localURL string) error {
 	if h.companion {
 		width, height = 680, 580
 	}
-	h.launcher = h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "DAEDALUS — Experimental Go Preview", Width: width, Height: height, URL: localURL})
+	h.launcher = h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "ERIDION — Experimental Go Preview", Width: width, Height: height, URL: localURL})
 	h.launcher.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		if h.companion && h.controller != nil && !h.controller.quitOnClose.Load() && !h.requested.Load() {
 			e.Cancel()
@@ -130,12 +130,12 @@ func (h *nativeHost) Open(localURL string) error {
 		var b bytes.Buffer
 		_ = png.Encode(&b, icon)
 		tray.SetIcon(b.Bytes())
-		tray.SetTooltip("DAEDALUS companion — journal service running")
+		tray.SetTooltip("ERIDION companion — journal service running")
 		menu := application.NewMenu()
 		menu.Add("Show Launcher").OnClick(func(*application.Context) { _ = h.Action("launcher") })
 		menu.Add("Open Dashboard").OnClick(func(*application.Context) { _ = h.Action("dashboard") })
 		menu.AddSeparator()
-		menu.Add("Quit DAEDALUS").OnClick(func(*application.Context) { h.Quit() })
+		menu.Add("Quit ERIDION").OnClick(func(*application.Context) { h.Quit() })
 		tray.SetMenu(menu)
 		tray.OnClick(func() { _ = h.Action("launcher") })
 	}
@@ -160,7 +160,7 @@ func (h *nativeHost) Action(action string) error {
 		h.windowMu.Lock()
 		d := h.dashboard.Load()
 		if d == nil {
-			d = h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "DAEDALUS Dashboard — Experimental", Width: 1366, Height: 900, URL: h.base + "/nav/route"})
+			d = h.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "ERIDION Dashboard — Experimental", Width: 1366, Height: 900, URL: h.base + "/nav/route"})
 			h.dashboard.Store(d)
 			d.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
 				h.dashboard.CompareAndSwap(d, nil)

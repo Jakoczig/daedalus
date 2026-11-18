@@ -4,7 +4,7 @@ These are static reference facts selected from data already committed in this
 repository. They describe stock modules and item names, not measured player ship
 statistics. The runtime never opens resource directories or personal game files.
 
-- `outfitting.csv`, `material.csv`, `microresources.csv`, `commodity.csv` are exact
+- `shipyard.csv`, `outfitting.csv`, `material.csv`, `microresources.csv`, `commodity.csv` are exact
   copies of the corresponding `resources/data/edcd/fdevids/` source files.
 - `modules.json` selects `symbol`, `ukName` (as `name`), `class`, `rating`, `mass`,
   `power`, and `ukDiscript` (as `description`) from every JSON file under
@@ -16,3 +16,5 @@ statistics. The runtime never opens resource directories or personal game files.
 
 The bundled snapshots may omit newer modules or labels. Unknown item symbols are
 preserved; absent reference fields remain unknown.
+
+G2M-A adds only the exact existing bundled `shipyard.csv` for human ship labels; it does not fetch or synthesize hull performance or license new ship imagery. Existing EDCD/FDevIDs attribution and repository third-party licensing continue to apply.

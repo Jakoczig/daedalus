@@ -3,12 +3,16 @@ package gamestate
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/fieldops"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/fieldops"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"time"
 )
 
-func (s *Service) FieldCommander() string { s.mu.Lock(); defer s.mu.Unlock(); return s.active }
+func (s *Service) FieldCommander() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.displayFIDLocked()
+}
 func (s *Service) captureBioLocked() {
 	if s.store == nil || len(s.bioStatus) == 0 || s.active == "" || s.stopped {
 		return
@@ -53,7 +57,7 @@ func (s *Service) FieldProgress(owner bool) (FieldRouteState, error) {
 	}
 	out.Enabled = s.store.BuiltinEnabled("itinerary")
 	var e error
-	out.Progress, e = s.store.ItineraryProgress(s.active)
+	out.Progress, e = s.store.ItineraryProgress(s.displayFIDLocked())
 	if e != nil {
 		return out, e
 	}
@@ -61,14 +65,14 @@ func (s *Service) FieldProgress(owner bool) (FieldRouteState, error) {
 	if e != nil {
 		return out, e
 	}
-	out.Current = s.summary.CurrentSystem
+	out.Current = s.selectedSummaryLocked().CurrentSystem
 	out.Target = s.projectionLocked().Navigation.TargetSystem
-	out.Evidence, e = s.store.FieldNavigationEvidence(s.active)
+	out.Evidence, e = s.store.FieldNavigationEvidence(s.displayFIDLocked())
 	if e != nil {
 		return out, e
 	}
 	if owner {
-		out.Plans, e = s.store.Itineraries(s.active)
+		out.Plans, e = s.store.Itineraries(s.displayFIDLocked())
 	}
 	return out, e
 }
@@ -85,8 +89,8 @@ func (s *Service) FieldBio(body string, owner bool) (map[string]any, error) {
 		out["notice"] = "BioScan module disabled; stored observations retained"
 		return out, nil
 	}
-	state := s.commanders[s.active]
-	survey := s.views.exploration.View(s.active, state.systemAddress)
+	state := s.commanders[s.displayFIDLocked()]
+	survey := s.views.exploration.View(s.displayFIDLocked(), state.systemAddress)
 	if state.systemAddress == "" {
 		return out, nil
 	}
@@ -94,7 +98,7 @@ func (s *Service) FieldBio(body string, owner bool) (map[string]any, error) {
 		if b.BodyID != body {
 			continue
 		}
-		v, err := s.store.BioBody(context.Background(), s.active, state.systemAddress, body)
+		v, err := s.store.BioBody(context.Background(), s.displayFIDLocked(), state.systemAddress, body)
 		if err != nil {
 			return out, err
 		}
@@ -113,7 +117,7 @@ func (s *Service) FieldBio(body string, owner bool) (map[string]any, error) {
 		v["signals"] = b.BioSignals
 		v["bodyName"] = b.Name
 		samples := v["samples"].([]history.BioSample)
-		if !s.stopped && s.summary.SourceState == "live" && len(samples) > 0 && (samples[0].Stage == "Log" || samples[0].Stage == "Sample") && samples[0].Session != "" && samples[0].Session == s.store.BioSession(s.active, s.activeSource) && samples[0].Event == s.store.ActiveOrganicEvent(s.active, s.activeSource) {
+		if s.displayFIDLocked() == s.active && !s.stopped && s.summary.SourceState == "live" && len(samples) > 0 && (samples[0].Stage == "Log" || samples[0].Stage == "Sample") && samples[0].Session != "" && samples[0].Session == s.store.BioSession(s.displayFIDLocked(), s.activeSource) && samples[0].Event == s.store.ActiveOrganicEvent(s.displayFIDLocked(), s.activeSource) {
 			if current, ok := fieldops.StatusPosition(s.bioStatus, b.Name, time.Now(), time.Now()); ok {
 				points := []fieldops.Position{}
 				complete := false

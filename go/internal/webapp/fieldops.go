@@ -6,7 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/fieldops"
+	"github.com/Jakoczig/eridion/go/internal/fieldops"
 	"strconv"
 	"strings"
 )

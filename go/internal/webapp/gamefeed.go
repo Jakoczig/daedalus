@@ -3,15 +3,16 @@ package webapp
 import (
 	"context"
 	"encoding/json"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/gamestate"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/providers"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/gamestate"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/providers"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 )
 
 type Options struct {
@@ -57,9 +58,26 @@ func (s *Server) startGame(ctx context.Context, opts Options) {
 	if s.g2e {
 		persistentDir = opts.StorageDir
 	}
-	s.game, _ = gamestate.NewService(gamestate.Options{StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
+	var accounts gamestate.AccountSettings
+	if raw, e := privatefs.Read(opts.StorageDir, "accounts-v1.json"); e == nil {
+		_ = json.Unmarshal(raw, &accounts)
+	}
+	if accounts.Multiple && s.providers != nil {
+		s.providers.PinAccount(accounts.Selected)
+	}
+	s.game, _ = gamestate.NewService(gamestate.Options{DisplayAccount: func(fid string) {
+		if s.remote != nil {
+			s.remote.selectAccount(fid)
+		}
+	}, StorageDir: persistentDir, OnHistoryReady: func(db *history.Store, seed history.ProviderSeed) {
 		if s.providers != nil {
 			_ = s.providers.AttachHistory(db, seed)
+			if s.remote != nil {
+				s.remote.selectAccount(seed.FID)
+			}
+			if accounts.Multiple && accounts.Selected != "" {
+				_ = s.providers.ActivateAccount(accounts.Selected, false)
+			}
 		}
 		if s.community != nil {
 			_ = s.community.AttachHistory(db)

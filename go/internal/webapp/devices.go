@@ -14,17 +14,19 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
-	"github.com/Jakoczig/daedalus/go/internal/remotetls"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/remotetls"
 )
 
 type device struct {
+	Account string    `json:"account,omitempty"`
 	ID      string    `json:"id"`
 	Name    string    `json:"name"`
 	Expires time.Time `json:"expires"`
 	Hash    string    `json:"hash"`
 }
 type remoteState struct {
+	Account string   `json:"account,omitempty"`
 	Version int      `json:"version"`
 	Enabled bool     `json:"enabled"`
 	Active  bool     `json:"active"`
@@ -89,12 +91,12 @@ func (m *remoteManager) load() error {
 	if err != nil {
 		return err
 	}
-	if json.Unmarshal(raw, &m.state) != nil || m.state.Version != 1 || len(m.state.Devices) > 32 {
+	if json.Unmarshal(raw, &m.state) != nil || (m.state.Version != 1 && m.state.Version != 2) || len(m.state.Devices) > 32 || (m.state.Version == 2 && len(m.state.Account) != 64) {
 		return errors.New("invalid remote settings")
 	}
 	seen := map[string]bool{}
 	for _, d := range m.state.Devices {
-		if len(d.Hash) != 64 || len(d.ID) != 32 || !validName(d.Name) || seen[d.ID] {
+		if len(d.Hash) != 64 || len(d.ID) != 32 || !validName(d.Name) || seen[d.ID] || (m.state.Version == 2 && len(d.Account) != 64) {
 			return errors.New("invalid device state")
 		}
 		seen[d.ID] = true
@@ -137,7 +139,7 @@ func (m *remoteManager) findLocked(token string) (device, bool) {
 	}
 	hash := tokenHash(token)
 	for _, d := range m.state.Devices {
-		if d.Hash == hash && m.now().Before(d.Expires) {
+		if d.Hash == hash && d.Account == m.state.Account && m.now().Before(d.Expires) {
 			return d, true
 		}
 	}
@@ -184,10 +186,40 @@ func (m *remoteManager) pairLocked(code, name string) (string, error) {
 		return "", err
 	}
 	m.pairing = nil
-	m.state.Devices = append(m.state.Devices, device{ID: id, Name: name, Expires: now.Add(12 * time.Hour), Hash: tokenHash(token)})
+	m.state.Devices = append(m.state.Devices, device{Account: m.state.Account, ID: id, Name: name, Expires: now.Add(12 * time.Hour), Hash: tokenHash(token)})
 	if err = m.saveLocked(); err != nil {
 		m.failLocked()
 		return "", errors.New("cannot persist device access")
 	}
 	return token, nil
+}
+
+// Called before selected-account projections are published. Existing grants
+// remain stored for their original profile; switching cannot expand a grant.
+func (m *remoteManager) selectAccount(fid string) {
+	if fid == "" {
+		return
+	}
+	scope := tokenHash(fid)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.fault || m.closed || m.state.Account == scope {
+		return
+	}
+	if m.state.Account == "" {
+		for i := range m.state.Devices {
+			if m.state.Devices[i].Account == "" {
+				m.state.Devices[i].Account = scope
+			}
+		}
+	}
+	m.state.Version = 2
+	m.state.Account = scope
+	m.pairing = nil
+	for conn := range m.connections {
+		conn.CloseNow()
+	}
+	if e := m.saveLocked(); e != nil {
+		m.failLocked()
+	}
 }

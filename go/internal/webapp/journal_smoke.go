@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/gamestate"
+	"github.com/Jakoczig/eridion/go/internal/gamestate"
 	"github.com/coder/websocket"
 )
 

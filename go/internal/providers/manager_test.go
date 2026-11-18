@@ -3,7 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"io"
 	"net/http"
 	"strings"

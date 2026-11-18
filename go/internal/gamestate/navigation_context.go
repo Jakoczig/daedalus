@@ -1,8 +1,8 @@
 package gamestate
 
 import (
-	"github.com/Jakoczig/daedalus/go/internal/explorestate"
-	"github.com/Jakoczig/daedalus/go/internal/navcontext"
+	"github.com/Jakoczig/eridion/go/internal/explorestate"
+	"github.com/Jakoczig/eridion/go/internal/navcontext"
 	"strings"
 	"time"
 )
@@ -10,7 +10,7 @@ import (
 func (s *Service) NavigationContext() navcontext.View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := s.navigationContext.View(s.active, time.Now())
+	v := s.navigationContext.View(s.displayFIDLocked(), time.Now())
 	if s.summary.ImportInProgress || s.summary.Cached || s.summary.SourceState != "live" {
 		v.Fresh = false
 		v.Mode = "idle"
@@ -19,7 +19,7 @@ func (s *Service) NavigationContext() navcontext.View {
 	for _, p := range v.Points {
 		seen[p.Address] = true
 	}
-	positions := s.views.navigation.VerifiedPositions(s.active)
+	positions := s.views.navigation.VerifiedPositions(s.displayFIDLocked())
 	// Reserve the coordinate-verified destination before filling the bounded route context.
 	for i := range positions {
 		index := i - 1
@@ -42,14 +42,14 @@ func (s *Service) KnownSystem(name string) (navcontext.Point, explorestate.Explo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var p navcontext.Point
-	for _, x := range s.navigationContext.View(s.active, time.Now()).Points {
+	for _, x := range s.navigationContext.View(s.displayFIDLocked(), time.Now()).Points {
 		if strings.EqualFold(x.Name, name) {
 			p = x
 			break
 		}
 	}
 	if p.Name == "" {
-		for _, x := range s.views.navigation.VerifiedPositions(s.active) {
+		for _, x := range s.views.navigation.VerifiedPositions(s.displayFIDLocked()) {
 			if strings.EqualFold(x.Name, name) {
 				coords := x.Coordinates
 				p = navcontext.Point{Name: x.Name, Address: x.Address, Coordinates: &coords, Source: "verified_route"}
@@ -60,5 +60,5 @@ func (s *Service) KnownSystem(name string) (navcontext.Point, explorestate.Explo
 	if p.Name == "" {
 		return p, explorestate.ExplorationView{}
 	}
-	return p, s.views.exploration.CachedSystem(s.active, p.Address)
+	return p, s.views.exploration.CachedSystem(s.displayFIDLocked(), p.Address)
 }

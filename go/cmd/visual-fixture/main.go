@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/frontend"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
-	"github.com/Jakoczig/daedalus/go/internal/webapp"
+	"github.com/Jakoczig/eridion/go/internal/frontend"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/webapp"
 	"io"
 	"io/fs"
 	"net/http"
@@ -131,6 +131,21 @@ func main() {
 				continue
 			}
 			kind := scanner.Text()
+			if filepath.Base(*fixture) == "g2l" && kind == "accounts-other-session" {
+				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)
+				if err != nil {
+					panic(err)
+				}
+				for _, row := range []map[string]any{{"event": "LoadGame", "FID": "SYNTHETIC-OTHER", "Commander": "Other Fixture Commander"}, {"event": "Location", "StarSystem": "Other Account System", "SystemAddress": uint64(7001)}} {
+					row["timestamp"] = time.Now().UTC().Format(time.RFC3339Nano)
+					raw, _ := json.Marshal(row)
+					if _, err = f.Write(append(raw, '\n')); err != nil {
+						panic(err)
+					}
+				}
+				f.Close()
+				continue
+			}
 			if filepath.Base(*fixture) == "g2l" && kind == "operations-goals-empty" {
 				raw, _ := json.Marshal(map[string]any{"event": "CommunityGoal", "timestamp": time.Now().UTC().Format(time.RFC3339Nano), "CurrentGoals": []any{}})
 				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)

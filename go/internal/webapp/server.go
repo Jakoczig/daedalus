@@ -3,9 +3,9 @@ package webapp
 import (
 	"context"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/community"
-	"github.com/Jakoczig/daedalus/go/internal/gamestate"
-	"github.com/Jakoczig/daedalus/go/internal/providers"
+	"github.com/Jakoczig/eridion/go/internal/community"
+	"github.com/Jakoczig/eridion/go/internal/gamestate"
+	"github.com/Jakoczig/eridion/go/internal/providers"
 	"io/fs"
 	"net"
 	"net/http"

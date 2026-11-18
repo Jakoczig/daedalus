@@ -7,7 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/catalog"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"strings"
 )
 
@@ -25,7 +26,9 @@ func (s *Server) operationsRPC(ctx context.Context, name string, raw json.RawMes
 	}
 	fid := s.game.FieldCommander()
 	if q.FID != "" {
-		fid = q.FID
+		if q.FID != fid {
+			return nil, errors.New("Switch the global commander profile before querying another account")
+		}
 	}
 	if name == "backfillGoOperationsSource" {
 		if !q.Acknowledge {
@@ -43,6 +46,21 @@ func (s *Server) operationsRPC(ctx context.Context, name string, raw json.RawMes
 	page, e := db.Operations(ctx, fid, q)
 	if e != nil {
 		return nil, e
+	}
+	if q.Kind == "modules" {
+		for i := range page.Rows {
+			page.Rows[i].Title = catalog.ModuleDisplayName(page.Rows[i].Title)
+		}
+	}
+	if q.Kind == "fleet" {
+		for i := range page.Rows {
+			var data map[string]any
+			if json.Unmarshal(page.Rows[i].Details, &data) == nil {
+				model, _ := data["model"].(string)
+				data["modelLabel"] = catalog.ShipDisplayName(model)
+				page.Rows[i].Details, _ = json.Marshal(data)
+			}
+		}
 	}
 	encoded, _ := json.Marshal(struct {
 		FID, Kind string

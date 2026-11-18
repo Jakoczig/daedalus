@@ -123,3 +123,10 @@ You can run DAEDALUS Terminal in development mode without building a native bina
 You can access the web client at http://localhost:3300
 
 Note: You may also need to create a `.env` file with a `LOG_DIR` entry so it can find your game data, see `.env-example`.
+
+
+## ERIDION native preview
+
+The Go successor is now ERIDION (ERID), repository `Jakoczig/eridion`, module `github.com/Jakoczig/eridion/go`. The compatibility source entry point remains `go/cmd/daedalus`; experimental packages contain `eridion.exe` / `eridion`. Existing legacy build/launcher instructions above are unchanged.
+
+See [G2M-A preview prerequisites and checksums](docs/testing/g2m-a-eridion-preview.md), [profile migration/account handoff](docs/handoffs/g2m-a-eridion-identity-frontier.md), and the [separate HTTPS Frontier website contract](docs/protocols/eridion-frontier-website-return.md). No website is deployed by the desktop build.

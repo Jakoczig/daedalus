@@ -36,6 +36,10 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		m.mu.Unlock()
 		return nil, errors.New("Provider read consent/approval required")
 	}
+	if (id == "frontier" || id == "inara" || id == "edsm") && m.accountFID != "" && m.accountFID != m.fid {
+		m.mu.Unlock()
+		return nil, errors.New("Selected account differs from the verified journal account; connect the selected commander first")
+	}
 	if id == "edastro" && kind == "gec" && m.layers.FetchedAt != "" {
 		expires, err := time.Parse(time.RFC3339, m.layers.ExpiresAt)
 		if err == nil && m.opts.Now().Before(expires) {
@@ -160,6 +164,9 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 			endpoint = "https://edastro.com/api/starsystem?q=" + url.QueryEscape(query)
 		}
 	case "frontier":
+		if kind != "profile" && (cred.Commander == "" || cred.Commander != commander || cred.JournalFID != fid) {
+			return nil, errors.New("Read and verify the selected commander's Frontier profile before other account endpoints")
+		}
 		if cred.AccessToken == "" || cred.RefreshToken == "" {
 			return nil, errors.New("Connect an approved Frontier application first")
 		}
@@ -245,10 +252,16 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		snapshot.commanderHash = identity
 	}
 	if id == "frontier" && kind == "profile" {
-		if profile, ok := data["commander"].(map[string]any); ok && text(profile["name"]) == commander && commander != "" {
-			snapshot.commanderHash = identity
+		profile, ok := data["commander"].(map[string]any)
+		if !ok || commander == "" || text(profile["name"]) != commander {
+			return nil, errors.New("Frontier commander identity mismatch; account state was not accepted")
 		}
+		if err := m.verifyFrontierAccount(generation, commander); err != nil {
+			return nil, err
+		}
+		snapshot.commanderHash = identity
 	}
+
 	if id == "edsm" {
 		if a, ok := data["logs"].([]any); ok {
 			for _, x := range a {

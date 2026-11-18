@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/paritystate"
+	"github.com/Jakoczig/eridion/go/internal/paritystate"
 )
 
 func (s *Service) EngineeredStatistics() paritystate.EngineeredStatistics {
@@ -20,7 +20,7 @@ func (s *Service) EngineeredStatistics() paritystate.EngineeredStatistics {
 	raw, _ := json.Marshal(struct {
 		Format, FID, ShipID, Formula string
 		Modules                      []paritystate.Module
-	}{"loadout-static-v1", s.active, s.views.ship.Identity(s.active), paritystate.StatisticsFormula, modules})
+	}{"loadout-static-v1", s.displayFIDLocked(), s.views.ship.Identity(s.displayFIDLocked()), paritystate.StatisticsFormula, modules})
 	sum := sha256.Sum256(raw)
 	key := hex.EncodeToString(sum[:])
 	var v paritystate.EngineeredStatistics

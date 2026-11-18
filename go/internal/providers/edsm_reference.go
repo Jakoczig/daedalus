@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"math"
 	"net/url"
 	"sort"

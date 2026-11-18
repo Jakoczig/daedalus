@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/history"
-	"github.com/Jakoczig/daedalus/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,7 +24,13 @@ func (s *Server) historyRPC(ctx context.Context, name string, raw json.RawMessag
 		if db != nil {
 			value["database"] = db.Stats()
 			if v, e := db.Commanders(); e == nil {
-				value["commanders"] = v
+				selected := []history.Commander{}
+				for _, c := range v {
+					if c.FID == s.game.FieldCommander() {
+						selected = append(selected, c)
+					}
+				}
+				value["commanders"] = selected
 			}
 			if v, e := db.Sources(); e == nil {
 				value["sources"] = v
@@ -63,11 +69,15 @@ func (s *Server) historyRPC(ctx context.Context, name string, raw json.RawMessag
 		if err := history.StageRecovery(ctx, s.profile, req.Path); err != nil {
 			return nil, errors.New("Backup could not be verified/staged. Select a private compatible SQLite backup; existing data was retained")
 		}
-		return map[string]any{"restartRequired": true, "notice": "Verified restore staged. Quit and restart DAEDALUS. Current history is preserved; uploads require renewed consent."}, nil
+		return map[string]any{"restartRequired": true, "notice": "Verified restore staged. Quit and restart ERIDION. Current history is preserved; uploads require renewed consent."}, nil
 	}
 	if db == nil {
 		return nil, errors.New("Database is not ready; check recovery status")
 	}
+	if req.FID != "" && req.FID != s.game.FieldCommander() {
+		return nil, errors.New("Switch the global commander profile before querying another account")
+	}
+	req.FID = s.game.FieldCommander()
 	switch name {
 	case "getGoConstruction":
 		return db.Construction(ctx, req.FID)

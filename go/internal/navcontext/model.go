@@ -5,8 +5,8 @@ package navcontext
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/paritystate"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/paritystate"
 	"math"
 	"strconv"
 	"strings"

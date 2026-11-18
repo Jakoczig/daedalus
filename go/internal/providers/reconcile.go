@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"time"
 )
 

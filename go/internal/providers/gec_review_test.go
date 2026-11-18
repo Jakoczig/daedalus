@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 )
 
 func TestGECActualCoordinatesContractCategoriesAndCache(t *testing.T) {

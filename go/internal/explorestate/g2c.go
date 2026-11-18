@@ -3,7 +3,7 @@ package explorestate
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/journal"
 	"math"
 	"time"
 )

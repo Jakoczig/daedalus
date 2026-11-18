@@ -2,8 +2,8 @@ package webapp
 
 import (
 	"context"
-	"github.com/Jakoczig/daedalus/go/internal/community"
-	"github.com/Jakoczig/daedalus/go/internal/navcontext"
+	"github.com/Jakoczig/eridion/go/internal/community"
+	"github.com/Jakoczig/eridion/go/internal/navcontext"
 	"strings"
 )
 

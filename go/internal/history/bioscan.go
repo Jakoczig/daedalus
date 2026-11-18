@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/Jakoczig/daedalus/go/internal/fieldops"
+	"github.com/Jakoczig/eridion/go/internal/fieldops"
 	"time"
 )
 

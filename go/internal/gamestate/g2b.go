@@ -2,14 +2,14 @@ package gamestate
 
 import (
 	"context"
-	"github.com/Jakoczig/daedalus/go/internal/activitystate"
-	"github.com/Jakoczig/daedalus/go/internal/explorestate"
-	"github.com/Jakoczig/daedalus/go/internal/journal"
-	"github.com/Jakoczig/daedalus/go/internal/navcontext"
-	"github.com/Jakoczig/daedalus/go/internal/navstate"
-	"github.com/Jakoczig/daedalus/go/internal/paritystate"
-	"github.com/Jakoczig/daedalus/go/internal/shipstate"
-	"github.com/Jakoczig/daedalus/go/internal/sidecar"
+	"github.com/Jakoczig/eridion/go/internal/activitystate"
+	"github.com/Jakoczig/eridion/go/internal/explorestate"
+	"github.com/Jakoczig/eridion/go/internal/journal"
+	"github.com/Jakoczig/eridion/go/internal/navcontext"
+	"github.com/Jakoczig/eridion/go/internal/navstate"
+	"github.com/Jakoczig/eridion/go/internal/paritystate"
+	"github.com/Jakoczig/eridion/go/internal/shipstate"
+	"github.com/Jakoczig/eridion/go/internal/sidecar"
 	"reflect"
 	"sync"
 )
@@ -44,9 +44,10 @@ func newProjectionState() projectionState {
 	return projectionState{parity: paritystate.NewModel(), activity: activitystate.NewModel(), ship: shipstate.NewModel(), navigation: navstate.NewModel(), exploration: explorestate.NewModel(), subscribers: map[chan Projections]struct{}{}, dirty: true}
 }
 func (s *Service) projectionLocked() Projections {
-	if s.cachedProjection != nil && s.summary.ImportInProgress {
+	fid := s.displayFIDLocked()
+	if s.cachedProjection != nil && s.summary.ImportInProgress && fid == s.active {
 		p := cloneProjection(*s.cachedProjection)
-		p.Source = s.summary
+		p.Source = s.selectedSummaryLocked()
 		p.Ship.Evidence = "cached"
 		p.Navigation.RouteState = "cached"
 		p.Exploration.SurveyState = "cached"
@@ -57,14 +58,14 @@ func (s *Service) projectionLocked() Projections {
 		return p
 	}
 
-	p := Projections{Ship: s.views.ship.View(s.active), Source: s.summary, Navigation: s.views.navigation.View(s.active)}
+	p := Projections{Ship: s.views.ship.View(fid), Source: s.selectedSummaryLocked(), Navigation: s.views.navigation.View(fid)}
 	address := s.unknown.systemAddress
-	if s.active != "" {
-		address = s.commanders[s.active].systemAddress
+	if fid != "" {
+		address = s.commanders[fid].systemAddress
 	}
-	p.Exploration = s.views.exploration.View(s.active, address)
+	p.Exploration = s.views.exploration.View(fid, address)
 	if s.opts.EnableParity {
-		w := WorkspaceView{Parity: s.views.parity.View(s.active), Activity: s.views.activity.View(s.active)}
+		w := WorkspaceView{Parity: s.views.parity.View(fid), Activity: s.views.activity.View(fid)}
 		if s.summary.ImportInProgress {
 			w = WorkspaceView{Parity: paritystate.View{Evidence: "replaying"}, Activity: activitystate.View{Evidence: "replaying"}}
 		} else if s.summary.SourceState != "live" && s.summary.SourceState != "partial" && s.summary.SourceState != "parse_warning" {
@@ -92,6 +93,9 @@ func (s *Service) projectionLocked() Projections {
 		if len(p.Exploration.Bodies) > 0 {
 			p.Exploration.SurveyState = "stale_source"
 		}
+	}
+	if fid != s.active && p.Workspace != nil {
+		p.Workspace.Parity.Status = paritystate.StatusView{State: "different_account"}
 	}
 	if s.summary.Cached {
 		if p.Navigation.RouteState == "verified_last_known" || p.Navigation.RouteState == "verified" {

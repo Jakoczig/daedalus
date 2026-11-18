@@ -4,22 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/Jakoczig/daedalus/go/internal/history"
+	"github.com/Jakoczig/eridion/go/internal/history"
 	"net/http"
 )
 
 func (m *Manager) AttachHistory(db *history.Store, seed history.ProviderSeed) error {
+	m.vaultMu.Lock()
+	defer m.vaultMu.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	initial := map[string]storedConfig{}
-	for id, s := range m.states {
-		initial[id] = storedConfig{Config: s.config, Identity: s.config.CommanderHash}
-	}
-	raw, _ := json.Marshal(struct {
-		Providers map[string]storedConfig `json:"providers"`
-		Ledger    map[string]int64        `json:"ledger"`
-		Uploader  string                  `json:"uploader"`
-	}{initial, m.ledger, m.uploader})
+	raw, _ := m.saveDiskLocked()
 	raw, err := db.LoadProviderConsent(raw)
 	if err != nil {
 		for _, s := range m.states {
@@ -30,12 +24,8 @@ func (m *Manager) AttachHistory(db *history.Store, seed history.ProviderSeed) er
 		m.notice = "Database consent could not be verified; all external access disabled"
 		return err
 	}
-	var state struct {
-		Providers map[string]storedConfig `json:"providers"`
-		Ledger    map[string]int64        `json:"ledger"`
-		Uploader  string                  `json:"uploader"`
-	}
-	if json.Unmarshal(raw, &state) != nil || len(state.Ledger) > 4096 {
+	var state providerDisk
+	if json.Unmarshal(raw, &state) != nil || len(state.Ledger) > 4096 || len(state.Accounts) > 64 {
 		return errors.New("Invalid canonical provider state")
 	}
 	m.history = db
@@ -55,6 +45,31 @@ func (m *Manager) AttachHistory(db *history.Store, seed history.ProviderSeed) er
 			s.config = c.Config
 		}
 	}
+	m.accountConfigs = state.Accounts
+	if m.accountConfigs == nil {
+		m.accountConfigs = map[string]map[string]storedConfig{}
+	}
+	// Legacy canonical consent is adopted only to the verified cached FID. A
+	// namespace already stored for a different FID never migrates implicitly.
+	if seed.FID != "" {
+		m.name = seed.Name
+		if state.ActiveAccount != "" {
+			m.accountConfigs[state.ActiveAccount] = state.Providers
+			for _, s := range m.states {
+				s.config = Config{}
+			}
+		}
+		if err := m.activateAccountLocked(seed.FID, state.ActiveAccount == ""); err != nil {
+			return err
+		}
+	}
+	if seed.FID == "" {
+		m.secrets = map[string]Credential{}
+		for _, s := range m.states {
+			s.config = Config{}
+		}
+	}
+
 	m.fid = seed.FID
 	m.name = seed.Name
 	m.identity = ""
