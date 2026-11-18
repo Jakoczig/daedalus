@@ -55,9 +55,29 @@ func (m *Manager) AttachHistory(db *history.Store, seed history.ProviderSeed) er
 		m.name = seed.Name
 		if state.ActiveAccount != "" {
 			m.accountConfigs[state.ActiveAccount] = state.Providers
-			for _, s := range m.states {
-				s.config = Config{}
+		} else {
+			// Legacy upload consent already has an exact hashed FID owner.
+			// Preserve that owner even if the cached reader last witnessed B.
+			selected := hash(seed.FID)
+			if m.accountConfigs[selected] == nil {
+				m.accountConfigs[selected] = map[string]storedConfig{}
 			}
+			for id, c := range state.Providers {
+				owner := selected
+				if c.Identity != "" {
+					if len(c.Identity) != 64 {
+						continue
+					}
+					owner = c.Identity
+				}
+				if m.accountConfigs[owner] == nil {
+					m.accountConfigs[owner] = map[string]storedConfig{}
+				}
+				m.accountConfigs[owner][id] = c
+			}
+		}
+		for _, s := range m.states {
+			s.config = Config{}
 		}
 		if err := m.activateAccountLocked(seed.FID, state.ActiveAccount == ""); err != nil {
 			return err

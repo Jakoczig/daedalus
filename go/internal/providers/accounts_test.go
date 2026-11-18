@@ -113,3 +113,29 @@ func TestOfflineAccountAdoptionDoesNotCreateAnEmptyOSVault(t *testing.T) {
 		t.Fatal("Offline cached account unnecessarily required a writable vault", e)
 	}
 }
+
+func TestLegacyUploadConsentStaysWithItsOriginalCommander(t *testing.T) {
+	db, e := history.Open(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	original := []byte(`{"providers":{"eddn":{"upload":true,"categories":["travel"],"identity":"` + hash("FIXTURE-A") + `"}},"ledger":{}}`)
+	if _, e = db.LoadProviderConsent(original); e != nil {
+		t.Fatal(e)
+	}
+	m := New(context.Background(), t.TempDir(), Options{Vault: &testVault{}, Manual: true})
+	defer m.Close()
+	if e = m.AttachHistory(db, history.ProviderSeed{FID: "FIXTURE-B", Name: "B"}); e != nil {
+		t.Fatal(e)
+	}
+	if m.states["eddn"].config.Upload {
+		t.Fatal("last-seen B inherited A's upload consent")
+	}
+	if e = m.ActivateAccount("FIXTURE-A", false); e != nil {
+		t.Fatal(e)
+	}
+	if c := m.states["eddn"].config; !c.Upload || c.CommanderHash != hash("FIXTURE-A") {
+		t.Fatal("original A publication permission was abandoned")
+	}
+}

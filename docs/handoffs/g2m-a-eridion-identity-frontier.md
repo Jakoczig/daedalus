@@ -25,6 +25,8 @@ Atomic manifest creation resumes after an interrupted temporary write; diagnosti
 
 Back up both the identity-manifest directory and the adopted native storage directory. SQLite export remains a database export, not a credential/certificate/portrait backup. Native `daedalus.sqlite`, cookie name and Linux vault cryptographic identifiers remain compatibility names. The Node/legacy profile is never adopted.
 
+Legacy upload consents retain their original recorded hashed-FID owner even when the last cached journal account is different; they are neither granted to that other account nor dropped from the original profile.
+
 Existing personal API keys migrate only if their commander matches verified cached journal identity (or already has an explicit verified FID association). Legacy OAuth tokens without an established association remain encrypted but unavailable to an arbitrary selected account: reconnect Frontier. This avoids assigning account A's credentials to the last-seen account B. Empty offline profiles do not create an OS vault or require an unlocked Secret Service.
 
 Cached projection ownership is explicit: catch-up/replay for B cannot authorize an older cached view from A. A selected profile can still recover its own cached view while another account replays. The deterministic regression failed before this correction and passes with the explicit FID check.
