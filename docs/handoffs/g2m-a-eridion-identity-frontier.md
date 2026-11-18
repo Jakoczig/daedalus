@@ -54,3 +54,5 @@ Galaxy layout: large top-down **X/Z**, immediately below it a **very thin, wide 
 5. After separate website deployment, log into Frontier on the gaming PC, verify profile identity before other reads, test cancel/expiry/manual return and revocation. Keep uploads OFF. Review goal subscription removal/empty snapshots and historical reward retention.
 
 Final visual regression updates keep the original safety assertions: unknown modules must display an explicit `?` rather than Class 0; Frontier has its approved public client while read consent remains OFF and Connect stays disabled until consent; engineering diagnostics are explicitly expanded before live-Status assertions. No checks or timeouts were removed or relaxed.
+
+Linux startup-order correction: first verified-account discovery binds an existing unscoped profile grant without dropping its valid socket or owner-issued pairing attempt. Every later account change still clears the pairing attempt, invalidates old-account recovery and closes active sockets. A deterministic failing-then-passing test exercises first binding and subsequent isolation; the existing raw-data and revocation assertions remain unchanged.

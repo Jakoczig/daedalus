@@ -206,7 +206,8 @@ func (m *remoteManager) selectAccount(fid string) {
 	if m.fault || m.closed || m.state.Account == scope {
 		return
 	}
-	if m.state.Account == "" {
+	initialBinding := m.state.Account == ""
+	if initialBinding {
 		for i := range m.state.Devices {
 			if m.state.Devices[i].Account == "" {
 				m.state.Devices[i].Account = scope
@@ -215,9 +216,13 @@ func (m *remoteManager) selectAccount(fid string) {
 	}
 	m.state.Version = 2
 	m.state.Account = scope
-	m.pairing = nil
-	for conn := range m.connections {
-		conn.CloseNow()
+	// Initial discovery narrows the existing profile grant to its first verified
+	// account; it is not an account change. Keep valid sockets/pairing attempts.
+	if !initialBinding {
+		m.pairing = nil
+		for conn := range m.connections {
+			conn.CloseNow()
+		}
 	}
 	if e := m.saveLocked(); e != nil {
 		m.failLocked()

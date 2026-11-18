@@ -10,7 +10,7 @@ import (
 )
 
 func TestPairedAccountGrantCannotFollowGlobalProfile(t *testing.T) {
-	s, _, client, remoteURL, code := remoteFixture(t)
+	s, owner, client, remoteURL, code := remoteFixture(t)
 	if status, _, _ := remotePost(t, client, remoteURL+"/auth/pair", remoteURL, map[string]any{"code": code}); status != 200 {
 		t.Fatal("pair", status)
 	}
@@ -37,7 +37,19 @@ func TestPairedAccountGrantCannotFollowGlobalProfile(t *testing.T) {
 			}
 		}
 	}
+	_ = ownerAction(t, s, owner, map[string]any{"action": "pair"})
+	s.remote.mu.Lock()
+	initialPairing := s.remote.pairing
+	s.remote.mu.Unlock()
 	s.remote.selectAccount("SYNTHETIC-A") // adopt the pre-account grant to A
+	if reply := callRPC(t, ctx, conn, "getLoadingStatus"); len(reply["error"]) != 0 {
+		t.Fatal("initial same-profile binding dropped a valid socket")
+	}
+	s.remote.mu.Lock()
+	if s.remote.pairing != initialPairing {
+		t.Error("initial binding invalidated an owner-issued pairing attempt")
+	}
+	s.remote.mu.Unlock()
 	if status, _, _ := remotePost(t, client, remoteURL+"/auth/session", remoteURL, nil); status != 200 {
 		t.Fatal("existing grant not adopted")
 	}
