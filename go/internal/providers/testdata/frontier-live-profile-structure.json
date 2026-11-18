@@ -1,0 +1,249 @@
+{
+  "commander": {
+    "alive": false,
+    "capabilities": {
+      "AllowCobraMkIV": false,
+      "Horizons": false,
+      "Odyssey": false
+    },
+    "credits": 100,
+    "currentShipId": 9007199254740993,
+    "debt": 100,
+    "docked": false,
+    "id": 9007199254740994,
+    "mercCoins": 100,
+    "name": "Fixture Commander",
+    "onfoot": false,
+    "rank": {
+      "builder": 100,
+      "combat": 100,
+      "cqc": 100,
+      "crime": 100,
+      "empire": 100,
+      "exobiologist": 100,
+      "explore": 100,
+      "federation": 100,
+      "learner": 100,
+      "power": 100,
+      "service": 100,
+      "soldier": 100,
+      "trade": 100
+    }
+  },
+  "ship": {
+    "alive": false,
+    "cockpitBreached": false,
+    "free": false,
+    "health": {
+      "hull": 100,
+      "integrity": 100,
+      "paintwork": 100,
+      "shield": 100,
+      "shieldup": false
+    },
+    "id": 9007199254740993,
+    "launchBays": {
+      "Slot06_Size5": {
+        "redactedField0": {
+          "loadout": "Fixture value",
+          "redactedField1": "Fixture value",
+          "locName": "Fixture value",
+          "name": "Fixture value",
+          "redactedField4": 100
+        }
+      },
+      "Slot08_Size4": {
+        "redactedField0": {
+          "loadout": "Fixture value",
+          "redactedField1": "Fixture value",
+          "locName": "Fixture value",
+          "name": "Fixture value",
+          "redactedField4": 100
+        }
+      }
+    },
+    "modules": {
+      "FrameShiftDrive": {
+        "WorkInProgress_modifications": {
+          "OutfittingFieldType_FSDOptimalMass": {
+            "LessIsGood": false,
+            "dir": "Fixture value",
+            "displayValue": "Fixture value",
+            "locName": "Fixture value",
+            "value": 1.25
+          },
+          "OutfittingFieldType_Integrity": {
+            "LessIsGood": false,
+            "dir": "Fixture value",
+            "displayValue": "Fixture value",
+            "locName": "Fixture value",
+            "value": 1.25
+          },
+          "OutfittingFieldType_Mass": {
+            "LessIsGood": false,
+            "dir": "Fixture value",
+            "displayValue": "Fixture value",
+            "locName": "Fixture value",
+            "value": 1.25
+          },
+          "OutfittingFieldType_PowerDraw": {
+            "LessIsGood": false,
+            "dir": "Fixture value",
+            "displayValue": "Fixture value",
+            "locName": "Fixture value",
+            "value": 1.25
+          }
+        },
+        "engineer": {
+          "engineerId": 9007199254741012,
+          "engineerName": "Fixture value",
+          "recipeLevel": 100,
+          "recipeLocDescription": "Fixture value",
+          "recipeLocName": "Fixture value",
+          "recipeName": "Fixture value"
+        },
+        "module": {
+          "free": false,
+          "health": 100,
+          "id": 9007199254741013,
+          "locDescription": "Fixture value",
+          "locName": "Fixture value",
+          "name": "int_hyperdrive_size5_class5",
+          "on": false,
+          "priority": 100,
+          "value": 100
+        },
+        "specialModifications": {
+          "redactedField0": "Fixture value"
+        }
+      },
+      "FuelTank": {
+        "module": {
+          "free": false,
+          "health": 100,
+          "id": 9007199254741014,
+          "locDescription": "Fixture value",
+          "locName": "Fixture value",
+          "name": "Fixture value",
+          "on": false,
+          "priority": 100,
+          "value": 100
+        }
+      },
+      "LifeSupport": {
+        "module": {
+          "free": false,
+          "health": 100,
+          "id": 9007199254741015,
+          "locDescription": "Fixture value",
+          "locName": "Fixture value",
+          "name": "Fixture value",
+          "on": false,
+          "priority": 100,
+          "value": 100
+        }
+      }
+    },
+    "name": "asp",
+    "oxygenRemaining": 100,
+    "starsystem": {
+      "id": 9007199254740996,
+      "name": "Fixture value",
+      "systemaddress": 9007199254740996
+    },
+    "station": {
+      "id": 9007199254740995,
+      "name": "Fixture value"
+    },
+    "value": {
+      "cargo": 100,
+      "hull": 100,
+      "modules": 100,
+      "total": 100,
+      "unloaned": 100
+    }
+  },
+  "ships": {
+    "9007199254740993": {
+      "free": false,
+      "id": 9007199254740993,
+      "name": "asp",
+      "starsystem": {
+        "id": 9007199254740996,
+        "name": "Fixture value",
+        "systemaddress": 9007199254740996
+      },
+      "station": {
+        "id": 9007199254740995,
+        "name": "Fixture value"
+      },
+      "value": {
+        "cargo": 100,
+        "hull": 100,
+        "modules": 100,
+        "total": 100,
+        "unloaned": 100
+      }
+    },
+    "9007199254741043": {
+      "free": false,
+      "id": 9007199254741043,
+      "name": "asp",
+      "starsystem": {
+        "id": 9007199254740996,
+        "name": "Fixture value",
+        "systemaddress": 9007199254740996
+      },
+      "station": {
+        "id": 9007199254740995,
+        "name": "Fixture value"
+      },
+      "value": {
+        "cargo": 100,
+        "hull": 100,
+        "modules": 100,
+        "total": 100,
+        "unloaned": 100
+      }
+    }
+  },
+  "lastStarport": {
+    "redactedField0": "Fixture value",
+    "id": 9007199254740995,
+    "redactedField2": "Fixture value",
+    "name": "Fixture Commander",
+    "services": {
+      "redactedField0": "Fixture value",
+      "redactedField1": "Fixture value",
+      "blackmarket": "Fixture value",
+      "commodities": "Fixture value",
+      "contacts": "Fixture value",
+      "crewlounge": "Fixture value",
+      "dock": "Fixture value",
+      "engineer": "Fixture value",
+      "exploration": "Fixture value",
+      "redactedField9": "Fixture value",
+      "redactedField10": "Fixture value",
+      "redactedField11": "Fixture value",
+      "outfitting": "Fixture value",
+      "redactedField13": "Fixture value",
+      "redactedField14": "Fixture value",
+      "rearm": "Fixture value",
+      "refuel": "Fixture value",
+      "redactedField17": "Fixture value",
+      "repair": "Fixture value",
+      "searchrescue": "Fixture value",
+      "shipyard": "Fixture value",
+      "shop": "Fixture value",
+      "socialspace": "Fixture value",
+      "stationmenu": "Fixture value",
+      "techbroker": "Fixture value",
+      "redactedField25": "Fixture value"
+    }
+  },
+  "lastSystem": {
+    "redactedField0": "Fixture value",
+    "id": 9007199254740996,
+    "name": "Fixture Commander"
+  }
+}

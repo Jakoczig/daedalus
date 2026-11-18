@@ -184,7 +184,7 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 			out.Totals[k] = v.String()
 		}
 	}
-	if q.Kind == "fleet" || q.Kind == "goals" || q.Kind == "squadron" {
+	if q.Kind == "fleet" || q.Kind == "goals" || q.Kind == "squadron" || q.Kind == "carrier" || q.Kind == "markets" || q.Kind == "commodities" {
 		out.Reference, _ = s.EffectiveFacts(ctx, fid, "commander", time.Now())
 	}
 	members := map[string]bool{}
@@ -239,6 +239,11 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 		current.Close()
 		if err != nil {
 			return out, err
+		}
+	}
+	if q.Kind == "fleet" {
+		if e := s.supplementFrontierFleet(ctx, fid, q, &out); e != nil {
+			return out, e
 		}
 	}
 	if q.Kind == "carrier" && len(out.Rows) == 0 {

@@ -107,7 +107,7 @@ func (s *Service) CommanderOverview(ctx context.Context) (map[string]any, error)
 		return nil, e
 	}
 	out["facts"] = facts
-	fleet, e := s.store.OwnedFleetCount(ctx, fid)
+	fleet, e := s.store.ReconciledFleetCount(ctx, fid, facts)
 	if e != nil {
 		return nil, e
 	}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/Jakoczig/eridion/go/internal/frontend"
 	"github.com/Jakoczig/eridion/go/internal/privatefs"
+	"github.com/Jakoczig/eridion/go/internal/providers"
 	"github.com/Jakoczig/eridion/go/internal/webapp"
 	"io"
 	"io/fs"
@@ -18,6 +19,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -66,6 +68,7 @@ func main() {
 	stage := flag.String("stage", "G2D", "G2C, G2D or G2E test stage")
 	reference := flag.String("reference", "", "generated synthetic legacy reference HTML")
 	communityFixture := flag.Bool("community-fixture", false, "explicit synthetic EDSM transport; never contacts provider")
+	frontierFixture := flag.Bool("frontier-fixture", false, "Explicit synthetic, fixed-transport CAPI reference; never contacts provider")
 	deferJournal := flag.Bool("defer-journal", false, "G2H synthetic startup without a known system")
 	flag.Parse()
 	if *deferJournal && filepath.Base(*fixture) != "g2h" {
@@ -119,7 +122,20 @@ func main() {
 			panic(err)
 		}
 	}
-	server, err := webapp.StartLocalWithOptions(ctx, overlay{assets, *reference}, webapp.Options{CommunityClient: communityClient, StorageDir: filepath.Join(root, "profile"), EnableJournal: true, EnableNavigation: true, EnableExploration: true, EnableDashboard: *stage == "G2D" || *stage == "G2E", EnableParity: *stage == "G2E", JournalDir: journalDir, PollInterval: 500 * time.Millisecond})
+	var providerOptions providers.Options
+	var frontierClock atomic.Int64
+	if *frontierFixture {
+		if *stage != "G2E" || filepath.Base(*fixture) != "g2l" {
+			panic("Frontier fixture requires explicit G2L synthetic journal")
+		}
+		frontierClock.Store(time.Now().Unix())
+		fixtureRoot, e := filepath.Abs(filepath.Join(*fixture, "../../..", "go/internal/providers/testdata"))
+		if e != nil {
+			panic(e)
+		}
+		providerOptions = frontierFixtureOptions(fixtureRoot, func() time.Time { return time.Unix(frontierClock.Load(), 0) })
+	}
+	server, err := webapp.StartLocalWithOptions(ctx, overlay{assets, *reference}, webapp.Options{ProviderOptions: providerOptions, CommunityClient: communityClient, StorageDir: filepath.Join(root, "profile"), EnableJournal: true, EnableNavigation: true, EnableExploration: true, EnableDashboard: *stage == "G2D" || *stage == "G2E", EnableParity: *stage == "G2E", JournalDir: journalDir, PollInterval: 500 * time.Millisecond})
 	if err != nil {
 		panic(err)
 	}
@@ -131,6 +147,11 @@ func main() {
 				continue
 			}
 			kind := scanner.Text()
+			if *frontierFixture && kind == "frontier-tick" {
+				frontierClock.Add(61)
+				fmt.Println("FRONTIER_TICKED")
+				continue
+			}
 			if filepath.Base(*fixture) == "g2l" && kind == "accounts-other-session" {
 				f, err := os.OpenFile(filepath.Join(journalDir, "Journal.20260101.01.log"), os.O_APPEND|os.O_WRONLY, 0600)
 				if err != nil {

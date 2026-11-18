@@ -9,3 +9,6 @@ Both platforms: one Go service, local-first. New external access is disabled unt
 Frontier login needs the separately deployed HTTPS website described in docs/protocols/eridion-frontier-website-return.md. A public client ID is not a shared key or evidence of live authorization. Read consent alone never enables uploads. After website deployment, the owner can connect in Settings → Data Providers → Frontier. If the browser blocks the return link, copy the local return from that website into the owner-only Manual browser return field.
 
 Paired laptop: keep existing trusted CA configuration; no bypass is required. Existing Go pairing grants are retained for their original commander. A different account needs its own owner-authorized pairing. No native credential or account identity/portrait is sent to viewers. Physical login and gameplay acceptance remain manual.
+
+
+The later [Frontier live-audit handoff](../handoffs/g2m-a-frontier-live-audit.md) documents owner-only command-mode structural diagnostics and the Fleet, station-reference, carrier-204 and global-CG corrections. No raw account responses or diagnostics are included in the preview archive.

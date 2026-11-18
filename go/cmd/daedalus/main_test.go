@@ -191,3 +191,21 @@ func TestParitySmokeRequiresExplicitSyntheticSource(t *testing.T) {
 		t.Fatal(out.String())
 	}
 }
+
+func TestFrontierDiagnosticRequiresExplicitOwnerIntentAndStartsNoService(t *testing.T) {
+	assets := fstest.MapFS{}
+	launch := func(context.Context, string, func()) error { t.Fatal("diagnostic launched a desktop"); return nil }
+	for _, args := range [][]string{{"--frontier-diagnostic", "profile"}, {"--owner-read-only"}, {"--frontier-diagnostic", "profile", "--owner-read-only", "--smoke-test", "--data-dir", t.TempDir(), "--diagnostic-output", t.TempDir()}} {
+		if e := run(context.Background(), args, assets, launch, io.Discard); e == nil {
+			t.Fatal("incomplete/combined diagnostic mode accepted")
+		}
+	}
+	profile := t.TempDir()
+	if e := run(context.Background(), []string{"--frontier-diagnostic", "profile", "--owner-read-only", "--data-dir", profile, "--diagnostic-output", t.TempDir()}, assets, launch, io.Discard); e == nil {
+		t.Fatal("unverified profile accepted")
+	}
+	files, e := os.ReadDir(profile)
+	if e != nil || len(files) != 0 {
+		t.Fatal("read-only diagnostic created original profile state")
+	}
+}

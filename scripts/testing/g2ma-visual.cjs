@@ -16,7 +16,7 @@ async function main () {
   const evaluate = async expression => { const r = await c.call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value }
   c.on(e => { if (e.method === 'Runtime.exceptionThrown') report.errors.push(e.params.exceptionDetails.exception?.description); if (e.method === 'Fetch.requestPaused') { const p = e.params; const ok = p.request.url.startsWith(origin + '/') || p.request.url.startsWith('data:'); if (!ok) report.outsideRequests.push(p.request.url); c.call(ok ? 'Fetch.continueRequest' : 'Fetch.failRequest', ok ? { requestId: p.requestId } : { requestId: p.requestId, errorReason: 'BlockedByClient' }).catch(() => {}) } })
   await c.call('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
-  const navigate = async (url, text) => { await c.call('Page.navigate', { url: origin + url }); await waitFor(() => evaluate(pageTextReady(text, true))); await evaluate('document.fonts.ready.then(()=>true)') }
+  const navigate = async (url, text) => { await c.call('Page.navigate', { url: origin + url }); await waitFor(() => evaluate(`location.origin === ${JSON.stringify(origin)} && ${pageTextReady(text, true)}`)); await evaluate('document.fonts.ready.then(()=>true)') }
   const measure = async name => { await c.call('HeapProfiler.collectGarbage'); const a = sample(host.child.pid); const first = await c.call('Performance.getMetrics'); await delay(3200); const z = sample(host.child.pid); const last = await c.call('Performance.getMetrics'); const m = (v, n) => v.metrics.find(x => x.name === n).value; report.resources.push({ name, milliseconds: z.at - a.at, goRSSBytes: z.rss, goCPUPercentOneCore: (z.cpu - a.cpu) / ((z.at - a.at) / 1000) * 100, browserHeapBytes: m(last, 'JSHeapUsedSize'), browserMainThreadPercent: (m(last, 'TaskDuration') - m(first, 'TaskDuration')) / (m(last, 'Timestamp') - m(first, 'Timestamp')) * 100 }) }
   const rpc = (name, message = {}) => evaluate(`new Promise((resolve,reject)=>{const w=new WebSocket(location.origin.replace('http:','ws:'));const timer=setTimeout(()=>{w.close();reject(new Error('owner RPC timed out'))},5000);w.onopen=()=>w.send(JSON.stringify({requestId:'g2ma',name:${JSON.stringify(name)},message:${JSON.stringify(message)}}));w.onmessage=e=>{const r=JSON.parse(e.data);if(r.requestId==='g2ma'){clearTimeout(timer);w.close();r.error?reject(new Error(r.error)):resolve(r.message)}};w.onerror=()=>{clearTimeout(timer);reject(new Error('owner socket failed'))}})`)
   try {
@@ -46,6 +46,30 @@ async function main () {
     await rpc('setGoAccounts', { multiple: true, selected: 'SYNTHETIC-OTHER' }); const other = await rpc('getGoCommanderOverview'); if (other.name !== 'Other Fixture Commander') throw new Error('Explicit profile switch failed')
     await navigate('/cmdr/overview', 'Other Fixture Commander'); if (await evaluate('document.body.innerText.includes("PRIVATE_SYNTHETIC")')) throw new Error('Previous identity remained visible')
     report.globalAccountIsolation = true
+    await host.stop(); host = null
+    host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2l'), false, { frontier: true }); origin = host.url
+    await navigate('/ship/status', 'SHIP'); await waitFor(async () => !(await rpc('getJournalSummary')).importInProgress)
+    const tick = () => new Promise(resolve => { const onData = data => { if (data.toString().includes('FRONTIER_TICKED')) { host.child.stdout.off('data', onData); resolve() } }; host.child.stdout.on('data', onData); host.child.stdin.write('frontier-tick\n') })
+    await rpc('configureGoProvider', { id: 'frontier', config: { read: true } })
+    await rpc('readGoProvider', { id: 'frontier', kind: 'profile' })
+    const membershipBefore = JSON.stringify((await rpc('getGoOperations', { kind: 'goals' })).goalMembership)
+    const fleetBeforeStock = (await rpc('getGoOperations', { kind: 'fleet' })).rows.map(r => r.entity).sort().join(',')
+    for (const kind of ['communitygoals', 'market', 'shipyard', 'fleetcarrier']) { await tick(); await rpc('readGoProvider', { id: 'frontier', kind }) }
+    if ((await rpc('getGoOperations', { kind: 'fleet' })).rows.map(r => r.entity).sort().join(',') !== fleetBeforeStock) throw new Error('Station stock became owned fleet')
+    if (JSON.stringify((await rpc('getGoOperations', { kind: 'goals' })).goalMembership) !== membershipBefore) throw new Error('Global CG response changed journal subscription')
+    report.frontierPages = []
+    for (const [name, width, height] of [['desktop', 1366, 768], ['compact', 680, 580]]) {
+      await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+      for (const [url, text] of [['/ship/fleet', 'Frontier owned-fleet reference'], ['/cmdr/community-goals', 'Frontier · global goals'], ['/trade/commodities', 'Frontier market reference']]) {
+        await navigate(url, text)
+        if (url === '/ship/fleet') await evaluate('document.querySelectorAll(".go-fleet-card").forEach(e=>{e.open=true})')
+        const overflow = await evaluate('document.querySelector(".go-page").scrollWidth-document.querySelector(".go-page").clientWidth'); if (overflow > 2) throw new Error('Frontier reference overflow ' + url + ': ' + overflow)
+        if (await evaluate('document.body.innerText.includes("SYNTHETIC-ACCESS")||document.body.innerText.includes("SYNTHETIC-REFRESH")')) throw new Error('Credential reached reference UI')
+        const shot = await c.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, 'frontier-' + name + '-' + url.replaceAll('/', '-') + '.png'), Buffer.from(shot.data, 'base64'))
+        report.frontierPages.push({ name, url, overflow })
+      }
+    }
+    report.frontierReferenceIsolation = true
     await host.stop(); host = null
     const executable = path.join(root, 'temp/g2ma-exact-g2l-baseline/go/bin/g2ma-baseline-fixture' + (process.platform === 'win32' ? '.exe' : ''))
     await c.call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false })

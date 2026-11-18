@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"slices"
 
@@ -184,7 +185,11 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		bearer = cred.AccessToken
 	}
 	raw, status, err := m.request(requestCtx, method, endpoint, ct, body, bearer)
-	if err != nil || status != 200 {
+	noCarrier := id == "frontier" && kind == "fleetcarrier" && status == http.StatusNoContent && err == nil
+	if noCarrier {
+		raw = []byte(`{"owned":false}`)
+	}
+	if err != nil || (status != 200 && !noCarrier) {
 		m.mu.Lock()
 		if generation == s.generation {
 			s.lastError = "Read failed; no server response or secret logged"
@@ -356,6 +361,9 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		}
 	}
 	if id == "frontier" {
+		if noCarrier {
+			add("Fleet carrier", "No owned fleet carrier")
+		}
 		for _, key := range []string{"commander", "ship", "lastSystem", "lastStarport", "carrier"} {
 			if o, ok := data[key].(map[string]any); ok {
 				for _, field := range []string{"name", "id", "credits", "docked", "value", "cargo", "capacity", "health", "callsign", "currentStarSystem", "fuel", "balance"} {
@@ -382,8 +390,25 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 	if generation != s.generation || !s.config.Read || s.config.Paused || m.closed {
 		return nil, errors.New("Read consent was revoked")
 	}
-	if id == "frontier" && kind == "communitygoals" {
-		add("Community goals", "Documented read endpoint; response-field normalization awaits verified authorized fixture. No account/journal state inferred.")
+	if id == "frontier" && kind != "profile" {
+		if kind != "fleetcarrier" || noCarrier {
+			normalized, e := normalizeCAPISnapshot(kind, fid, data, now)
+			if e != nil {
+				return nil, e
+			}
+			if m.history != nil {
+				if e = m.history.SaveExternal(requestCtx, normalized); e != nil {
+					return nil, e
+				}
+			}
+			if kind == "communitygoals" {
+				entries, _ := data["activeCommunityGoals"].([]any)
+				add("Active global goals", len(entries))
+				add("Personal participation", "Not provided by this verified response format; journal membership/contributions/rewards retained")
+			}
+		} else {
+			add("Carrier limitation", "Owner-carrier response remains a bounded supplemental summary; ownership reconciliation requires verified owner fixture")
+		}
 	}
 	if m.history != nil && kind == "profile" {
 		if err := m.persistCommanderRead(requestCtx, id, kind, fid, commander, data, now); err != nil {

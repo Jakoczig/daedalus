@@ -26,3 +26,6 @@ Core invariants: one journal pipeline and SQLite writer; Windows/Linux native de
 The maintainer reported real gameplay acceptance through G2L, including paired-laptop updates in earlier phases. That does not establish G2M-A Frontier website deployment, live authorization, multiple-account migration or current physical-device acceptance. Current technical status and checklist: [G2M-A handoff](handoffs/g2m-a-eridion-identity-frontier.md). Separate website contract: [Frontier return](protocols/eridion-frontier-website-return.md). Historical handoffs remain available in `docs/handoffs/`.
 
 G2M-B navigation/Galaxy presentation requirements are recorded in the current handoff and intentionally deferred. No merge, release, deployment, replacement of the original application or unauthorized provider upload is part of these draft batches.
+
+
+G2M-A follow-up on 2026-11-18: maintainer OAuth acceptance is followed by an owner-authorized live read audit of the five approved Frontier endpoints, scalar-anonymized structural fixtures, owned-fleet gap filling, separate last-station/global-CG references and normal carrier-204 handling. No uploads, credential changes, application replacement or live revocation were performed. See the [live-audit matrix](handoffs/g2m-a-frontier-live-audit.md).
