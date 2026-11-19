@@ -2,7 +2,7 @@ name: ERIDION Go desktop
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations, go/g2m-a-eridion-identity-frontier, go/g2m-b-navigation-field-context]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations, go/g2m-a-eridion-identity-frontier, go/g2m-b-navigation-field-context, go/g2m-c-live-audit-functional-corrections]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 

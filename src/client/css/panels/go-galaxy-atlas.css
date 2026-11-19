@@ -1,0 +1,12 @@
+.go-terminal .go-galaxy-projections{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,9%);grid-template-rows:minmax(0,1fr) minmax(0,9%);gap:6px;aspect-ratio:1}
+.go-terminal .go-galaxy-plane{min-height:0;min-width:0;overflow:hidden}
+.go-terminal .go-galaxy-xz{grid-area:1 / 1}
+.go-terminal .go-galaxy-xy{grid-area:2 / 1}
+.go-terminal .go-galaxy-yz{grid-area:1 / 2}
+.go-terminal .go-galaxy-plane svg{display:block;width:100%;height:100%;overflow:hidden;background:#01040a;border:1px solid #6a420b;box-sizing:border-box}
+.go-terminal .go-galaxy-plane image{image-rendering:auto}
+.go-terminal .go-galaxy-plane figcaption{z-index:2}
+.go-terminal .go-galaxy.is-compact .go-galaxy-projections{display:block}
+.go-terminal .go-galaxy.is-compact .go-galaxy-xz{height:100%}
+.go-terminal .go-galaxy-source{overflow-wrap:anywhere}
+@media(max-width:600px){.go-terminal .go-galaxy-area{min-height:180px}.go-terminal .go-galaxy-projections{gap:3px}.go-terminal .go-galaxy-plane figcaption{font-size:9px}}

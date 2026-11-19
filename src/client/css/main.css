@@ -44,6 +44,7 @@
 @import './panels/go-usability.css';
 @import './panels/go-navigation-launcher.css';
 @import './panels/go-g2h.css';
+@import './panels/go-galaxy-atlas.css';
 
 @font-face {
   font-family: 'Jura';
