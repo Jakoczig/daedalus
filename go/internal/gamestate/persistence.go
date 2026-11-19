@@ -21,20 +21,22 @@ const reducerFormat = shipstate.CacheFormat + paritystate.CacheFormat + activity
 
 type cacheCommander struct{ System, SystemAddress, MarketID string }
 type reducerCache struct {
-	ActiveSource string
-	Format       string
-	Summary      Summary
-	Active       string
-	Stopped      bool
-	Order        []string
-	Unknown      cacheCommander
-	Commanders   map[string]cacheCommander
-	Ship         *shipstate.Model
-	Parity       *paritystate.Model
-	Activity     *activitystate.Model
-	Navigation   *navstate.Model
-	Exploration  *explorestate.Model
-	Context      *navcontext.Model
+	StartupVersion uint
+	Startup        journal.Startup
+	ActiveSource   string
+	Format         string
+	Summary        Summary
+	Active         string
+	Stopped        bool
+	Order          []string
+	Unknown        cacheCommander
+	Commanders     map[string]cacheCommander
+	Ship           *shipstate.Model
+	Parity         *paritystate.Model
+	Activity       *activitystate.Model
+	Navigation     *navstate.Model
+	Exploration    *explorestate.Model
+	Context        *navcontext.Model
 }
 
 func cacheState(v commanderState) cacheCommander {
@@ -48,6 +50,8 @@ func (s *Service) cacheLocked() ([]byte, error) {
 	for k, v := range s.commanders {
 		c.Commanders[k] = cacheState(v)
 	}
+	c.StartupVersion = 1
+	c.Startup = s.startup
 	c.Summary.CachedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	var b bytes.Buffer
 	err := gob.NewEncoder(&b).Encode(c)
@@ -64,6 +68,11 @@ func (s *Service) restoreCacheLocked(raw []byte) error {
 	if c.Format != reducerFormat || c.Ship == nil || c.Parity == nil || c.Activity == nil || c.Navigation == nil || c.Exploration == nil || c.Context == nil || len(c.Commanders) > 64 {
 		return errors.New("Derived cache needs an explicit rebuild")
 	}
+	if c.StartupVersion > 1 {
+		return errors.New("Unsupported startup cache version")
+	}
+	s.needsStartupRebuild = c.StartupVersion == 0
+	s.startup = c.Startup
 	s.activeSource = c.ActiveSource
 	s.summary = c.Summary
 	s.active = c.Active
@@ -116,6 +125,12 @@ func (s *Service) CommitRecords(records []journal.Record, cp journal.Checkpoint)
 		}
 	}
 	s.summary.EventsRead += uint64(len(records) - len(applyRecords))
+	// A new file's prelude may end before LoadGame in another transaction.
+	// Retain only bounded provisional evidence even when this file is not yet
+	// allowed to replace the active projection. No counters/providers are run.
+	for _, r := range records[:len(records)-len(applyRecords)] {
+		s.startup.Observe(r.Event)
+	}
 	if len(applyRecords) > 0 {
 		s.activeSource = cp.Source.ID
 	}

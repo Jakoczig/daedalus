@@ -20,7 +20,14 @@ export function useCommunity (props, local) {
 }
 export default function GoCommunitySettings ({ sendEvent, onChange }) {
   const [value, setValue] = useState(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
-  useEffect(() => { let active = true; sendEvent('getGoCommunity').then(v => { if (active) setValue(v) }).catch(() => { if (active) setError('Community settings unavailable') }); return () => { active = false } }, [sendEvent])
+  useEffect(() => {
+    let active = true
+    // This RPC reads shared local cache metadata only; it never fetches EDSM.
+    const load = () => sendEvent('getGoCommunity').then(v => { if (active) { setValue(v); setError('') } }).catch(() => { if (active) setError('Community settings unavailable') })
+    load()
+    const timer = setInterval(load, 15000)
+    return () => { active = false; clearInterval(timer) }
+  }, [sendEvent])
   const setEnabled = async enabled => {
     setBusy(true); setError('')
     try { setValue(await sendEvent('setGoCommunityEnabled', { enabled })); onChange() } catch { setError('Preference could not be saved. Check private profile permissions.') } finally { setBusy(false) }

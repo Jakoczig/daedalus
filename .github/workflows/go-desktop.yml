@@ -2,7 +2,7 @@ name: ERIDION Go desktop
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations, go/g2m-a-eridion-identity-frontier]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations, go/g2m-a-eridion-identity-frontier, go/g2m-b-navigation-field-context]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 
@@ -352,13 +352,25 @@ jobs:
             temp/g2mb-visual/report.json
           if-no-files-found: error
           retention-days: 14
+      - name: G2M-C verified startup and keyboard navigation browser regressions
+        run: node scripts/testing/g2mc-visual.cjs
+      - name: Upload G2M-C synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eridion-g2mc-synthetic-evidence-${{ runner.os }}
+          path: |
+            temp/g2mc-visual/*.png
+            temp/g2mc-visual/report.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: eridion-g2m-b-${{ runner.os }}-x64-experimental-unsigned-preview
+          name: eridion-g2m-c-${{ runner.os }}-x64-experimental-unsigned-preview
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

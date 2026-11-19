@@ -159,7 +159,12 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 	}
 	s.v.Evidence = "journal_last_known"
 	if e.Type == "Shutdown" {
+		// Account-scoped inventory is last-known history, not live telemetry.
+		// Keep only this verified snapshot; a new header/session or source gap
+		// still clears it, and shutdown cannot authorize later deltas/sidecars.
+		materials := s.v.Materials
 		*s = state{v: blank()}
+		s.v.Materials = materials
 		s.v.Evidence = "waiting_game"
 		return
 	}

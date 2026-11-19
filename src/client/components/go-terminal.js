@@ -1,5 +1,5 @@
 import GoOperations, { operationPaths } from './go-operations'
-import { BGSTally } from './go-field-operations'
+import { BGSTally, PrivateCommanderActivity } from './go-field-operations'
 import { useState, useEffect } from 'react'
 import Layout from './layout'
 import Panel from './panel'
@@ -28,7 +28,7 @@ export default function GoTerminal (props) {
   useEffect(() => { setDisplay(previous => transition(previous, controllerInput)) }, [flight, plotted, props.connected, props.ready])
   const manual = event => { if (event.target.closest('.secondary-navigation, header button') || event.target.closest('[data-primary-navigation]')) setDisplay(previous => transition(previous, { ...controllerInput, manual: true })) }
   const [communityVersion, setCommunityVersion] = useState(0)
-  const path = props.path === '/cmdr/field' || props.path?.startsWith('/controls') ? '/cmdr/overview' : props.path === '/' || props.path === '/nav' ? '/nav/map' : props.path === '/ship' ? '/ship/status' : props.path === '/exploration' ? '/exploration/system' : props.path === '/eng' ? '/eng/blueprints' : props.path === '/cmdr' ? '/cmdr/overview' : props.path === '/mining' ? '/mining/status' : props.path === '/missions' ? '/missions/overview' : props.path
+  const path = props.path === '/cmdr/field' || props.path?.startsWith('/controls') ? '/cmdr/overview' : props.path === '/' || props.path === '/nav' ? '/nav/map' : props.path === '/ship' ? '/ship/status' : props.path === '/exploration' ? '/exploration/system' : props.path === '/eng' ? '/eng/blueprints' : props.path === '/cmdr' ? '/cmdr/overview' : props.path === '/mining' ? '/mining/status' : props.path === '/missions' ? '/missions/overview' : props.path === '/trade' ? '/trade/routes' : props.path
   const group = path.split('/')[1]; const page = path.split('/')[2] || ''
   const menus = { nav: navigation.NavPanelNavItems, exploration: navigation.ExplorationPanelNavItems, ship: navigation.ShipPanelNavItems, eng: navigation.EngineeringPanelNavItems, cmdr: navigation.CmdrPanelNavItems, missions: navigation.MissionsPanelNavItems, mining: navigation.MiningPanelNavItems, trade: navigation.TradePanelNavItems }
   const items = menus[group] ? menus[group](page, {}).filter(i => i.url).map(item => group === 'nav' ? { ...item, name: ({ Map: 'System', List: 'System List', 'Neutron Plotter': 'Spansh Plotter' })[item.name] || item.name, active: (item.url.pathname || item.url) === path } : item) : []
@@ -37,7 +37,8 @@ export default function GoTerminal (props) {
   const { value: ship } = useGoProjection(props, 'getGoShip', 'goShipChanged')
   if (group === 'cmdr' && props.stage === 'G2E') items.push({ name: 'Colonisation', icon: 'scan', url: '/cmdr/colonisation', active: page === 'colonisation' })
   let content
-  if (props.stage === 'G2E' && operationPaths.includes(path)) content = <GoOperations key={path} {...props} path={path} />
+  if (props.stage === 'G2E' && path === '/missions/local-activity') content = <section className='go-page'><h2>Local activity</h2>{props.role === 'owner' ? <PrivateCommanderActivity {...props} /> : <p>Private commander history is available to the local owner only.</p>}<p>Mission and Powerplay observations remain in their respective pages.</p></section>
+  else if (props.stage === 'G2E' && operationPaths.includes(path)) content = <GoOperations key={path} {...props} path={path} />
   else if (path === '/cmdr/colonisation' && props.stage === 'G2E') content = <GoColonisation {...props} />
   else if (path === '/nav/neutron-plotter' && props.stage === 'G2E') content = <GoSpansh {...props} />
   else if (path === '/nav/galaxy' && props.stage === 'G2E') content = <GoGalaxy context={flight?.navigation} route={plotted} {...props} />

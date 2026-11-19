@@ -124,6 +124,7 @@ func (s *Service) Exploration() explorestate.ExplorationView {
 	return s.projectionLocked().Exploration
 }
 func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
+	batch := s.startup.Observe(e)
 	s.views.ship.ApplyEvent(s.active, e)
 	if s.opts.EnableParity {
 		s.navigationContext.Apply(s.active, e, phase)
@@ -131,6 +132,10 @@ func (s *Service) applyProjectionsLocked(e journal.Event, phase journal.Phase) {
 	if s.opts.EnableParity {
 		s.views.parity.ApplyEvent(s.active, e)
 		s.views.activity.ApplyEvent(s.active, e)
+		if e.Type == "LoadGame" {
+			s.views.parity.RestoreStartup(s.active, e, batch)
+			s.views.activity.RestoreStartup(s.active, e, batch)
+		}
 	}
 	s.views.navigation.ApplyEventPhase(s.active, e, phase)
 	s.views.exploration.ApplyEvent(s.active, e)
@@ -157,6 +162,7 @@ func (s *Service) sidecarProjectionLocked(c sidecar.Change) {
 	}
 }
 func (s *Service) resetProjectionsLocked() {
+	s.startup = journal.Startup{}
 	s.views.ship.ResetSource()
 	s.navigationContext = navcontext.New()
 	s.views.parity.ResetSource()
