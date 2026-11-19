@@ -58,6 +58,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		CSVBase64   string `json:"csvBase64"`
 		CSV         string `json:"csv"`
 		ID          string `json:"id"`
+		Hash        string `json:"hash"`
 		Next        int    `json:"next"`
 		Acknowledge bool   `json:"acknowledge"`
 		FID         string `json:"fid"`
@@ -66,6 +67,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		Before      string `json:"before"`
 		Enabled     bool   `json:"enabled"`
 		Ticks       bool   `json:"ticks"`
+		Context     string `json:"context"`
 	}
 	if strictDecode(raw, &r) != nil {
 		return nil, errors.New("Invalid field-operation request")
@@ -105,6 +107,11 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 			return nil, errors.New("CSV exceeds 512 KiB")
 		}
 		if _, e := db.ImportItinerary(fid, r.Name, []byte(r.CSV)); e != nil {
+			return nil, e
+		}
+		return s.fieldView(true), nil
+	case "deleteGoItinerary":
+		if e := db.DeleteItinerary(fid, r.ID, r.Hash, r.Acknowledge); e != nil {
 			return nil, e
 		}
 		return s.fieldView(true), nil
@@ -148,9 +155,9 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if e := w.Error(); e != nil {
 			return nil, e
 		}
-		filename := "daedalus-itinerary.csv"
+		filename := "eridion-itinerary.csv"
 		if name == "exportGoBGSTally" {
-			filename = "daedalus-private-bgs.csv"
+			filename = "eridion-private-activity.csv"
 		}
 		if s.saveFieldCSV != nil {
 			if e := s.saveFieldCSV(filename, b.String()); e != nil {
@@ -163,7 +170,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if !db.BuiltinEnabled("bgs") {
 			return nil, errors.New("BGS module disabled; stored history retained")
 		}
-		rows, e := db.FieldTallyCursor(ctx, fid, r.System, r.Faction, r.Before, 100, r.Ticks)
+		rows, e := db.FieldTallyCursor(ctx, fid, r.System, r.Faction, r.Before, 100, r.Ticks, r.Context)
 		if e != nil {
 			return nil, e
 		}
@@ -187,9 +194,9 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if e := w.Error(); e != nil {
 			return nil, e
 		}
-		filename := "daedalus-itinerary.csv"
+		filename := "eridion-itinerary.csv"
 		if name == "exportGoBGSTally" {
-			filename = "daedalus-private-bgs.csv"
+			filename = "eridion-private-activity.csv"
 		}
 		if s.saveFieldCSV != nil {
 			if e := s.saveFieldCSV(filename, b.String()); e != nil {

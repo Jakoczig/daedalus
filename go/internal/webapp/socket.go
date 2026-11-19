@@ -297,7 +297,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			} else {
 				response["message"] = v
 			}
-		case "getGoBuiltinModules", "setGoBuiltinModule", "importGoItinerary", "getGoItinerary", "editGoItinerary", "copyGoItineraryNext", "exportGoItinerary", "getGoBGSTally", "exportGoBGSTally":
+		case "getGoBuiltinModules", "setGoBuiltinModule", "importGoItinerary", "deleteGoItinerary", "getGoItinerary", "editGoItinerary", "copyGoItineraryNext", "exportGoItinerary", "getGoBGSTally", "exportGoBGSTally":
 			if principal.role != "owner" {
 				response["error"] = "Local owner required"
 				break

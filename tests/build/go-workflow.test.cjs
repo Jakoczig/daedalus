@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('eridion-g2m-a-'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('eridion-g2m-b-'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2m-a-.*experimental-unsigned-preview/)
+  assert.match(job.steps[upload].with.name, /g2m-b-.*experimental-unsigned-preview/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -142,4 +142,16 @@ test('G2L stacked base, operations evidence and preview remain mandatory', () =>
   for (const file of ['go-desktop.yml', 'ci.yml']) { const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows', file), 'utf8')); assert.ok(w.on.pull_request.branches.includes('go/g2k-native-field-operations')) }
   const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8')); const steps = w.jobs.desktop.steps; const pack = steps.findIndex(s => s.name === 'Package experimental preview')
   for (const name of ['G2L exact G2K lifecycle baseline and operations queries', 'G2L owner operations and upload-disabled market browser smoke']) { const i = steps.findIndex(s => s.name === name); assert.ok(i >= 0 && i < pack); assert.equal(steps[i].if, undefined) }
+})
+
+test('G2M-B stacked base, complete regression gates and new exact geometry evidence precede preview', () => {
+  const workflow = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/go-desktop.yml'), 'utf8'))
+  const legacy = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf8'))
+  for (const w of [workflow, legacy])assert.ok(w.on.pull_request.branches.includes('go/g2m-a-eridion-identity-frontier'))
+  const steps = workflow.jobs.desktop.steps
+  const i = steps.findIndex(s => s.name === 'G2M-B navigation, Spansh, activity and exact galaxy geometry')
+  assert.ok(i > steps.findIndex(s => s.name === 'G2M-A commander, fleet, goals and account browser smoke'))
+  assert.ok(i < steps.findIndex(s => s.name === 'Package experimental preview'))
+  assert.equal(steps[i].if, undefined)
+  assert.equal(steps[i]['continue-on-error'], undefined)
 })

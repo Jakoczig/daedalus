@@ -16,7 +16,7 @@ const NAV_BUTTONS = [
 
 const TAB_MEMORY_PREFIX = 'daedalus:lastPage:'
 
-export default function PrimaryNavigation () {
+export default function PrimaryNavigation ({ native = false }) {
   const router = useRouter()
   const currentPath = `/${router.pathname.split('/')[1].toLowerCase()}`
 
@@ -34,7 +34,7 @@ export default function PrimaryNavigation () {
 
   return (
     <div id='primaryNavigation' className='button-group'>
-      {NAV_BUTTONS.map((button, i) =>
+      {NAV_BUTTONS.filter(button => !native || button.path !== '/controls').map((button, i) =>
         <button
           key={button.name}
           data-primary-navigation={i + 1}

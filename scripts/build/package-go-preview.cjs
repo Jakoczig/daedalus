@@ -10,14 +10,14 @@ async function regularBytes (filename) {
 }
 
 async function packagePreview ({ binaryPath, readmePath, outputParent, platform, milestone = 'g2b' }) {
-  if (!['g2b', 'g2c', 'g2d', 'g2e', 'g2f', 'g2g', 'g2h', 'g2j', 'g2k', 'g2l', 'g2m-a'].includes(milestone)) throw new Error('Unsupported preview milestone')
+  if (!['g2b', 'g2c', 'g2d', 'g2e', 'g2f', 'g2g', 'g2h', 'g2j', 'g2k', 'g2l', 'g2m-a', 'g2m-b'].includes(milestone)) throw new Error('Unsupported preview milestone')
   if (!['Windows', 'Linux'].includes(platform)) throw new Error('Unsupported preview platform')
   // Read explicit inputs only. Never enumerate/copy a build directory or profile.
   const binary = await regularBytes(binaryPath)
   const readme = await regularBytes(readmePath)
-  const descriptor = ['g2h', 'g2j', 'g2k', 'g2l', 'g2m-a'].includes(milestone) ? 'preview' : 'local-route-survey-no-uploads'
-  const directory = await fs.mkdtemp(path.join(outputParent, `${milestone === 'g2m-a' ? 'eridion' : 'daedalus'}-${milestone}-experimental-unsigned-${descriptor}-`))
-  const executable = milestone === 'g2m-a' ? 'eridion' : 'daedalus'
+  const descriptor = ['g2h', 'g2j', 'g2k', 'g2l', 'g2m-a', 'g2m-b'].includes(milestone) ? 'preview' : 'local-route-survey-no-uploads'
+  const directory = await fs.mkdtemp(path.join(outputParent, `${['g2m-a', 'g2m-b'].includes(milestone) ? 'eridion' : 'daedalus'}-${milestone}-experimental-unsigned-${descriptor}-`))
+  const executable = ['g2m-a', 'g2m-b'].includes(milestone) ? 'eridion' : 'daedalus'
   const files = { [executable + (platform === 'Windows' ? '.exe' : '')]: binary, 'README.md': readme }
   const hashes = []
   for (const [name, bytes] of Object.entries(files)) {
@@ -33,10 +33,10 @@ async function main () {
   const platform = process.env.RUNNER_OS || (process.platform === 'win32' ? 'Windows' : 'Linux')
   const directory = await packagePreview({
     binaryPath: path.join(root, 'go/bin', platform === 'Windows' ? 'daedalus.exe' : 'daedalus'),
-    readmePath: path.join(root, 'docs/testing/g2m-a-eridion-preview.md'),
+    readmePath: path.join(root, 'docs/testing/g2m-b-eridion-preview.md'),
     outputParent: process.env.RUNNER_TEMP || os.tmpdir(),
     platform,
-    milestone: 'g2m-a'
+    milestone: 'g2m-b'
   })
   if (process.env.GITHUB_OUTPUT) await fs.appendFile(process.env.GITHUB_OUTPUT, `directory=${directory}\n`)
   console.log(`Packaged experimental, unsigned, local-first preview (optional providers; uploads require explicit consent) (${platform}); executable, README and hashes only`)
