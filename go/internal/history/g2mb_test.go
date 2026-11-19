@@ -72,10 +72,48 @@ func TestG2MBRouteHistoryAfterAbruptExit(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if _, e = s.ImportItinerary("SYNTHETIC", "Second route", []byte("system\nGamma\nDelta\n")); e != nil {
+		second, e := s.ImportItinerary("SYNTHETIC", "Second route", []byte("system\nGamma\nDelta\n"))
+		if e != nil {
 			t.Fatal(e)
 		}
 		if _, e = s.EditItinerary("SYNTHETIC", first.ID, 1, true); e != nil {
+			t.Fatal(e)
+		}
+		for i := 2; i < 16; i++ {
+			if _, e = s.ImportItinerary("SYNTHETIC", fmt.Sprintf("Plan %d", i), []byte("system\nOne\nTwo\n")); e != nil {
+				t.Fatal(e)
+			}
+		}
+		if _, e = s.EditItinerary("SYNTHETIC", first.ID, 1, true); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = s.ImportItinerary("SYNTHETIC", "Seventeenth", []byte("system\nThree\nFour\n")); e == nil {
+			t.Fatal("limit bypassed without owner management")
+		}
+		if _, e = s.writer.Exec("INSERT INTO commander VALUES('SYNTHETIC_B','Other',NULL)"); e != nil {
+			t.Fatal(e)
+		}
+		other, e := s.ImportItinerary("SYNTHETIC_B", "Foreign plan", []byte("system\nElsewhere\n"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = s.DeleteItinerary("SYNTHETIC", other.ID, other.Hash, true); e == nil {
+			t.Fatal("foreign route deletion")
+		}
+		if _, e = s.writer.Exec("CREATE TRIGGER fail_delete BEFORE DELETE ON itineraries BEGIN SELECT RAISE(ABORT,'injected deletion failure'); END"); e != nil {
+			t.Fatal(e)
+		}
+		if e = s.DeleteItinerary("SYNTHETIC", second.ID, second.Hash, true); e == nil {
+			t.Fatal("injected failure bypassed")
+		}
+		retained, e := s.Itinerary("SYNTHETIC", second.ID)
+		if e != nil || len(retained.Waypoints) != 2 {
+			t.Fatal("partial child deletion survived rollback", retained, e)
+		}
+		if _, e = s.writer.Exec("DROP TRIGGER fail_delete"); e != nil {
+			t.Fatal(e)
+		}
+		if e = s.DeleteItinerary("SYNTHETIC", second.ID, second.Hash, true); e != nil {
 			t.Fatal(e)
 		}
 		os.Exit(0)
@@ -92,7 +130,7 @@ func TestG2MBRouteHistoryAfterAbruptExit(t *testing.T) {
 	}
 	defer s.Close()
 	plans, e := s.Itineraries("SYNTHETIC")
-	if e != nil || len(plans) != 2 {
+	if e != nil || len(plans) != 15 {
 		t.Fatal("history lost", plans, e)
 	}
 	current, e := s.Itinerary("SYNTHETIC", "")
@@ -109,4 +147,16 @@ func TestG2MBRouteHistoryAfterAbruptExit(t *testing.T) {
 	if p, e := s.Itineraries("OTHER"); e != nil || len(p) != 0 {
 		t.Fatal("cross commander history", p, e)
 	}
+	foreign, e := s.Itineraries("SYNTHETIC_B")
+	if e != nil || len(foreign) != 1 {
+		t.Fatal("foreign history changed", foreign, e)
+	}
+	if _, e = s.ImportItinerary("SYNTHETIC", "Seventeenth", []byte("system\nThree\nFour\n")); e != nil {
+		t.Fatal("capacity did not survive crash", e)
+	}
+	plans, e = s.Itineraries("SYNTHETIC")
+	if e != nil || len(plans) != 16 {
+		t.Fatal("recovered capacity", plans, e)
+	}
+
 }

@@ -58,6 +58,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		CSVBase64   string `json:"csvBase64"`
 		CSV         string `json:"csv"`
 		ID          string `json:"id"`
+		Hash        string `json:"hash"`
 		Next        int    `json:"next"`
 		Acknowledge bool   `json:"acknowledge"`
 		FID         string `json:"fid"`
@@ -109,6 +110,11 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 			return nil, e
 		}
 		return s.fieldView(true), nil
+	case "deleteGoItinerary":
+		if e := db.DeleteItinerary(fid, r.ID, r.Hash, r.Acknowledge); e != nil {
+			return nil, e
+		}
+		return s.fieldView(true), nil
 	case "getGoItinerary":
 		return db.Itinerary(fid, r.ID)
 	case "editGoItinerary":
@@ -149,9 +155,9 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if e := w.Error(); e != nil {
 			return nil, e
 		}
-		filename := "daedalus-itinerary.csv"
+		filename := "eridion-itinerary.csv"
 		if name == "exportGoBGSTally" {
-			filename = "daedalus-private-bgs.csv"
+			filename = "eridion-private-activity.csv"
 		}
 		if s.saveFieldCSV != nil {
 			if e := s.saveFieldCSV(filename, b.String()); e != nil {
@@ -188,9 +194,9 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if e := w.Error(); e != nil {
 			return nil, e
 		}
-		filename := "daedalus-itinerary.csv"
+		filename := "eridion-itinerary.csv"
 		if name == "exportGoBGSTally" {
-			filename = "daedalus-private-bgs.csv"
+			filename = "eridion-private-activity.csv"
 		}
 		if s.saveFieldCSV != nil {
 			if e := s.saveFieldCSV(filename, b.String()); e != nil {

@@ -32,3 +32,28 @@ test('context activity requires owner and does not enumerate or choose the first
   assert.ok(!h.calls.includes('getGoDataStatus'))
   h.unmount()
 })
+
+test('Commander Overview and Session do not mount or query the activity ledger for owner or viewer', async t => {
+  const previousWindow = globalThis.window; globalThis.window = { addEventListener () {}, removeEventListener () {} }; t.after(() => { if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow })
+  for (const role of ['owner', 'viewer']) {
+    for (const path of ['/cmdr/overview', '/cmdr/session']) {
+      const h = harness('go-terminal', () => ({}))
+      Object.assign(h.props, { role, path, stage: 'G2E' })
+      try {
+        assert.doesNotMatch(h.html(), /go-context-activity|Export selected activity CSV/)
+        await h.flush()
+        assert.ok(!h.calls.includes('getGoBGSTally'), role + ' ' + path + ' queried BGS')
+      } finally { h.unmount() }
+    }
+  }
+})
+test('complete commander activity is absent until an owner explicitly opens it', () => {
+  for (const role of ['owner', 'viewer']) {
+    const h = harness('go-field-operations', [], 'PrivateCommanderActivity'); h.props.role = role
+    const html = h.html(); assert.doesNotMatch(html, /go-context-activity|Export selected activity CSV/)
+    assert.equal(h.calls.length, 0)
+    if (role === 'viewer')assert.equal(html, '')
+    else { const d = h.elements('details')[0]; assert.equal(d.props.open, undefined); d.props.onToggle({ currentTarget: { open: true } }); assert.match(h.html(), /Commander activity/) }
+    h.unmount()
+  }
+})

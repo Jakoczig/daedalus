@@ -45,7 +45,7 @@ func TestG2KViewerCannotOperatePlansClipboardTallyOrExports(t *testing.T) {
 	defer c.CloseNow()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	for _, name := range []string{"getGoBuiltinModules", "setGoBuiltinModule", "importGoItinerary", "getGoItinerary", "editGoItinerary", "copyGoItineraryNext", "exportGoItinerary", "getGoBGSTally", "exportGoBGSTally"} {
+	for _, name := range []string{"getGoBuiltinModules", "setGoBuiltinModule", "importGoItinerary", "deleteGoItinerary", "getGoItinerary", "editGoItinerary", "copyGoItineraryNext", "exportGoItinerary", "getGoBGSTally", "exportGoBGSTally"} {
 		if len(callRPC(t, ctx, c, name)["error"]) == 0 {
 			t.Fatal("viewer authorized", name)
 		}

@@ -91,6 +91,45 @@ func readPlan(q interface {
 	return p, rows.Err()
 }
 func (s *Store) Itinerary(fid, id string) (Itinerary, error) { return readPlan(s.reader, fid, id) }
+
+// DeleteItinerary removes only the exact inactive plan previewed by its owner.
+// Children and parent are deleted in one transaction; journal history is untouched.
+func (s *Store) DeleteItinerary(fid, id, hash string, acknowledge bool) error {
+	if !acknowledge || fid == "" || id == "" || len(hash) != 64 {
+		return errors.New("Preview an inactive route and confirm its permanent deletion")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tx, err := s.writer.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var savedHash string
+	var active bool
+	if err = tx.QueryRow("SELECT source_hash,active FROM itineraries WHERE commander_fid=? AND cast(id AS TEXT)=?", fid, id).Scan(&savedHash, &active); err != nil {
+		return errors.New("Selected route is unavailable for this commander")
+	}
+	if active {
+		return errors.New("Active route is protected; select an inactive saved route")
+	}
+	if savedHash != hash {
+		return errors.New("Route preview changed; reload before deleting")
+	}
+	for _, table := range []string{"itinerary_edits", "itinerary_waypoints"} {
+		if _, err = tx.Exec("DELETE FROM "+table+" WHERE itinerary_id=?", id); err != nil {
+			return err
+		}
+	}
+	result, err := tx.Exec("DELETE FROM itineraries WHERE commander_fid=? AND cast(id AS TEXT)=? AND active=0 AND source_hash=?", fid, id, hash)
+	if err != nil {
+		return err
+	}
+	if count, err := result.RowsAffected(); err != nil || count != 1 {
+		return errors.New("Route changed; nothing was deleted")
+	}
+	return tx.Commit()
+}
 func (s *Store) Itineraries(fid string) ([]Itinerary, error) {
 	rows, e := s.reader.Query("SELECT cast(id AS TEXT),name,source_hash,state,origin,next_hop,active FROM itineraries WHERE commander_fid=? ORDER BY id DESC LIMIT 16", fid)
 	if e != nil {
@@ -128,7 +167,7 @@ func (s *Store) ImportItinerary(fid, name string, raw []byte) (Itinerary, error)
 		return p, e
 	}
 	if n >= 16 {
-		return p, errors.New("16 saved plans per commander maximum")
+		return p, errors.New("16 saved plans: export if needed, then confirm deletion of an inactive route in Route History to make room")
 	}
 	if _, e = tx.Exec("UPDATE itineraries SET active=0 WHERE commander_fid=?", fid); e != nil {
 		return p, e

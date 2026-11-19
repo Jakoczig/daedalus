@@ -16,13 +16,13 @@ Native tabs are System, System List, Route, Spansh Plotter and Galaxy. Controls 
 
 Spansh Plotter offers the current public modes and Route History. Planning notes stay local and are copied only when requested. Open the fixed official web page yourself, configure its advanced options and export CSV. No automatic route-generation API, embedded browser, query-prefill contract or result retrieval is claimed.
 
-Import supports UTF-8 CSV up to 512 KiB, 2,048 unique systems and 16 named plans per commander. A `System Name` or `system` column is required. Body/trade/loop exports may need editing to a unique-system itinerary. Imported routes never change the game's NavRoute or target. Successful import opens Route. Manual import/progress/export controls are below the game route. History and manual activation use the existing transactional SQLite store and survive restart/crash. Copy-to-owner-PC remains local-owner-only.
+Import supports UTF-8 CSV up to 512 KiB, 2,048 unique systems and 16 named plans per commander. A `System Name` or `system` column is required. Body/trade/loop exports may need editing to a unique-system itinerary. Imported routes never change the game's NavRoute or target. Successful import opens Route. Manual import/progress/export controls are below the game route. History and manual activation use the existing transactional SQLite store and survive restart/crash. At capacity, open Route History, select an inactive route, review its name/waypoints/progress/source, export it if needed, then explicitly confirm permanent deletion. Active routes cannot be deleted. This frees a slot for another import; import never silently prunes history and deletion never removes journal records. Copy-to-owner-PC remains local-owner-only.
 
 Galaxy has a large X/Z view, a thin X/Y band below and a thin Y/Z band on the right. X and Z markers align with the main view under the shared pan/zoom frame. Artwork is the original illustrative procedural model, not measured galaxy density or copied EDAstro imagery.
 
 ## Contextual activity
 
-Mission/faction effects are in Missions; Powerplay activity is in Powerplay; contributions and witnessed depot progress are in Commander → Colonisation; the complete private activity ledger is in Commander. Carrier activities remain in the existing owned-carrier ledger, never attributed from unrelated personal trades. Built-in module controls and creator credits are in Owner Settings. Tick grouping requires already-cached verified closed boundaries; otherwise labels show UTC day. INF/REP ratings are ordinal, awards are separate from redemption, and no BGS percentage or combined profit is invented. CSV export requires explicit owner acknowledgment. No reporting is activated.
+Mission/faction effects are in Missions; Powerplay activity is in Powerplay; contributions and witnessed depot progress are in Commander → Colonisation; Commander Overview and Session keep their approved layouts without mounting or querying a BGS ledger. The complete private activity ledger is available only after explicitly opening Owner Settings → Private commander activity. Carrier activities remain in the existing owned-carrier ledger, never attributed from unrelated personal trades. Built-in module controls and creator credits are in Owner Settings. Tick grouping requires already-cached verified closed boundaries; otherwise labels show UTC day. INF/REP ratings are ordinal, awards are separate from redemption, and no BGS percentage or combined profit is invented. CSV export requires explicit owner acknowledgment. No reporting is activated.
 
 ## Secondary laptop
 
@@ -30,7 +30,7 @@ Existing pairing is preserved. Enable remote access only in Owner Settings, inst
 
 ## Gameplay checklist
 
-1. Import a synthetic or known Spansh CSV; confirm Route opens, GAME ROUTE stays separate, copy is explicit, arrival advances only on journal evidence, and history/progress survive restart.
+1. Import a synthetic or known Spansh CSV; confirm Route opens, GAME ROUTE stays separate, copy is explicit, arrival advances only on journal evidence, and history/progress survive restart. At 16 plans, confirm an inactive-route deletion and import another route; verify the separate active plan stays intact on failure.
 2. Check System/System List, Spansh modes, Route History and thin galaxy projections at your Windows scaling and laptop size. Pan/zoom and compare aligned current/destination markers.
 3. Complete a mission and inspect faction effects, rewards and UTC/tick labels; check witnessed Powerplay and construction/carrier activity where available. Unknown evidence must stay unknown.
 4. Check Commander, Fleet, Ship and Frontier references still match witnessed/local versus cached sources. No new live Frontier authentication is needed for this test.

@@ -41,7 +41,7 @@ export default function GoTerminal (props) {
   else if (path === '/cmdr/colonisation' && props.stage === 'G2E') content = <GoColonisation {...props} />
   else if (path === '/nav/neutron-plotter' && props.stage === 'G2E') content = <GoSpansh {...props} />
   else if (path === '/nav/galaxy' && props.stage === 'G2E') content = <GoGalaxy context={flight?.navigation} route={plotted} {...props} />
-  else if (props.stage === 'G2E' && parityPaths.includes(path)) content = <><GoParity {...props} path={path} />{['/missions/overview', '/cmdr/overview', '/cmdr/session'].includes(path) && <BGSTally {...props} context={path.startsWith('/missions/') ? 'missions' : 'commander'} />}</>
+  else if (props.stage === 'G2E' && parityPaths.includes(path)) content = <><GoParity {...props} path={path} />{path === '/missions/overview' && <BGSTally {...props} context='missions' />}</>
   else if (['/nav/map', '/nav/list', '/exploration/system', '/exploration/biologicals'].includes(path)) content = <GoTerminalSurvey {...props} communityVersion={communityVersion} path={path} />
   else if (['/ship/status', '/ship/stats'].includes(path)) content = <GoTerminalShip {...props} />
   else if (['/nav/route', '/exploration/route'].includes(path)) {
