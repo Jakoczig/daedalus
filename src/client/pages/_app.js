@@ -14,18 +14,11 @@ const WindowTitleBar = dynamic(() => import('components/window-title-bar'), { ss
 const LAUNCHER_PATHS = ['/launcher']
 
 const handleKeyPress = (event) => {
-  const element = document.activeElement.tagName
-
-  // Check for focus on input elements
-  if (element.toLowerCase() === 'input') {
-    // If ESC is pressed, then remove focus from input
-    if (event.key === 'Escape') document.body.click()
-    
-    // If UP or DOWN arrow is pressed then remove focus
-    if (['ArrowUp', 'ArrowDown'].includes(event.key)) document.body.click()
-
-    return
-  }
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.ctrlKey || event.metaKey || event.shiftKey) return
+  // Leave native editing, selectors, widget keys and browser/OS chords alone.
+  const interactive = element => element?.isContentEditable || element?.closest?.('input, select, textarea, button, a, summary, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="listbox"], [role="slider"], [role="spinbutton"], [role="menu"], [role="menuitem"]')
+  if (interactive(event.target) || interactive(document.activeElement)) return
+  if (event.altKey && !/^[1-7]$/.test(event.key)) return
 
   try {
     switch(event.key) {

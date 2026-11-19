@@ -86,6 +86,7 @@ func (s *Service) rebuildDerived(ctx context.Context) error {
 	} else {
 		s.databaseError = ""
 		s.restored = true
+		s.needsStartupRebuild = false
 		s.cachedProjection = nil
 	}
 	s.publishLocked()

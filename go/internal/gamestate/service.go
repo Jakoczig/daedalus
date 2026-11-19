@@ -62,6 +62,8 @@ type maintenanceRequest struct {
 	reply        chan error
 }
 type Service struct {
+	startup             journal.Startup
+	needsStartupRebuild bool
 	accounts            AccountSettings
 	legacyPairingFID    string
 	statisticsKey       string
@@ -269,6 +271,9 @@ func (s *Service) Run(ctx context.Context) error {
 					s.holdProjectionLocked(v)
 				}
 				s.mu.Unlock()
+			}
+			if e == nil && s.needsStartupRebuild {
+				e = s.rebuildDerived(ctx)
 			}
 			err = e
 		}
