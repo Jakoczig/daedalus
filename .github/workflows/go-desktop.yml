@@ -2,7 +2,7 @@ name: ERIDION Go desktop
 
 on:
   pull_request:
-    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations]
+    branches: [main, security/phase-1a-foundations, go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity, go/g2e-feature-parity, go/g2f-usability-edsm, go/g2g-navigation-launcher, go/g2h-unified-navigation-integrations, go/g2j-persistent-history-integrations, go/g2k-native-field-operations, go/g2l-fleet-economy-commander-operations, go/g2m-a-eridion-identity-frontier]
   push:
     branches: [go/g1a-desktop-foundation, go/g1b-secure-remote-displays, go/g2a-journal-ingestion, go/g2b-local-nav-exploration, go/g2c-exploration-parity, go/g2d-original-ui-parity]
 
@@ -16,7 +16,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     defaults:
       run:
         shell: bash
@@ -340,13 +340,25 @@ jobs:
             temp/g2j-lifecycle.txt
           if-no-files-found: error
           retention-days: 14
+      - name: G2M-B navigation, Spansh, activity and exact galaxy geometry
+        run: node scripts/testing/g2mb-visual.cjs
+      - name: Upload G2M-B synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eridion-g2mb-synthetic-evidence-${{ runner.os }}
+          path: |
+            temp/g2mb-visual/*.png
+            temp/g2mb-visual/report.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Package experimental preview
         id: preview
         run: node scripts/build/package-go-preview.cjs
       - name: Upload experimental unsigned local route and survey preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: eridion-g2m-a-${{ runner.os }}-x64-experimental-unsigned-preview
+          name: eridion-g2m-b-${{ runner.os }}-x64-experimental-unsigned-preview
           path: ${{ steps.preview.outputs.directory }}
           if-no-files-found: error
           retention-days: 14

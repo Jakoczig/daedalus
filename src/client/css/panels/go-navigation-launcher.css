@@ -28,3 +28,30 @@ body:has(.go-launcher){zoom:1}
 .go-launcher input,.go-launcher select{min-width:0;max-width:100%}
 .go-launcher .go-provider-card{min-width:0;overflow-wrap:anywhere}
 .go-launcher .go-provider-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))}
+
+/* G2M-B: the same X and Z axes align across the three genuine projections. */
+.go-terminal .go-galaxy-area{flex:1 1 0;min-height:210px;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.go-terminal .go-galaxy-projections{display:grid;flex:none;grid-template-columns:minmax(0,1fr) max(32px,8%);grid-template-rows:minmax(0,1fr) max(32px,8%);gap:6px;overflow:hidden;max-width:100%;box-sizing:border-box}
+.go-terminal .go-galaxy-xz{grid-column:1;grid-row:1;min-height:0}
+.go-terminal .go-galaxy-xy{grid-column:1;grid-row:2}
+.go-terminal .go-galaxy-yz{grid-column:2;grid-row:1}
+.go-terminal .go-galaxy-plane{position:relative;min-height:0;overflow:hidden}
+.go-terminal .go-galaxy-plane svg{height:100%;width:100%;flex:none;display:block;box-sizing:border-box;touch-action:none}
+.go-terminal .go-galaxy-plane figcaption{position:absolute;z-index:1;top:0;left:0;pointer-events:none;padding:2px 4px;background:#0009;font-size:11px;line-height:1.2}
+.go-terminal .go-galaxy-yz figcaption{writing-mode:vertical-rl;max-height:100%;white-space:nowrap}
+.go-terminal .go-galaxy-controls{display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;font-size:.85rem;flex:none}
+.go-terminal .go-galaxy-controls small{font-size:.75rem;flex-basis:100%}
+.go-terminal .go-galaxy-source{font-size:.75rem;margin:0;flex:none}
+.go-terminal .go-galaxy-detail{font-size:.85rem}
+.go-terminal .go-galaxy.is-compact .go-galaxy-area{min-height:0;width:100%}
+.go-terminal .go-galaxy.is-compact .go-galaxy-projections{display:block;width:100%;height:100%}
+.go-terminal .go-galaxy.is-compact .go-galaxy-xz{height:100%;min-height:0}
+.go-spansh-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:.7rem}
+.go-spansh-options label{display:flex;flex-direction:column;gap:.3rem}
+.go-spansh-options input,.go-spansh-options textarea{width:100%;box-sizing:border-box;min-width:0}
+.go-spansh pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.go-context-activity{flex:none;margin:.5rem 0}
+.go-context-activity summary{color:var(--color-primary);font-size:1.2rem;cursor:pointer}
+.go-terminal .go-route>.go-field-ops{font-size:.9rem;flex:none;margin-top:.5rem}
+.go-terminal .go-route>.go-field-ops h3{font-size:1.1rem}
+.go-terminal .go-route>.go-field-ops details>summary{cursor:pointer}

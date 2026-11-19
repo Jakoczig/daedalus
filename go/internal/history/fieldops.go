@@ -249,7 +249,7 @@ type TallyRow struct {
 func (s *Store) FieldTally(ctx context.Context, fid, system, faction string, before int64, limit int, ticks bool) ([]TallyRow, error) {
 	return s.fieldTallyPage(ctx, fid, system, faction, before, -1, limit, ticks)
 }
-func (s *Store) FieldTallyCursor(ctx context.Context, fid, system, faction, cursor string, limit int, ticks bool) ([]TallyRow, error) {
+func (s *Store) FieldTallyCursor(ctx context.Context, fid, system, faction, cursor string, limit int, ticks bool, contexts ...string) ([]TallyRow, error) {
 	before := int64(0)
 	ordinal := -1
 	if cursor != "" {
@@ -267,16 +267,36 @@ func (s *Store) FieldTallyCursor(ctx context.Context, fid, system, faction, curs
 			return nil, fmt.Errorf("Invalid tally cursor")
 		}
 	}
-	return s.fieldTallyPage(ctx, fid, system, faction, before, ordinal, limit, ticks)
+	return s.fieldTallyPage(ctx, fid, system, faction, before, ordinal, limit, ticks, contexts...)
 }
-func (s *Store) fieldTallyPage(ctx context.Context, fid, system, faction string, before int64, ordinal, limit int, ticks bool) ([]TallyRow, error) {
+func (s *Store) fieldTallyPage(ctx context.Context, fid, system, faction string, before int64, ordinal, limit int, ticks bool, contexts ...string) ([]TallyRow, error) {
+	// Only fixed category predicates enter SQL. Filtering precedes LIMIT/cursors.
+	scope := ""
+	if len(contexts) > 1 {
+		return nil, errors.New("Invalid activity context")
+	}
+	if len(contexts) == 1 {
+		scope = contexts[0]
+	}
+	predicate := ""
+	switch scope {
+	case "", "commander":
+	case "missions":
+		predicate = " AND (category IN ('mission_completed','mission_influence','mission_reputation','MissionFailed','MissionAbandoned','bounty_awarded','voucher_redeemed','combat_bond_awarded'))"
+	case "powerplay":
+		predicate = " AND category LIKE 'Powerplay%'"
+	case "colonisation":
+		predicate = " AND category IN ('colonisation_contribution','colonisation_commodity')"
+	default:
+		return nil, errors.New("Invalid activity context")
+	}
 	if limit < 1 || limit > 200 {
 		return nil, errors.New("Choose 1–200 rows")
 	}
 	if before == 0 {
 		before = 1<<63 - 1
 	}
-	rows, e := s.reader.QueryContext(ctx, "SELECT cast(source_event AS TEXT),ordinal,system_address,faction,category,observed_at,amount,unit,qualifier,mission_id FROM field_tally WHERE commander_fid=? AND (?='' OR system_address=?) AND (?='' OR faction=?) AND (source_event<? OR (source_event=? AND ordinal>?)) ORDER BY source_event DESC,ordinal LIMIT ?", fid, system, system, faction, faction, before, before, ordinal, limit)
+	rows, e := s.reader.QueryContext(ctx, "SELECT cast(source_event AS TEXT),ordinal,system_address,faction,category,observed_at,amount,unit,qualifier,mission_id FROM field_tally WHERE commander_fid=? AND (?='' OR system_address=?) AND (?='' OR faction=?) AND (source_event<? OR (source_event=? AND ordinal>?))"+predicate+" ORDER BY source_event DESC,ordinal LIMIT ?", fid, system, system, faction, faction, before, before, ordinal, limit)
 	if e != nil {
 		return nil, e
 	}

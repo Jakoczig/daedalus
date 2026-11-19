@@ -29,3 +29,7 @@ G2M-B navigation/Galaxy presentation requirements are recorded in the current ha
 
 
 G2M-A follow-up on 2026-11-18: maintainer OAuth acceptance is followed by an owner-authorized live read audit of the five approved Frontier endpoints, scalar-anonymized structural fixtures, owned-fleet gap filling, separate last-station/global-CG references and normal carrier-204 handling. No uploads, credential changes, application replacement or live revocation were performed. See the [live-audit matrix](handoffs/g2m-a-frontier-live-audit.md).
+
+## G2M-B — navigation and contextual field operations
+
+Continues from the live-audited G2M-A corrections. Native System/System List/Spansh naming, unified game/imported Route with transactional history, official Spansh manual web workflow, true aligned three-plane galaxy geometry, contextual mission/Powerplay/colonisation activity and existing ownership-qualified carrier history. Module controls/credits move to owner settings. Existing single SQLite/journal pipeline, secure displays and upload permissions remain intact. See [G2M-B handoff](handoffs/g2m-b-navigation-field-context.md) and its preview acceptance checklist; final PR metadata records exact-head CI and verified artifacts.

@@ -1,0 +1,7 @@
+import { BGSTally, useFieldRead } from './go-field-operations'
+
+export default function GoColonisation (props) {
+  const { value, notice } = useFieldRead({ ...props, connected: props.connected && props.role === 'owner' }, 'getGoConstruction')
+  if (props.role !== 'owner') return <section className='go-page'><h2>Colonisation</h2><p>Private construction history is available to the local owner. This display remains read-only.</p></section>
+  return <section className='go-page go-colonisation' aria-label='Colonisation'><h2>Colonisation · witnessed projects</h2><p>Journal-backed depot snapshots, not construction predictions. No Raven requests or contributions are sent. Unknown amounts and unverified locations remain unknown.</p>{Array.isArray(value) && value.map(p => <article className='go-field-ops' key={p.marketId}><h3>Depot {p.marketId}</h3><p>System address {p.systemAddress || 'unknown'} · observed {p.observedAt || 'unknown'}</p><p>{p.progress == null ? 'Progress unknown' : (p.progress * 100).toFixed(1) + '%'} · complete {p.complete == null ? 'unknown' : String(p.complete)} · failed {p.failed == null ? 'unknown' : String(p.failed)}</p>{p.resources?.map(r => <p key={r.name}>{r.name} · provided {r.provided ?? 'unknown'} / required {r.required ?? 'unknown'} · payment {r.payment ?? 'unknown'}</p>)}</article>)}{!value?.length && <p>No witnessed construction projects for the selected commander.</p>}{notice && <p role='status'>{notice}</p>}<BGSTally {...props} context='colonisation' /></section>
+}

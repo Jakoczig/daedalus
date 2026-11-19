@@ -66,6 +66,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		Before      string `json:"before"`
 		Enabled     bool   `json:"enabled"`
 		Ticks       bool   `json:"ticks"`
+		Context     string `json:"context"`
 	}
 	if strictDecode(raw, &r) != nil {
 		return nil, errors.New("Invalid field-operation request")
@@ -163,7 +164,7 @@ func (s *Server) fieldRPC(ctx context.Context, name string, raw json.RawMessage)
 		if !db.BuiltinEnabled("bgs") {
 			return nil, errors.New("BGS module disabled; stored history retained")
 		}
-		rows, e := db.FieldTallyCursor(ctx, fid, r.System, r.Faction, r.Before, 100, r.Ticks)
+		rows, e := db.FieldTallyCursor(ctx, fid, r.System, r.Faction, r.Before, 100, r.Ticks, r.Context)
 		if e != nil {
 			return nil, e
 		}

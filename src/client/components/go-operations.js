@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Badge, Icon } from './go-terminal-widgets'
 import GoCommunityGoals from './go-community-goals'
 import GoFleet from './go-fleet'
+import { BGSTally } from './go-field-operations'
 import GoProviderReference from './go-provider-reference'
 
 const routes = {
@@ -66,7 +67,7 @@ export default function GoOperations (props) {
       {kind === 'mining' && <p>Each MiningRefined event records one tonne. Attributed mining receipts require a witnessed empty cargo baseline and exclusively refined input in the same session. Mixed or unknown cargo is excluded; mining profit remains unknown. All sales remain available separately. No inferred stock valuation.</p>}
       {kind === 'loadouts' && <p>Exact witnessed final engineering modifiers, never inferred from blueprint grade. Stored ship full performance remains unavailable. <a href='/ship/stats'>Current ship native statistics</a></p>}
       {kind === 'powerplay' && <p>Witnessed fields only. No inferred merit conversion, decay, post-2.0 rank rules or causal BGS influence.</p>}
-      {kind === 'goals' && <p>Last witnessed participation, expiry and progress. Reward is received only for CommunityGoalReward; an offered bonus is not payment. <a href='/cmdr/field'>Local BGS activity</a></p>}
+      {kind === 'goals' && <p>Last witnessed participation, expiry and progress. Reward is received only for CommunityGoalReward; an offered bonus is not payment. <a href='/missions/overview'>Local mission & faction activity</a></p>}
       {page?.goalMembership && <section aria-label='Subscribed-goal membership'><h3>{page.goalMembership.known ? `${page.goalMembership.ids.length} subscribed goals as last witnessed` : 'Subscribed goals unknown'}</h3><p>{page.goalMembership.observedAt || 'No complete snapshot'} · {page.goalMembership.notice}</p></section>}
       {page?.totals && <section><h3>Selected page transaction totals</h3><Evidence value={page.totals} /></section>}
       {page?.current?.length > 0 && <details><summary>Last witnessed state · not a live account</summary>{page.current.map(r => <section key={r.id}><h3>{r.title} · {r.entity || 'identity not witnessed'}</h3><small>{r.at} · {r.state.replaceAll('_', ' ')}</small><Evidence value={r.details} /></section>)}</details>}
@@ -76,6 +77,8 @@ export default function GoOperations (props) {
       <details><summary>Private CSV export · selected page only</summary><p>Contains private financial details, ship locations and potentially other players’ names. Preview the exact currently loaded page before acknowledging. No provider upload occurs.</p><button disabled={!page?.rows?.length} onClick={() => { setPreview({ rows: page.rows, hash: page.previewHash }); setAck(false) }}>Preview selected private records</button>{preview && <><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(preview.rows, null, 2)}</pre><label><input type='checkbox' checked={ack} onChange={e => setAck(e.target.checked)} /> I reviewed these private records and understand the exposure.</label><button disabled={!ack} onClick={exportPage}>Download selected private CSV</button></>}</details>
       {page?.reference?.length > 0 && <details><summary>Reconciled cached account reference · Frontier first, Inara gaps only</summary>{page.reference.filter(f => ['ships', 'ship', 'carrier', 'squadron', 'communityGoals'].includes(f.field)).map(f => <section key={f.field}><h3>{f.field} · {f.source}</h3><p>Observed {f.observedAt || 'unknown'} · fetched {f.fetchedAt} · {f.stale ? 'stale' : 'cached'}; separate source evidence, not assumed current</p><Evidence value={f.value} /></section>)}</details>}
       <GoProviderReference {...props} publicGoals={kind === 'goals'} />
+      {kind === 'powerplay' && <BGSTally {...props} context='powerplay' />}
+      {kind === 'carrier' && <p>Owned-carrier activity stays in this carrier ledger; unrelated personal market trades are never attributed to it. Private local CSV export above requires your explicit review. External reporting remains separately opt-in. BGS-Tally behavior reference: tezw21/aussig (MIT).</p>}
       {notice && <p role='status'>{notice}</p>}
     </section>
   )

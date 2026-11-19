@@ -1,0 +1,32 @@
+# G2M-B — navigation and contextual field operations
+
+Based on corrected G2M-A `255cacbd2c61d0d0e5b80e31f8e3ab493344d179`; new stacked draft targets `go/g2m-a-eridion-identity-frontier`. The final PR description is the exact-head CI/artifact/checksum ledger, populated after verification without a documentation-only rebuild.
+
+The preceding [live Frontier audit](g2m-a-frontier-live-audit.md) used the actual Windows session and five authorized GET endpoints. Its [Windows/Linux desktop CI](https://github.com/Jakoczig/eridion/actions/runs/44368730191) and [legacy/security CI](https://github.com/Jakoczig/eridion/actions/runs/44368730249) passed. The first Linux job timed out at packaging after passing tests; its unchanged-head retry passed. Both preview manifests and archive digests were independently verified. The user subsequently closed Elite Dangerous; G2M-B verification uses synthetic fixtures and does not restart or access the game.
+
+| Capability | Implementation and limit |
+|---|---|
+| Native navigation | System, System List, Spansh Plotter; legacy names/behavior retained. Native Controls removed; compatible old links open Commander. |
+| Unified Route | Game NavRoute and imported user plan remain distinct. Manual controls below game waypoints; no targeting, auto-copy or game command. |
+| Spansh | Eleven verified public plotter links plus local Route History. Relevant local planning notes, explicit device-local copy, manual official-site export/CSV import, successful import opens Route. No undocumented generation/prefill/result API. |
+| Durable itineraries | Existing SQLite transactions, per-commander history/progress/manual activation, 16 plans and 2,048 unique systems per plan. Abrupt-process-exit regression checks committed WAL recovery and failed-import atomicity. No new database or journal reader. |
+| Galaxy | Large square X/Z, thin bottom X/Y matching width, thin right Y/Z matching height. Shared frame and real coordinate projection; ResizeObserver only, no render timer/WebGL. One additional 19,303-byte original procedural texture. |
+| Missions and Powerplay | Context-specific indexed SQLite history with filters before pagination, exact source-event cursor, verified closed tick grouping or explicit UTC-day fallback. Awards/redemption and ordinal effects remain distinct. |
+| Colonisation | Existing witnessed depot snapshots/resources plus contributions in a dedicated Commander context. No new provider request. |
+| Carrier / Commander | Existing ownership-qualified carrier ledger and exports retained; all private journal activity available in Commander. No guessed carrier influence or attribution from personal trading. |
+| Modules / attribution | Existing built-in controls moved to owner settings, retained creator credits/licenses/history. No EDMC execution/install/updater. |
+| Security | Existing owner-only history/exports/modules/imports; viewer route-progress allowlist, account scoping, revocation and upload consent unchanged. New context filter accepts a fixed enum, never arbitrary SQL. |
+
+## Source references and licensing
+
+- Official [Spansh](https://spansh.co.uk/) public navigation inspected 2026-11-18: `plotter`, `exact-plotter`, `fleet-carrier`, `trade`, `tourist`, `riches`, `ammonia`, `earth`, `rocky-metal`, `exobiology`, `colonisation`. Public application asset `elite-dangerous-gui-5c61d07491d3e5ed07afdd07c7a00e7e.js`, SHA-256 `9b7a57a9453cdc99eb7600d596f93563a820c55f36fad6dbaae83f7cc71c9f12`, was inspected read-only to verify navigation, not executed/copied/bundled. These are website routes, not a stable backend contract. Advanced website options are configured there; local notes do not validate range, fuel or route safety.
+- [BGS-Tally](https://github.com/aussig/BGS-Tally/tree/fb843967ef4e7a6f23a3d26bb58c5c612f253643), MIT, tezw21/aussig, current behavior reference. Existing ported G2K algorithm revision and [license notices](../licenses/g2k) remain unchanged. This batch reorganizes existing journal effects; it does not claim full EDMC plugin parity, manual combat-zone inference, automatic Inara lookup, Discord reporting, overlays or colonisation predictions.
+- Galaxy imagery is original procedural artwork under the repository license. No CC BY-NC-SA artwork/data was added. The older Z/Y texture remains for compatibility; the new right projection is actually Y/Z with Z vertical.
+
+## Verification and remaining acceptance
+
+Focused regressions cover mode catalogue/fixed links/no automatic request, native-only Controls removal, owner-only activity without first-commander selection, category scope before LIMIT/cursors, commander isolation, strict context rejection, and crash/restart route recovery. Synthetic real-browser tests cover all plotters, import-to-Route, persistent reload/history, contextual pages, exact marker/edge alignment at desktop/laptop/compact/portrait sizes, zoom alignment and zero external requests. Full Windows/Linux native, Go, JavaScript, security, Linux race and prior-milestone visual gates remain mandatory in CI.
+
+CI job budget is 35 minutes, allowing the accumulated native regression/benchmark gates and the added browser batch after the observed 25-minute Linux infrastructure timeout. No test timeout, assertion or security gate was removed. Performance evidence is limited to measured synthetic CI/browser results in the PR ledger; no real-game resource improvement is claimed. Backend processing is reused, with no new polling/provider requests or duplicate ingestion pipeline.
+
+Physical gameplay, monitor scaling and paired-laptop acceptance remain manual. Use the single [preview checklist](../testing/g2m-b-eridion-preview.md#gameplay-checklist). The legacy application and installed preview are untouched. No merge, release, deployment, credential change or production upload was performed.

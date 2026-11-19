@@ -3,7 +3,7 @@
   "label": "Illustrative spiral-arm concept — not measured star density",
   "source": "DAEDALUS analytic four-arm concept; galactic center (0,0,25900 LY)",
   "license": "Original procedural artwork; repository LICENSE",
-  "coordinates": "Elite Dangerous Y vertical; top X/Z; side X/Y and Z/Y; positive Z and Y up",
+  "coordinates": "Elite Dangerous Y vertical; top X/Z; bottom X/Y; right Y/Z (Z vertical); legacy Z/Y retained; positive Z and Y up",
   "extents": {
     "x": [
       -65000,
@@ -37,6 +37,12 @@
       "width": 512,
       "height": 120,
       "bytes": 10724
+    },
+    {
+      "axes": "yz",
+      "width": 120,
+      "height": 512,
+      "bytes": 19303
     }
   ]
 }
