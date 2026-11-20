@@ -15,6 +15,13 @@ import (
 	"time"
 )
 
+const maxProjectionTiles = 96
+
+// At most 3 projections, each with 96 desired files and 96 displayed fallback
+// sources. Each verified PNG is <=4 MiB: a finite 2.25 GiB worst-case working
+// set, not a reserved cache allocation. Normal retention remains 128 MiB.
+const maxWorkingSetBytes = int64(3*maxProjectionTiles*2) * (4 << 20)
+
 type Frame map[string][2]float64
 type ViewRequest struct {
 	Frame   Frame `json:"frame"`
@@ -93,7 +100,7 @@ func selectTiles(meta Metadata, q ViewRequest) ([]wanted, error) {
 			for x := x0; x <= x1; x++ {
 				if l.occupied(x, y) {
 					items = append(items, wanted{axes, n, x, y})
-					if len(items) > 96 {
+					if len(items) > maxProjectionTiles {
 						return nil, errors.New("viewport tile bound")
 					}
 				}
@@ -240,7 +247,6 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 	}
 	m.mu.Lock()
 	r := m.current
-	online := owner && m.state.Details && !m.state.Metered
 	m.mu.Unlock()
 	v := View{Tiles: []Tile{}, Source: sourceURL}
 	if r == nil {
@@ -256,6 +262,26 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 	v.Attribution = r.index.Attribution
 	missing := []wanted{}
 	cats := map[string]map[string]Asset{}
+	// Load catalog metadata before either manager/cache lock. A catalog download
+	// may hold catalogsMu and need m.mu for progress; never wait for it while pinned.
+	for _, w := range desired {
+		for n := w.level; n > 4; n-- {
+			key := fmt.Sprintf("%s%d", w.axes, n)
+			if _, ok := cats[key]; !ok {
+				assets, _ := m.catalog(r, w.axes, n, false, m.ctx)
+				cats[key] = assets
+			}
+		}
+	}
+	// One lock order: m.mu -> cacheMu. File selection plus publication is atomic
+	// with eviction, so an asset cannot disappear between verification and pinning.
+	m.mu.Lock()
+	if m.current != r || m.ctx.Err() != nil {
+		m.mu.Unlock()
+		return v, errors.New("Atlas view changed; retry")
+	}
+	online := owner && m.state.Details && !m.state.Metered
+	m.cacheMu.Lock()
 	for _, w := range desired {
 		found := false
 		for n := w.level; n >= 0; n-- {
@@ -265,11 +291,7 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 			if n > 4 {
 				name = "tiles/" + name
 				catKey := fmt.Sprintf("%s%d", w.axes, n)
-				a, ok := cats[catKey]
-				if !ok {
-					a, _ = m.catalog(r, w.axes, n, false, m.ctx)
-					cats[catKey] = a
-				}
+				a := cats[catKey]
 				desc, ok := a[name]
 				if !ok {
 					continue
@@ -292,26 +314,30 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 		}
 	}
 	if owner {
+		m.visible = map[string]bool{}
+		// A visible high-LOD cell may currently use a cached lower-LOD tile.
+		// Keep that actual source as well as its pending replacement.
+		for _, tile := range v.Tiles {
+			if tile.SourceLevel > 4 {
+				name := strings.TrimPrefix(tile.URL, "/atlas/assets/"+r.index.ID+"/")
+				m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(name))] = true
+			}
+		}
+		for _, w := range desired {
+			if w.level > 4 {
+				m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(fmt.Sprintf("tiles/%s/%d/%d-%d.png", w.axes, w.level, w.x, w.y)))] = true
+			}
+		}
+
+		m.evictLocked()
+	}
+	m.cacheMu.Unlock()
+	if owner {
 		keyBytes, _ := json.Marshal(q)
 		key := r.index.ID + string(keyBytes)
-		m.mu.Lock()
 		if key != m.viewKey {
 			if m.viewCancel != nil {
 				m.viewCancel()
-			}
-			m.visible = map[string]bool{}
-			// A visible high-LOD cell may currently use a cached lower-LOD tile.
-			// Keep that actual source as well as its pending replacement.
-			for _, tile := range v.Tiles {
-				if tile.SourceLevel > 4 {
-					name := strings.TrimPrefix(tile.URL, "/atlas/assets/"+r.index.ID+"/")
-					m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(name))] = true
-				}
-			}
-			for _, w := range desired {
-				if w.level > 4 {
-					m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(fmt.Sprintf("tiles/%s/%d/%d-%d.png", w.axes, w.level, w.x, w.y)))] = true
-				}
 			}
 			m.viewKey = key
 			m.viewPending = false
@@ -324,8 +350,8 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 			}
 		}
 		v.Pending = m.viewPending
-		m.mu.Unlock()
 	}
+	m.mu.Unlock()
 	return v, nil
 }
 func (m *Manager) downloadVisible(ctx context.Context, key string, r *release, items []wanted) {
@@ -443,41 +469,61 @@ func (m *Manager) scanCache() {
 	})
 	m.evictLocked()
 }
+
+// cacheMu guards both the pin snapshot and LRU entries. Never acquire m.mu here.
 func (m *Manager) evictLocked() {
-	var total int64
+	keep := map[string]bool{}
+	for p, v := range m.visible {
+		keep[p] = v
+	}
+	var total, pinned int64
 	paths := make([]string, 0, len(m.disk))
 	for p, e := range m.disk {
 		total += e.bytes
-		paths = append(paths, p)
+		if keep[p] {
+			pinned += e.bytes
+		} else {
+			paths = append(paths, p)
+		}
 	}
-	sort.Slice(paths, func(i, j int) bool { return m.disk[paths[i]].used.Before(m.disk[paths[j]].used) })
+	// A genuine visible working set may temporarily exceed 128 MiB. In that
+	// case retain exactly the pinned files, not extra historic/cache entries.
+	budget := max(int64(maxDetailCache), pinned)
+	if total <= budget {
+		m.cacheBytes = total
+		return
+	}
+	sort.Slice(paths, func(i, j int) bool {
+		a, b := m.disk[paths[i]], m.disk[paths[j]]
+		if a.used.Equal(b.used) {
+			return paths[i] < paths[j]
+		}
+		return a.used.Before(b.used)
+	})
 	for _, p := range paths {
-		if total <= maxDetailCache {
+		if total <= budget {
 			break
 		}
-		if os.Remove(p) == nil {
+		if e := os.Remove(p); e == nil || os.IsNotExist(e) {
 			total -= m.disk[p].bytes
 			delete(m.disk, p)
 		}
 	}
 	m.cacheBytes = total
 }
-func (m *Manager) cacheSize() int64 {
+func (m *Manager) cacheStats() (total, detail, pinned, budget int64) {
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
-	return m.cacheBytes + m.baseBytes
+	for p := range m.visible {
+		pinned += m.disk[p].bytes
+	}
+	return m.cacheBytes + m.baseBytes, m.cacheBytes, pinned, max(int64(maxDetailCache), pinned)
 }
 func (m *Manager) ClearDetails() error {
-	m.mu.Lock()
-	keep := map[string]bool{}
-	for p, v := range m.visible {
-		keep[p] = v
-	}
-	m.mu.Unlock()
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
 	for p := range m.disk {
-		if keep[p] {
+		if m.visible[p] {
 			continue
 		}
 		if e := os.Remove(p); e != nil && !os.IsNotExist(e) {
@@ -487,6 +533,14 @@ func (m *Manager) ClearDetails() error {
 	}
 	m.evictLocked()
 	return nil
+}
+
+// Caller holds m.mu; keep the sole nested lock order when changing releases.
+func (m *Manager) resetVisibleLocked() {
+	m.cacheMu.Lock()
+	defer m.cacheMu.Unlock()
+	m.visible = nil
+	m.evictLocked()
 }
 func (m *Manager) pruneReleases() {
 	m.mu.Lock()

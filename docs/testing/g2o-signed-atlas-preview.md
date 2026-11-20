@@ -19,11 +19,18 @@ No new uploads are enabled.
    Fit Route, zoom and drag retain independent game-position/route overlays.
 4. Optionally allow **missing visible high-resolution tiles**. This permission is
    independent of automatic version checks. Only occupied visible tiles are fetched,
-   with two concurrent downloads and a 128 MiB persistent detail budget.
+   with two concurrent downloads and a 128 MiB persistent detail target.
 5. Leave automatic checks off for fully manual network use. If enabled, only a signed
    pointer check runs on startup, at most once per 24 hours, including failure cooldown.
    Updates still require the Install button. The metered pause blocks automatic checks
    and detail downloads; explicit manual check/install remain available.
+
+Automatic and manual cleanup preserve the current owner viewport's verified
+sources and temporary fallbacks. If that working set itself exceeds 128 MiB,
+Settings reports the actual retained bytes and effective budget; nonvisible files
+are evicted. Only the current working set gets this exception (at most 576 files,
+2.25 GiB worst-case disk use at the protocol's 4 MiB/file bound). Refinement and
+panning release old pins and immediately restore the normal 128 MiB target.
 
 The atlas host receives ordinary asset requests and tile addresses (which reveal the
 viewport region), never account tokens, commander/system names, raw journals or uploads.
@@ -50,6 +57,7 @@ One gameplay / laptop checklist:
 - Confirm commander selection and existing Frontier connection remain unchanged.
 - Install the overview; compare X/Z, X/Y and Y/Z orientation and player/destination positions.
 - Pan/zoom and Fit Route; allow detail, then revisit the same area offline after restart.
+- After extended high-zoom browsing, confirm visible detail/fallback does not disappear; pan away and confirm the reported budget returns to normal.
 - Disconnect the network during an update; confirm the old map remains usable.
 - On a paired laptop, confirm cached map/overlays/reconnect work and owner controls remain unavailable.
 - Check FSD compact mode and return-to-page behavior during real travel. Keep uploads disabled.

@@ -20,7 +20,7 @@ No publisher/server/generator changes or Proxmox access were performed.
 | Protocol | Python-compatible canonical payload bytes (including Unicode, exact integers and float formatting), signature/key/algorithm checks, recursive duplicate rejection, surrogate/numeric/depth/size validation, exact schemas and paths, pointer time/high-water checks, immutable IDs and hashes. Release IDs are hashes, not sortable version numbers. |
 | Network | Fixed HTTPS origin; no cookies, credentials, queries or arbitrary URL proxy; strict redirects, header/body bounds, 8s pointer and 30s asset deadlines. No requests on ordinary startup unless opted in. Automatic pointer attempts, including failure, persist a 24h cooldown and conditional ETag. No busy polling, automatic installs or source-dump downloads. |
 | Install | Signed pointer/index → bounded overview → validated CRC/PNG/occupancy metadata in isolated staging → immutable version directory → atomic active-state write. Previous release retained; explicit verified rollback. Failed extraction/write/download cannot replace the old release. Abandoned staging is cleaned on restart. |
-| Detail | Metadata-driven LOD and sparse visible tiles, catalog hashes/identity/counts, <=2 workers, cancellation on superseding viewport, fairness across projections, verified lower-LOD fallback. Persistent 128 MiB LRU detail budget, bounded catalogs/metadata, memory-only access tracking. No raster generation. |
+| Detail | Metadata-driven LOD and sparse visible tiles, catalog hashes/identity/counts, <=2 workers, cancellation on superseding viewport, fairness across projections, verified lower-LOD fallback. Persistent 128 MiB LRU detail target with the bounded visible-working-set exception below, bounded catalogs/metadata, memory-only access tracking. No raster generation. |
 | UI | Original three-plane layout, shared pan/zoom/Fit actions and overlays preserved. Verified cropped tile references replace illustrative native imagery. Launcher/settings expose version, provenance, checks, progress, separate permissions, cache cleanup, rollback and errors. No atlas means an honest uninstalled state. |
 | Security | Existing single Go service and profile lock; read-only authenticated asset routes; viewers cannot mutate settings/install/fetch remotely. SQLite, commander isolation, Frontier and uploads untouched. |
 
@@ -31,6 +31,39 @@ and overview storage are additional to the 128 MiB detail budget. Images are ver
 against signed metadata before serving. Manual checks provide retry; automatic pointer
 failures cool down for 24h, and failed detail attempts retry after a changed viewport
 or explicit permission refresh rather than looping offline.
+
+## P2 automatic-eviction correction
+
+Review [7042800660](https://github.com/Jakoczig/eridion/pull/22#issuecomment-7042800660),
+against `14eb8a93a70da3d5279b20a21bbb1ff6f0436796`, was reproduced with a
+near-full cache: inserting a signed L7 tile made the old L5 fallback unreadable
+through `Manager.Asset()`. Automatic LRU now skips a cache-locked snapshot of
+current source and pending paths, including verified fallback sources. Snapshot
+selection/publication and eviction are serialized; no `cacheMu → mu` acquisition
+is introduced. Catalog metadata is loaded outside both locks; the only nested
+order is `mu → cacheMu`. Manual cleanup uses the same snapshot protection.
+
+The 128 MiB detail target is unchanged. If the pinned working set alone exceeds
+it, the effective budget is **max(128 MiB, currently pinned bytes)**; all extra
+nonvisible entries are evicted. This is not a reserved allocation. A viewport
+has at most 96 tiles per projection, three projections, and one displayed
+fallback per desired tile: at most 576 protected paths × 4 MiB = **2.25 GiB
+worst-case disk working set**. Actual retained bytes/effective budget are exposed
+in owner settings. Pins refresh even on the same viewport when L7 replaces a
+fallback; panning or changing release releases old pins and immediately resumes
+normal budget enforcement. Historic viewports are not accumulated. Overview and
+catalog storage remain additional to the detail target, as before.
+
+Focused regressions use genuine signed fixtures for visible/incoming `Asset()`
+checks and sparse cold files for near-full disk accounting. They cover automatic
+insertion and rescans, LRU ordering, same-viewport refinement, pan/release,
+140 MiB working-set disclosure and return to 128 MiB, unchanged manual cleanup,
+and two concurrent downloads with a viewport change. A channel-controlled write
+boundary proves eviction completes while `mu` is held, catching reverse lock
+acquisition without relying on sleeps. Focused race tests passed; the final PR
+ledger records the corrected implementation commit, comprehensive exact-head CI
+and independently verified refreshed previews. Prior live publisher evidence
+below is retained; this correction makes no additional production-provider calls.
 
 ## Evidence and measurements
 

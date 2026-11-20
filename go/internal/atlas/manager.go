@@ -68,22 +68,25 @@ type state struct {
 }
 type Status struct {
 	Preferences
-	Installed  string    `json:"installed"`
-	Available  string    `json:"available"`
-	Previous   string    `json:"previous"`
-	LastCheck  time.Time `json:"lastCheck"`
-	Source     string    `json:"source"`
-	Generated  string    `json:"generated"`
-	SourceDate string    `json:"sourceDate"`
-	Busy       bool      `json:"busy"`
-	Downloaded int64     `json:"downloaded"`
-	Estimated  int64     `json:"estimated"`
-	CacheBytes int64     `json:"cacheBytes"`
-	Error      string    `json:"error"`
+	Installed            string    `json:"installed"`
+	Available            string    `json:"available"`
+	Previous             string    `json:"previous"`
+	LastCheck            time.Time `json:"lastCheck"`
+	Source               string    `json:"source"`
+	Generated            string    `json:"generated"`
+	SourceDate           string    `json:"sourceDate"`
+	Busy                 bool      `json:"busy"`
+	Downloaded           int64     `json:"downloaded"`
+	Estimated            int64     `json:"estimated"`
+	CacheBytes           int64     `json:"cacheBytes"`
+	DetailBytes          int64     `json:"detailBytes"`
+	VisibleDetailBytes   int64     `json:"visibleDetailBytes"`
+	DetailBudgetBytes    int64     `json:"detailBudgetBytes"`
+	WorkingSetLimitBytes int64     `json:"workingSetLimitBytes"`
+	Error                string    `json:"error"`
 }
 type Manager struct {
 	baseBytes             int64
-	visible               map[string]bool
 	write                 func(string, string, []byte) error
 	mu                    sync.Mutex
 	operation             sync.Mutex
@@ -105,6 +108,7 @@ type Manager struct {
 	viewKey               string
 	viewPending           bool
 	cacheMu               sync.Mutex
+	visible               map[string]bool // guarded only by cacheMu
 	disk                  map[string]diskEntry
 	cacheBytes            int64
 }
@@ -228,7 +232,8 @@ func (m *Manager) Status() Status {
 		v.SourceDate = source.Downloaded
 	}
 	m.mu.Unlock()
-	v.CacheBytes = m.cacheSize()
+	v.CacheBytes, v.DetailBytes, v.VisibleDetailBytes, v.DetailBudgetBytes = m.cacheStats()
+	v.WorkingSetLimitBytes = maxWorkingSetBytes
 	return v
 }
 func (m *Manager) fail(e error) error { m.mu.Lock(); m.lastError = e.Error(); m.mu.Unlock(); return e }
@@ -486,6 +491,7 @@ func (m *Manager) Install(ctx context.Context) error {
 	m.state = s
 	m.current = r
 	m.current.dir = dest
+	m.resetVisibleLocked()
 	m.lastError = ""
 	if m.viewCancel != nil {
 		m.viewCancel()
@@ -553,6 +559,7 @@ func (m *Manager) Rollback() error {
 	}
 	m.mu.Lock()
 	m.current = r
+	m.resetVisibleLocked()
 	m.state = s
 	m.lastError = ""
 	if m.viewCancel != nil {
