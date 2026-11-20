@@ -24,6 +24,7 @@ func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessag
 		}
 		return v, e
 	}
+	confirmedChoice := false
 	if name == "setGoAccounts" {
 		s.accountMu.Lock()
 		defer s.accountMu.Unlock()
@@ -45,6 +46,7 @@ func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessag
 			return nil, errors.New("Select a verified local journal account")
 		}
 		previousSettings := s.game.Accounts()
+		confirmedChoice = !q.Multiple || previousSettings.Multiple
 		target := q.Selected
 		if !q.Multiple {
 			target = ""
@@ -73,9 +75,18 @@ func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessag
 			}
 		}
 	}
+	// Successful explicit selection (including reselecting the persisted profile)
+	// confirms this launch. Enabling multi-account mode still requires card choice.
+	if name == "setGoAccounts" {
+		s.accountConfirmed.Store(confirmedChoice)
+	}
 	cards := []map[string]any{}
 	for _, c := range s.game.AccountCards() {
 		cards = append(cards, map[string]any{"fid": c.FID, "name": c.Name, "shipName": c.ShipName, "shipType": c.ShipType, "system": c.System, "active": c.Active, "avatar": s.avatarThumbnail(c.FID)})
 	}
-	return map[string]any{"settings": s.game.Accounts(), "cards": cards}, nil
+	return map[string]any{"settings": s.game.Accounts(), "cards": cards, "choiceRequired": s.accountChoiceRequired()}, nil
+}
+
+func (s *Server) accountChoiceRequired() bool {
+	return s.game != nil && s.game.Accounts().Multiple && !s.accountConfirmed.Load()
 }

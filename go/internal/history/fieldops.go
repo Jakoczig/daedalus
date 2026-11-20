@@ -324,6 +324,8 @@ func (s *Store) fieldTallyPage(ctx context.Context, fid, system, faction string,
 		predicate = " AND (category IN ('mission_completed','mission_influence','mission_reputation','MissionFailed','MissionAbandoned','bounty_awarded','voucher_redeemed','combat_bond_awarded'))"
 	case "powerplay":
 		predicate = " AND category LIKE 'Powerplay%'"
+	case "trade":
+		predicate = " AND category IN ('MarketBuy','MarketSell')"
 	case "colonisation":
 		predicate = " AND category IN ('colonisation_contribution','colonisation_commodity')"
 	default:
@@ -335,7 +337,7 @@ func (s *Store) fieldTallyPage(ctx context.Context, fid, system, faction string,
 	if before == 0 {
 		before = 1<<63 - 1
 	}
-	rows, e := s.reader.QueryContext(ctx, "SELECT cast(source_event AS TEXT),ordinal,system_address,faction,category,observed_at,amount,unit,qualifier,mission_id FROM field_tally WHERE commander_fid=? AND (?='' OR system_address=?) AND (?='' OR faction=?) AND (source_event<? OR (source_event=? AND ordinal>?))"+predicate+" ORDER BY source_event DESC,ordinal LIMIT ?", fid, system, system, faction, faction, before, before, ordinal, limit)
+	rows, e := s.reader.QueryContext(ctx, "SELECT cast(source_event AS TEXT),ordinal,system_address,faction,category,observed_at,amount,unit,qualifier,mission_id,CASE WHEN category LIKE 'Powerplay%' THEN coalesce((SELECT raw_relevant_json FROM journal_events j WHERE j.event_id=field_tally.source_event AND j.commander_fid=field_tally.commander_fid),'{}') ELSE '{}' END FROM field_tally WHERE commander_fid=? AND (?='' OR system_address=?) AND (?='' OR faction=?) AND (source_event<? OR (source_event=? AND ordinal>?))"+predicate+" ORDER BY source_event DESC,ordinal LIMIT ?", fid, system, system, faction, faction, before, before, ordinal, limit)
 	if e != nil {
 		return nil, e
 	}
@@ -343,8 +345,24 @@ func (s *Store) fieldTallyPage(ctx context.Context, fid, system, faction string,
 	out := []TallyRow{}
 	for rows.Next() {
 		var r TallyRow
-		if e = rows.Scan(&r.Event, &r.Ordinal, &r.System, &r.Faction, &r.Category, &r.At, &r.Amount, &r.Unit, &r.Qualifier, &r.Mission); e != nil {
+		var powerRaw string
+		if e = rows.Scan(&r.Event, &r.Ordinal, &r.System, &r.Faction, &r.Category, &r.At, &r.Amount, &r.Unit, &r.Qualifier, &r.Mission, &powerRaw); e != nil {
 			return nil, e
+		}
+		// Retained source repair is read-only and bounded by this indexed page.
+		// Powerplay is a balance snapshot; only PowerplayMerits reports earned delta.
+		if strings.HasPrefix(r.Category, "Powerplay") {
+			v := object([]byte(powerRaw))
+			r.Qualifier = text(v["Power"]) + "; no inferred influence"
+			if r.Category == "PowerplayMerits" {
+				r.Amount = ""
+				r.Unit = "earned merits"
+				if n, ok := v["MeritsGained"].(json.Number); ok {
+					r.Amount = identifier(n)
+				}
+			} else if r.Category == "Powerplay" {
+				r.Unit = "reported merit balance"
+			}
 		}
 		at, e := time.Parse(time.RFC3339Nano, r.At)
 		r.Period = "unknown date"
@@ -464,6 +482,8 @@ func fieldTally(tx *sql.Tx, id int64, fid, system, kind, stamp string, v map[str
 			return nil
 		}
 		return add(system, faction, "voucher_redeemed", v["Amount"], "CR", text(v["Type"])+"; impact unknown")
+	case "PowerplayMerits":
+		return add(system, "", kind, v["MeritsGained"], "earned merits", text(v["Power"])+"; no inferred influence")
 	case "FactionKillBond":
 		return add(system, text(v["AwardingFaction"]), "combat_bond_awarded", v["Reward"], "CR", "Awarded, not redeemed")
 	case "ColonisationContribution":

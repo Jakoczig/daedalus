@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -17,6 +18,7 @@ import (
 
 type Server struct {
 	accountMu                 sync.Mutex
+	accountConfirmed          atomic.Bool
 	copyWaypoint              func(string) error
 	saveFieldCSV              func(string, string) error
 	providers                 *providers.Manager

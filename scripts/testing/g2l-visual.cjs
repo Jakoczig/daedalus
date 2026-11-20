@@ -32,11 +32,12 @@ async function main () {
         report.pages.push({ name, url, overflow })
       }
     }
-    await navigate('/cmdr/community-goals', '2 subscribed goals as last witnessed')
+    await navigate('/cmdr/community-goals', '2 subscribed')
     host.child.stdin.write('operations-goals-empty\n')
-    await waitFor(() => evaluate(pageTextReady('0 subscribed goals as last witnessed')))
-    if (!await evaluate('document.body.textContent.includes("1000")&&document.body.textContent.includes("Received reward")&&document.body.textContent.includes("Historical contributions and rewards are retained")')) throw new Error('Empty complete CG snapshot lost history or left removed goals current')
-    await navigate('/cmdr/community-goals', '0 subscribed goals as last witnessed')
+    await waitFor(() => evaluate(pageTextReady('0 subscribed')))
+    await evaluate('Array.from(document.querySelectorAll("details")).find(e=>e.querySelector("summary")?.textContent==="Past participation & rewards").open=true')
+    if (!await evaluate('/Reward\\s+1[,\\s]?000 CR/.test(document.querySelector(".go-goals").innerText)&&document.querySelector(".go-goals").innerText.includes("Reward")&&!Array.from(document.querySelectorAll(".go-goal-card .go-badge")).some(e=>e.textContent==="SUBSCRIBED")')) throw new Error('Empty complete CG snapshot lost history or left removed goals current: ' + await evaluate('document.querySelector(".go-goals").innerText'))
+    await navigate('/cmdr/community-goals', '0 subscribed')
     report.completeGoalSnapshotRetiresMembershipAndKeepsHistory = true
     await navigate('/ship/fleet', 'Fixture Explorer'); await measure('G2L open Fleet')
     const priorEvents = eventsRead; host.child.stdin.write('operations-dock\n'); await waitFor(() => eventsRead >= priorEvents + 3); host.child.stdin.write('operations-market\n')

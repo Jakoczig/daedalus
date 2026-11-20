@@ -44,6 +44,7 @@ type Model struct {
 
 func NewModel() *Model        { return &Model{states: map[string]*state{}} }
 func (m *Model) ResetSource() { m.states = map[string]*state{}; m.order = nil }
+
 func copyPtr[T any](p *T) *T {
 	if p == nil {
 		return nil
@@ -75,6 +76,16 @@ func (m *Model) View(key string) View {
 // Identity is internal cache context; it is never a public projection field.
 func (m *Model) Identity(key string) string {
 	if s := m.states[key]; s != nil && s.verified {
+		return s.id
+	}
+	return ""
+}
+
+// LastKnownIdentity is owner-only display lookup context. Shutdown retains the
+// witnessed ship ID; gaps and unverified states cannot authorize this lookup.
+// Live telemetry/calculations must continue to use Identity instead.
+func (m *Model) LastKnownIdentity(key string) string {
+	if s := m.states[key]; s != nil && (s.verified || s.v.Evidence == "waiting_game") {
 		return s.id
 	}
 	return ""
@@ -126,7 +137,7 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		return
 	}
 	switch e.Type {
-	case "LoadGame", "Loadout", "FSDJump", "FuelScoop", "HullDamage", "RefuelAll", "RefuelPartial", "Docked", "Undocked", "Touchdown", "Liftoff", "Location", "ShipyardSwap", "ShipyardBuy", "Shutdown":
+	case "LoadGame", "Loadout", "SetUserShipName", "FSDJump", "FuelScoop", "HullDamage", "RefuelAll", "RefuelPartial", "Docked", "Undocked", "Touchdown", "Liftoff", "Location", "ShipyardSwap", "ShipyardBuy", "Shutdown":
 	default:
 		return
 	}
@@ -162,6 +173,12 @@ func (m *Model) ApplyEvent(key string, e journal.Event) {
 		s.id = shipID(data["ShipID"])
 		numeric(data, "FuelLevel", 0, 1e6, &s.v.FuelMainT)
 		numeric(data, "FuelCapacity", 0, 1e6, &s.v.FuelCapacityT)
+	case "SetUserShipName":
+		if shipID(data["ShipID"]) == s.id && s.id != "" {
+			if name, ok := data["UserShipName"].(string); ok && len(name) <= 80 && strings.IndexFunc(name, unicode.IsControl) < 0 {
+				s.v.ShipName = name
+			}
+		}
 	case "Loadout":
 		kind, id := shipType(data["Ship"]), shipID(data["ShipID"])
 		fuel := s.v.FuelMainT

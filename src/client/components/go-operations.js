@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Badge, Icon } from './go-terminal-widgets'
 import GoCommunityGoals from './go-community-goals'
-import GoFleet from './go-fleet'
+import GoFleet, { GoStoredModules } from './go-fleet'
 import { BGSTally } from './go-field-operations'
 import GoProviderReference from './go-provider-reference'
 
@@ -30,7 +30,8 @@ export default function GoOperations (props) {
   const [kind, setKind] = useState(initial)
   const [commodity, setCommodity] = useState(''); const [market, setMarket] = useState(''); const [otherMarket, setOtherMarket] = useState(''); const [id, setID] = useState(''); const [before, setBefore] = useState('')
   const [page, setPage] = useState(null); const [notice, setNotice] = useState(''); const [revision, setRevision] = useState(0); const [ack, setAck] = useState(false); const [preview, setPreview] = useState(null)
-  const query = JSON.stringify({ kind, commodity: commodity.toLowerCase(), market, otherMarket, id, before, limit: 30 })
+  const [fleetState, setFleetState] = useState('owned'); const [fleetAfter, setFleetAfter] = useState(0)
+  const query = JSON.stringify({ kind, commodity: commodity.toLowerCase(), market, otherMarket, id, before, limit: 30, fleetState: kind === 'fleet' ? fleetState : '', fleetAfter: kind === 'fleet' ? fleetAfter : 0 })
   useEffect(() => {
     let active = true; let pending = false; let timer
     setPage(null); setPreview(null); setAck(false)
@@ -44,8 +45,9 @@ export default function GoOperations (props) {
   if (props.role !== 'owner') return <section className='go-page'><h2>{title}</h2><Badge>LOCAL OWNER ONLY</Badge><p>Fleet, carrier finances, prices, transactions and other commanders’ names are private. Paired displays remain read-only; this private history is not transmitted.</p></section>
   if (initial === 'external') return <section className='go-page'><h2>{title}</h2><p>External community reference only. DAEDALUS has no verified consumable PTN/FCOC feed. No scraping or automatic external request.</p><a href={props.path.endsWith('/ptn') ? 'https://pilotstradenetwork.com/' : 'https://inara.cz/elite/squadron/7636/'} target='_blank' rel='noreferrer'>Open community website</a></section>
   if (!props.connected || !props.ready) return <p role='status'>Operations disconnected. Waiting for authenticated recovery.</p>
-  if (initial === 'goals') return <GoCommunityGoals page={page} />
-  if (initial === 'fleet' && kind === 'fleet') return <GoFleet page={page} sendEvent={props.sendEvent} />
+  if (initial === 'goals') return <GoCommunityGoals {...props} page={page} onRefresh={() => setRevision(v => v + 1)} />
+  if (kind === 'modules') return <GoStoredModules page={page} onOlder={() => setBefore(page.next)} onNewest={() => setBefore('')} hasBefore={!!before} onFleet={initial === 'fleet' ? () => { setKind('fleet'); setBefore('') } : null} onHistory={() => { setKind('module-events'); setBefore('') }} />
+  if (initial === 'fleet' && kind === 'fleet') return <GoFleet page={page} sendEvent={props.sendEvent} fleetState={fleetState} onState={value => { setFleetState(value); setBefore(''); setFleetAfter(0) }} onOlder={() => { if (page.next) setBefore(page.next); else { setBefore(''); setFleetAfter(page.fleetNext) } }} onNewest={() => { setBefore(''); setFleetAfter(0) }} hasBefore={!!before || fleetAfter > 0} onModules={() => setKind('modules')} />
   const exportPage = async () => {
     try { const value = await props.sendEvent('exportGoOperations', { ...JSON.parse(query), acknowledge: ack, previewHash: preview?.hash }); const url = URL.createObjectURL(new Blob([value.csv], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'eridion-private-' + kind + '.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) } catch { setNotice('Private export unavailable. Preview and acknowledge first.') }
   }
@@ -77,6 +79,7 @@ export default function GoOperations (props) {
       <details><summary>Private CSV export · selected page only</summary><p>Contains private financial details, ship locations and potentially other players’ names. Preview the exact currently loaded page before acknowledging. No provider upload occurs.</p><button disabled={!page?.rows?.length} onClick={() => { setPreview({ rows: page.rows, hash: page.previewHash }); setAck(false) }}>Preview selected private records</button>{preview && <><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(preview.rows, null, 2)}</pre><label><input type='checkbox' checked={ack} onChange={e => setAck(e.target.checked)} /> I reviewed these private records and understand the exposure.</label><button disabled={!ack} onClick={exportPage}>Download selected private CSV</button></>}</details>
       {page?.reference?.length > 0 && <details><summary>Reconciled cached account reference · Frontier first, Inara gaps only</summary>{page.reference.filter(f => ['ships', 'ship', 'carrier', 'squadron', 'communityGoals'].includes(f.field)).map(f => <section key={f.field}><h3>{f.field} · {f.source}</h3><p>Observed {f.observedAt || 'unknown'} · fetched {f.fetchedAt} · {f.stale ? 'stale' : 'cached'}; separate source evidence, not assumed current</p><Evidence value={f.value} /></section>)}</details>}
       <GoProviderReference {...props} publicGoals={kind === 'goals'} />
+      {['trades', 'comparison', 'commodities'].includes(kind) && <BGSTally {...props} context='trade' />}
       {kind === 'powerplay' && <BGSTally {...props} context='powerplay' />}
       {kind === 'carrier' && <p>Owned-carrier activity stays in this carrier ledger; unrelated personal market trades are never attributed to it. Private local CSV export above requires your explicit review. External reporting remains separately opt-in. BGS-Tally behavior reference: tezw21/aussig (MIT).</p>}
       {notice && <p role='status'>{notice}</p>}

@@ -24,25 +24,29 @@
       "axes": "xz",
       "width": 512,
       "height": 512,
-      "bytes": 66903
+      "bytes": 66903,
+      "image": "/images/galaxy-density/galaxy-xz.png"
     },
     {
       "axes": "xy",
       "width": 512,
       "height": 120,
-      "bytes": 10746
+      "bytes": 10746,
+      "image": "/images/galaxy-density/galaxy-xy.png"
     },
     {
       "axes": "zy",
       "width": 512,
       "height": 120,
-      "bytes": 10724
+      "bytes": 10724,
+      "image": "/images/galaxy-density/galaxy-zy.png"
     },
     {
       "axes": "yz",
       "width": 120,
       "height": 512,
-      "bytes": 19303
+      "bytes": 19303,
+      "image": "/images/galaxy-density/galaxy-yz.png"
     }
   ]
 }

@@ -30,7 +30,7 @@ async function main () {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
       for (const [url, text] of pages) {
         await navigate(url, text)
-        if (url === '/ship/fleet') { await evaluate('document.querySelector(".go-fleet-card").open=true'); await waitFor(() => evaluate('document.body.textContent.includes("9007199254740993")')) }
+        if (url === '/ship/fleet') { await evaluate('Array.from(document.querySelectorAll(".go-fleet-card")).find(e=>e.querySelector("summary strong").textContent==="Fixture Explorer").open=true'); await waitFor(() => evaluate('document.body.textContent.includes("9007199254740993")')) }
         const overflow = await evaluate('document.querySelector(".go-page").scrollWidth-document.querySelector(".go-page").clientWidth'); if (overflow > 2) throw new Error('UI overflow ' + url + ': ' + overflow)
         if (await evaluate('document.body.innerText.includes("NaN")')) throw new Error('Invalid displayed calculation')
         const shot = await c.call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); await fs.writeFile(path.join(output, name + url.replaceAll('/', '-') + '.png'), Buffer.from(shot.data, 'base64')); report.pages.push({ name, url, overflow })
@@ -60,7 +60,7 @@ async function main () {
     report.frontierPages = []
     for (const [name, width, height] of [['desktop', 1366, 768], ['compact', 680, 580]]) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
-      for (const [url, text] of [['/ship/fleet', 'Frontier owned-fleet reference'], ['/cmdr/community-goals', 'Frontier · global goals'], ['/trade/commodities', 'Frontier market reference']]) {
+      for (const [url, text] of [['/ship/fleet', 'Frontier owned-fleet reference'], ['/cmdr/community-goals', 'Frontier · cached'], ['/trade/commodities', 'Frontier market reference']]) {
         await navigate(url, text)
         if (url === '/ship/fleet') await evaluate('document.querySelectorAll(".go-fleet-card").forEach(e=>{e.open=true})')
         const overflow = await evaluate('document.querySelector(".go-page").scrollWidth-document.querySelector(".go-page").clientWidth'); if (overflow > 2) throw new Error('Frontier reference overflow ' + url + ': ' + overflow)

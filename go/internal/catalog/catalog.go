@@ -8,6 +8,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -51,7 +52,11 @@ func initData() {
 			key := moduleKey(row[symbolCol])
 			labels[strings.ToLower(row[symbolCol])] = row[nameCol]
 			if filename == "outfitting.csv" {
-				modules[key] = Module{Source: "bundled_edcd_coriolis_reference", Name: row[nameCol], Rating: row[cols["rating"]]}
+				v := Module{Source: "bundled_edcd_coriolis_reference", Name: row[nameCol], Rating: row[cols["rating"]]}
+				if n, e := strconv.Atoi(row[cols["class"]]); e == nil && n >= 0 && n <= 8 {
+					v.Class = &n
+				}
+				modules[key] = v
 			}
 		}
 	}
@@ -71,7 +76,9 @@ func initData() {
 		if v.Name == "" && r.Name != "" {
 			v.Name = r.Name
 		}
-		v.Class = r.Class
+		if r.Class != nil {
+			v.Class = r.Class
+		}
 		v.Rating = r.Rating
 		v.MassT = r.Mass
 		v.PowerMW = r.Power
@@ -144,6 +151,9 @@ func ModuleDisplayName(symbol string) string {
 
 // ShipDisplayName is a label only; it never substitutes another hull's stats.
 func ShipDisplayName(symbol string) string {
+	if strings.TrimSpace(symbol) == "" {
+		return ""
+	}
 	once.Do(initData)
 	if v := labels[strings.ToLower(symbol)]; v != "" {
 		return v

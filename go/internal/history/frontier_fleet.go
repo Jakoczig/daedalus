@@ -53,6 +53,7 @@ func (s *Store) supplementFrontierFleet(ctx context.Context, fid string, q Opera
 	for _, r := range out.Rows {
 		seen[r.Entity] = true
 	}
+	candidate := 0
 	for _, ship := range ships {
 		id := text(ship["id"])
 		if identifier(id) == "" {
@@ -85,15 +86,19 @@ func (s *Store) supplementFrontierFleet(ctx context.Context, fid string, q Opera
 		}
 		// A journal row outside this page may contain a newer sale/transfer. Never
 		// manufacture a CAPI-only row for a ship already represented in local history.
-		if known[id] || q.Before != "" {
+		if known[id] || out.Next != "" || (q.FleetState != "" && q.FleetState != "owned") {
 			continue
 		}
 
 		if q.Commodity != "" && !strings.Contains(strings.ToLower(text(ship["name"])+" "+text(ship["model"])), strings.ToLower(q.Commodity)) {
 			continue
 		}
+		candidate++
+		if q.FleetAfter > 0 && candidate < q.FleetAfter {
+			continue
+		}
 		if len(out.Rows) >= q.Limit {
-			out.Notice += " Additional CAPI fleet references exceed this bounded page; use source facts for the complete cached reference."
+			out.FleetNext = candidate
 			break
 		}
 		fill["capiReference"] = source

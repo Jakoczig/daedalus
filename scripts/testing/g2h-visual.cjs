@@ -53,7 +53,7 @@ async function main () {
 
       await navigate('/nav/list', 'SYSTEM CATALOGUE'); if (await evaluate('!!document.querySelector(\'.go-body-strip\')')) throw new Error('Catalogue retained duplicate strip'); await screenshot('catalogue-' + viewport); report.pages.push({ page: 'catalogue', viewport })
       await navigate('/ship/stats', 'Maximum unladen jump range'); await waitFor(() => evaluate('Array.from(document.querySelectorAll(\'.go-stat-fact\')).find(e=>e.textContent.includes(\'Insurance rebuy\'))?.textContent.replace(/[^0-9]/g,\'\')===\'123456\'')).catch(async err => { report.failedStatistics = await evaluate('document.body?.innerText || \'\''); throw err })
-      if (!await evaluate('!document.body.innerText.includes(\'NaN\')&&document.body.innerText.includes(\'JOURNAL\')&&document.body.innerText.includes(\'UNAVAILABLE\')&&!document.querySelector(\'.go-flight-switches\')')) throw new Error('Stats missing evidence or duplicates Status')
+      if (!await evaluate('!document.body.innerText.includes(\'NaN\')&&!!document.querySelector(\'.go-stat-fact[title="JOURNAL"]\')&&document.querySelector(\'.go-stats-advanced\')?.textContent.includes(\'UNAVAILABLE\')&&!document.querySelector(\'.go-flight-switches\')')) throw new Error('Stats missing evidence or duplicates Status')
       await screenshot('statistics-' + viewport); report.pages.push({ page: 'statistics', viewport })
       await navigate('/nav/galaxy', 'Galaxy Map'); await waitFor(() => evaluate('document.querySelectorAll(\'[data-marker="destination"]\').length===3'))
       if (!await evaluate('Array.from(document.querySelectorAll(\'[data-marker]\')).every(e=>e.dataset.position.split(\',\').every(v=>Number(v)>=0&&Number(v)<=1))')) throw new Error('Route not framed')
