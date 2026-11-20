@@ -113,7 +113,7 @@ async function main () {
     await navigate('/controls', 'Pilot ranks'); if (await evaluate('!!document.querySelector("[aria-label=\\"Key bindings\\"]")')) throw Error('Native Controls page still active')
     await navigate('/nav/galaxy', 'GALAXY MAP'); await c.call('HeapProfiler.collectGarbage')
     const metrics = Object.fromEntries((await c.call('Performance.getMetrics')).metrics.map(m => [m.name, m.value]))
-    report.renderer = { heapBytes: metrics.JSHeapUsedSize, svgCount: await evaluate('document.querySelectorAll(".go-galaxy-plane svg").length'), artworkBytes: 19303, method: 'one synthetic renderer snapshot after explicit GC; no claim about full Wails process memory or real gameplay' }
+    report.renderer = { heapBytes: metrics.JSHeapUsedSize, svgCount: await evaluate('document.querySelectorAll(".go-galaxy-plane svg").length'), artworkBytes: await evaluate('performance.getEntriesByType("resource").filter(r=>r.name.includes("/atlas/assets/")).reduce((n,r)=>n+(r.encodedBodySize||0),0)'), method: 'one synthetic renderer snapshot after explicit GC; no claim about full Wails process memory or real gameplay' }
     if (report.errors.length || report.outsideRequests.length) throw Error('Runtime or external request errors')
     report.passed = true; console.log(JSON.stringify(report))
   } finally { if (!report.passed) report.diagnostic = await evaluate('document.body.innerText').catch(() => 'unavailable'); if (host) await host.stop(); await b.stop(); await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2)) }
