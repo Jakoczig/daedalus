@@ -1,5 +1,22 @@
 # G2P launcher, settings and Frontier prerequisites
 
+## Targeted review correction (7050637253)
+
+Credential controls now follow persisted credentials and consent: missing keys open
+automatically after Read consent or pending Write setup; saved keys show Delete only,
+including when consent is paused. Successful deletion clears pending setup and exposes
+explicit re-entry. Failed persistence retains the saved state. Write setup is labeled
+pending and its checkbox stays off until categories are saved; removing the last
+category persists upload=false and clears staging. Account changes close the old editor.
+Focused transitions assert saved configuration, rendered toggles, missing/stored/paused
+credentials, deletion/re-entry and cross-account reopening.
+
+Startup progress now says “Reviewing enabled services” and “saved status only”. Its
+timer and local getGoProviders operation are unchanged; tests advance the timer
+deterministically, retain the honest “not checked” result and assert no provider calls.
+The PR ledger contains the correction SHA, final exact-head CI and refreshed hashes.
+No Go, OAuth, vault, Atlas, portrait or production-permission change was required.
+
 Base: G2O `dc93468d0aa88587b4a85bfb7b01dc41eadc095d`.
 Branch: `go/g2p-launcher-settings-frontier`; draft stacked PR targets G2O.
 Final exact-head CI, preview links and independently verified checksums are recorded

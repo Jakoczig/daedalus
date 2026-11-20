@@ -24,7 +24,7 @@ export default function LauncherServices ({ sendEvent, connected, ready, eventLi
   useEffect(() => { if (index >= values.length) return; const timer = setTimeout(() => setIndex(index + 1), 650); return () => clearTimeout(timer) }, [index, values])
   useEffect(() => eventListener?.('goProviderStatusChanged', v => { setError(''); setValues(v.filter(p => (p.config.read || p.config.upload) && !p.config.paused && !p.capability.gate)) }), [eventListener])
   if (error) return <span>{error}</span>
-  if (index < values.length) return <span role='status'>Checking {({ frontier: 'Frontier', edsm: 'EDSM', edastro: 'EDAstro', eddn: 'EDDN' })[values[index].capability.id] || values[index].capability.id}… {index + 1}/{values.length}</span>
+  if (index < values.length) return <span role='status'>Reviewing enabled services… {index + 1}/{values.length} · saved status only</span>
   const current = values.filter(v => (v.config.read || v.config.upload) && !v.config.paused && !v.capability.gate)
   const states = current.map(v => providerHealth(v, started)); const errors = states.filter(s => s === 'error').length; const verified = states.filter(s => s === 'verified').length
   return <span>{current.length === 0 ? 'No live services enabled' : verified === current.length ? 'All services OK' : `${errors} service errors · ${verified} ready · ${current.length - errors - verified} not checked`}</span>
