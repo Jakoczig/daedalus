@@ -3,7 +3,6 @@ package webapp
 import (
 	"context"
 	"encoding/json"
-	"github.com/Jakoczig/eridion/go/internal/catalog"
 	"github.com/Jakoczig/eridion/go/internal/gamestate"
 	"github.com/Jakoczig/eridion/go/internal/paritystate"
 	"net/http"
@@ -266,13 +265,23 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			if principal.role != "owner" || s.game == nil {
 				response["error"] = "Local owner required"
 			} else {
-				response["message"] = map[string]string{"shipName": s.game.Ship().ShipName, "shipType": catalog.ShipDisplayName(s.game.Ship().ShipType)}
+				response["message"] = s.game.OwnerShipIdentity()
 			}
 		case "getGoGalaxyLayers":
 			if s.providers == nil {
 				response["message"] = map[string]any{"points": []any{}}
 			} else {
 				response["message"] = s.providers.Layers()
+			}
+		case "refreshGoCommunityGoals":
+			if principal.role != "owner" || s.providers == nil || s.game == nil {
+				response["error"] = "Local owner and consented Frontier connection required"
+			} else if _, err := s.providers.Read(readCtx, "frontier", "communitygoals", ""); err != nil {
+				response["error"] = err.Error()
+			} else if value, err := s.operationsRPC(readCtx, "getGoOperations", json.RawMessage(`{"kind":"goals","limit":30}`)); err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
 			}
 		case "getGoOperations", "exportGoOperations", "backfillGoOperationsSource":
 			if principal.role != "owner" {
@@ -393,6 +402,10 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				}
 				if s.companion.action == nil {
 					response["error"] = "Native desktop unavailable"
+					break
+				}
+				if q.Action == "dashboard" && s.accountChoiceRequired() {
+					response["error"] = "Choose a commander in the launcher before opening the terminal"
 					break
 				}
 				if err := s.companion.action(q.Action); err != nil {

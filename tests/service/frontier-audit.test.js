@@ -15,7 +15,7 @@ test('Frontier global goals never establish personal subscription or contributio
   const h = harness('go-community-goals')
   h.props.page = { goalMembership: { known: true, ids: [] }, reference: [{ field: 'communityGoals', source: 'frontier', fetchedAt: '2026-01-01', value: { global: [{ id: '9007199254740993', title: 'Fixture public goal', globalTotal: '100', targetTotal: '1000' }] } }] }
   const html = h.html()
-  assert.match(html, /0 subscribed goals as last witnessed/)
+  assert.match(html, /0 subscribed/)
   assert.match(html, /Fixture public goal/)
   assert.match(html, /Global progress does not establish your subscription/)
   assert.match(html, /Global target/)

@@ -31,6 +31,31 @@ func (s *Service) selectedSummaryLocked() Summary {
 	return v
 }
 func (s *Service) Accounts() AccountSettings { s.mu.Lock(); defer s.mu.Unlock(); return s.accounts }
+
+// OwnerShipIdentity recovers witnessed renames from durable history even when an
+// older reducer cache predates rename support. Exact commander/ship ID binding
+// is mandatory; provider current-ship guesses are not used.
+func (s *Service) OwnerShipIdentity() map[string]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fid := s.displayFIDLocked()
+	v := s.views.ship.View(fid)
+	out := map[string]string{"shipName": v.ShipName, "shipType": catalog.ShipDisplayName(v.ShipType)}
+	if s.summary.ImportInProgress {
+		return map[string]string{"shipName": "", "shipType": ""}
+	}
+	if s.store != nil && fid != "" {
+		var name, at string
+		if e := s.store.WitnessedShipName(context.Background(), fid, s.views.ship.LastKnownIdentity(fid), &name, &at); e == nil && name != "" {
+			observed, e := time.Parse(time.RFC3339Nano, at)
+			loaded, _ := time.Parse(time.RFC3339Nano, v.LoadoutAt)
+			if e == nil && !observed.Before(loaded) {
+				out["shipName"] = name
+			}
+		}
+	}
+	return out
+}
 func (s *Service) SetAccounts(multiple bool, fid string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

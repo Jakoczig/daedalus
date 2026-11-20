@@ -41,6 +41,15 @@ func (m *Manager) Read(ctx context.Context, id, kind, query string, pages ...int
 		m.mu.Unlock()
 		return nil, errors.New("Selected account differs from the verified journal account; connect the selected commander first")
 	}
+	// Frontier owns overlapping account reads; missing fields do not imply consent
+	// to query a second provider. Inara remains available when Frontier is absent.
+	if id == "inara" {
+		f, c := m.states["frontier"], m.secrets["frontier"]
+		if f != nil && f.config.Read && !f.config.Paused && c.RefreshToken != "" && c.Commander == m.name && c.JournalFID == m.fid && m.fid != "" {
+			m.mu.Unlock()
+			return nil, errors.New("Frontier is connected; overlapping Inara account and goals reads are deferred")
+		}
+	}
 	if id == "edastro" && kind == "gec" && m.layers.FetchedAt != "" {
 		expires, err := time.Parse(time.RFC3339, m.layers.ExpiresAt)
 		if err == nil && m.opts.Now().Before(expires) {

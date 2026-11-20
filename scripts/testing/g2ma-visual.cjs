@@ -60,7 +60,7 @@ async function main () {
     report.frontierPages = []
     for (const [name, width, height] of [['desktop', 1366, 768], ['compact', 680, 580]]) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
-      for (const [url, text] of [['/ship/fleet', 'Frontier owned-fleet reference'], ['/cmdr/community-goals', 'Frontier · global goals'], ['/trade/commodities', 'Frontier market reference']]) {
+      for (const [url, text] of [['/ship/fleet', 'Frontier owned-fleet reference'], ['/cmdr/community-goals', 'Frontier · cached'], ['/trade/commodities', 'Frontier market reference']]) {
         await navigate(url, text)
         if (url === '/ship/fleet') await evaluate('document.querySelectorAll(".go-fleet-card").forEach(e=>{e.open=true})')
         const overflow = await evaluate('document.querySelector(".go-page").scrollWidth-document.querySelector(".go-page").clientWidth'); if (overflow > 2) throw new Error('Frontier reference overflow ' + url + ': ' + overflow)

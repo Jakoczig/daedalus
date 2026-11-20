@@ -13,6 +13,8 @@ import (
 )
 
 type OperationQuery struct {
+	FleetAfter  int    `json:"fleetAfter"`
+	FleetState  string `json:"fleetState"`
 	PreviewHash string `json:"previewHash"`
 	Kind        string `json:"kind"`
 	FID         string `json:"fid"`
@@ -34,6 +36,7 @@ type OperationRow struct {
 	Details json.RawMessage `json:"details"`
 }
 type OperationPage struct {
+	FleetNext      int               `json:"fleetNext,omitempty"`
 	GoalMembership *GoalMembership   `json:"goalMembership,omitempty"`
 	PreviewHash    string            `json:"previewHash"`
 	Totals         map[string]string `json:"totals,omitempty"`
@@ -56,8 +59,14 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 		q.Limit = 50
 	}
 	before := q.Before
+	if q.FleetAfter < 0 || q.FleetAfter > 512 || (q.FleetAfter > 0 && (q.Kind != "fleet" || q.Before != "")) {
+		return out, errors.New("Invalid fleet cursor")
+	}
 	if before == "" {
 		before = "9223372036854775807"
+	}
+	if q.FleetAfter > 0 {
+		before = "0"
 	}
 	// All identifiers and JSON numbers are decimal strings. SQL identifiers are
 	// fixed here, never interpolated from browser-supplied table/column names.
@@ -65,8 +74,11 @@ func (s *Store) Operations(ctx context.Context, fid string, q OperationQuery) (O
 	args := []any{}
 	switch q.Kind {
 	case "fleet":
-		query = `SELECT cast(rowid AS TEXT),ship_id,'Fleet',observed_at,state,model||' '||name,json_set(metadata_json,'$.system',system_name,'$.marketId',market_id,'$.model',model,'$.shipName',name) FROM fleet_ships WHERE commander_fid=? AND rowid<cast(? AS INTEGER) AND (?='' OR model LIKE '%'||?||'%' OR name LIKE '%'||?||'%') ORDER BY rowid DESC LIMIT ?`
-		args = []any{fid, before, q.Commodity, q.Commodity, q.Commodity, q.Limit + 1}
+		if q.FleetState != "" && q.FleetState != "owned" && q.FleetState != "sold" && q.FleetState != "in_transit" {
+			return out, errors.New("Unsupported fleet filter")
+		}
+		query = `SELECT cast(rowid AS TEXT),ship_id,'Fleet',observed_at,state,model||' '||name,json_set(metadata_json,'$.system',system_name,'$.marketId',market_id,'$.model',model,'$.shipName',name) FROM fleet_ships WHERE commander_fid=? AND rowid<cast(? AS INTEGER) AND (?='' OR model LIKE '%'||?||'%' OR name LIKE '%'||?||'%') AND (?='' OR (?='owned' AND state<>'sold') OR state=?) ORDER BY rowid DESC LIMIT ?`
+		args = []any{fid, before, q.Commodity, q.Commodity, q.Commodity, q.FleetState, q.FleetState, q.FleetState, q.Limit + 1}
 	case "loadouts":
 		query = `SELECT cast(id AS TEXT),ship_id,'Loadout',coalesce(observed_at,''),'historical_witnessed','Exact witnessed fitted modules',raw_json FROM ship_loadout_snapshots WHERE commander_fid=? AND ship_id=? AND id<cast(? AS INTEGER) ORDER BY id DESC LIMIT ?`
 		args = []any{fid, q.ID, before, q.Limit + 1}

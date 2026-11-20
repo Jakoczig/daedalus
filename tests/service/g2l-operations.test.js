@@ -61,8 +61,8 @@ test('CG membership distinguishes known empty, unknown and historical goals with
     const h = harness('go-operations', { rows: [{ id: '1', entity: '9007199254740993', title: 'CommunityGoalReward', kind: 'CommunityGoalReward', at: '2026-01-01', state: 'historical_goal_event', details: { Reward: '100' } }], current: [{ id: '2', entity: '9007199254740993', title: 'progress_snapshot', at: '2026-01-01', state: known ? 'historical_goal' : 'membership_unknown_no_complete_snapshot', details: {} }], goalMembership: { known, ids: [], observedAt: '2026-01-02', notice: 'Complete snapshot; historical rewards retained' } })
     h.props.path = '/cmdr/community-goals'; h.props.role = 'owner'; h.props.ready = true
     h.html(); const html = await h.flush(); h.unmount()
-    assert.match(html, known ? /0 subscribed goals as last witnessed/ : /Subscribed goals unknown/)
-    assert.match(html, /Received reward 100/); assert.match(html, /9007199254740993/)
-    assert.match(html, /Historical participation/)
+    assert.match(html, known ? /0 subscribed/ : /Subscriptions not reported/)
+    assert.match(html, /Reward 100/); assert.match(html, /9007199254740993/)
+    assert.match(html, /Past participation &amp; rewards/)
   }
 })
