@@ -1,4 +1,5 @@
 /* G2G keeps the original orange/cyan hierarchy and bounded 2D rendering. */
+.go-launcher .go-provider-heading{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;gap:1rem}.go-service-dot{display:inline-block;width:.7rem;height:.7rem;border:2px solid #999;border-radius:50%;flex:none}.go-service-dot.verified{border-color:#65d697}.go-service-dot.error{border-color:#ff7468}.go-provider-expanded{padding:.6rem}.go-provider-expanded label,.go-companion-settings form label{display:block;margin:.5rem 0}.go-companion-settings input:not([type=checkbox]){width:100%;box-sizing:border-box}.go-launcher article{min-width:0;overflow-wrap:anywhere}.go-launcher #launcher-settings-content{padding-top:.5rem}.go-launcher{width:100%;height:100dvh!important;max-height:100dvh!important}.go-launcher>h1{font-size:2rem}.go-launcher>h2{font-size:1rem}.go-launcher .go-companion-settings>button{margin:.2rem;font-size:1rem;padding:.5rem}.go-launcher .go-provider-settings>article{border-bottom:1px solid #5a3e20}
 .go-launcher{padding:1.5rem;max-width:58rem;margin:auto;font-family:Jura,sans-serif;color:var(--color-info);line-height:1.5;box-sizing:border-box}
 .go-launcher h1{font-size:2.7rem;color:var(--color-info);margin:.3rem 0}.go-launcher h1 .icon{color:var(--color-primary)}.go-launcher h2{font-size:1.25rem;color:var(--color-primary)}.go-launcher dl{margin:1rem 0;border-top:1px solid var(--color-primary)}.go-launcher dl>div{display:grid;grid-template-columns:1fr 1.5fr;gap:1rem;padding:.6rem;border-bottom:1px solid #5a3e20}.go-launcher dd{margin:0}.go-launcher-actions{display:flex;flex-wrap:wrap;gap:.5rem}.go-launcher button,.go-launcher a{font-size:1.15rem;padding:.7rem}.go-launcher p{font-size:1.05rem}.go-launcher section{margin-top:1rem}
 .go-companion-settings{padding:.5rem;line-height:1.5;font-size:1.05rem}.go-companion-settings>label{display:flex;gap:.7rem;align-items:center;margin:.7rem 0}.go-companion-settings input[type=checkbox]{appearance:auto;width:1.2rem;height:1.2rem}.go-data-providers{margin:1rem 0}.go-data-providers>summary{font-size:1.2rem;color:var(--color-secondary);cursor:pointer}
@@ -22,6 +23,7 @@ body:has(.go-launcher)::before,body:has(.go-launcher)::after,.go-launcher *{anim
 
 /* The legacy dashboard body zoom must not shrink the launcher's scrollport. */
 body:has(.go-launcher){zoom:1}
+html:has(.go-launcher){zoom:1}
 .go-launcher{scrollbar-width:auto;scrollbar-color:var(--color-primary) #100b06}
 .go-launcher :focus-visible{outline:2px solid var(--color-info);outline-offset:3px}
 .go-launcher:focus-visible{outline-offset:-3px}

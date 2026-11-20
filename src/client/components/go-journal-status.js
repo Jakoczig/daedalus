@@ -6,7 +6,7 @@ export async function journalAction (action, values = {}) {
   return response.json()
 }
 
-export default function GoJournalStatus ({ stage, connected, ready, role, sendEvent, eventListener }) {
+export default function GoJournalStatus ({ settingsOnly = false, stage, connected, ready, role, sendEvent, eventListener }) {
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState('')
   const [source, setSource] = useState(null)
@@ -45,6 +45,7 @@ export default function GoJournalStatus ({ stage, connected, ready, role, sendEv
   else if (summary?.sourceState === 'partial') status = 'Waiting for a journal line to finish writing.'
   else if (summary?.sourceState === 'parse_warning') status = 'Reading local journal; malformed or oversized records were skipped.'
   else if (summary) status = 'Local journal available. This is independent of service connection readiness.'
+  if (settingsOnly) return <section aria-label='Journal configuration'><p>The journal contains your local Elite Dangerous gameplay records.</p>{(error || source?.Error) && <p role='alert'>{error || source.Error}</p>}<form onSubmit={e => { e.preventDefault(); change('selectDir') }}><label>Journal directory<input required value={directory} disabled={pending} onChange={e => { sourceVersion.current++; setDirectory(e.target.value) }} /></label><button disabled={pending}>Save Journal Directory</button><button type='button' disabled={pending} onClick={() => change('clearOverride')}>Use Automatic Discovery</button></form></section>
   return (
     <section aria-label='Journal status' style={{ padding: '1rem', border: '1px solid currentColor', position: 'relative', zIndex: 20, background: 'var(--color-background, #100d12)' }}>
       <h2>Current system — local journal preview</h2>

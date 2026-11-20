@@ -1,5 +1,7 @@
 import GoOperations, { operationPaths } from './go-operations'
-import { BGSTally, PrivateCommanderActivity } from './go-field-operations'
+import { BGSTally, PrivateCommanderActivity, BuiltinModules } from './go-field-operations'
+import DataHistory from './go-data-history'
+import { ProviderDiagnostics } from './go-provider-settings'
 import { useState, useEffect } from 'react'
 import Layout from './layout'
 import Panel from './panel'
@@ -90,6 +92,7 @@ export default function GoTerminal (props) {
           <div className='go-page__heading'><h2>{props.role === 'owner' ? 'Owner settings' : 'Display status'}</h2><button aria-label='Close settings' onClick={() => setSettings(false)}>Ä‚—</button></div>
           <GoJournalStatus {...props} stage={props.stage || 'G2D'} />
           {props.role === 'owner' && props.stage === 'G2E' && <CompanionSettings {...props} onProvidersChange={() => setCommunityVersion(v => v + 1)} />}
+          {props.role === 'owner' && <details><summary>Advanced local tools</summary><DataHistory {...props} /><BuiltinModules {...props} /><PrivateCommanderActivity {...props} /><details className='go-data-providers'><summary>Provider diagnostics</summary><ProviderDiagnostics {...props} /></details></details>}
           {props.role === 'owner' && <RemoteDisplays />}
           {props.role !== 'owner' && <p className='text-muted'>Pairing, journal directories and device permissions are controlled by the local owner.</p>}
         </aside>

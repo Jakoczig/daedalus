@@ -29,6 +29,7 @@ type companionState struct {
 func (s *Server) initCompanion(opts Options) {
 	s.copyWaypoint = opts.CopyWaypoint
 	s.saveFieldCSV = opts.SaveFieldCSV
+	s.chooseAvatar = opts.ChooseAvatar
 	s.companion = &companionState{config: displayConfig{Restore: true, CloseMode: "tray"}, action: opts.DesktopAction, setClose: opts.DesktopCloseMode}
 	if raw, err := privatefs.Read(opts.StorageDir, "companion.json"); err == nil {
 		var c displayConfig

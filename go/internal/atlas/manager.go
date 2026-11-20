@@ -52,6 +52,7 @@ type Index struct {
 	AtlasHash   string          `json:"atlas_json_sha256"`
 }
 type Preferences struct {
+	Disabled  bool `json:"disabled"`
 	Automatic bool `json:"automatic"`
 	Details   bool `json:"details"`
 	Metered   bool `json:"metered"`
@@ -86,6 +87,9 @@ type Status struct {
 	Error                string    `json:"error"`
 }
 type Manager struct {
+	clearing              bool
+	networkCtx            context.Context
+	networkCancel         context.CancelFunc
 	baseBytes             int64
 	write                 func(string, string, []byte) error
 	mu                    sync.Mutex
@@ -136,6 +140,7 @@ func newManager(ctx context.Context, root string, client *http.Client, key []byt
 		return nil
 	}
 	m := &Manager{ctx: ctx, cancel: cancel, root: root, client: &c, key: append([]byte(nil), key...), now: now, slots: make(chan struct{}, 2), write: writeFile}
+	m.networkCtx, m.networkCancel = context.WithCancel(ctx)
 	if e := privatefs.Prepare(root); e != nil {
 		m.lastError = "Atlas cache unavailable"
 		return m
@@ -169,7 +174,7 @@ func newManager(ctx context.Context, root string, client *http.Client, key []byt
 			}
 		}
 	}
-	if m.state.Automatic && !m.state.Metered {
+	if m.state.Automatic && !m.state.Metered && !m.state.Disabled {
 		m.wg.Add(1)
 		go func() { defer m.wg.Done(); _ = m.Check(ctx, true) }()
 	}
@@ -196,12 +201,21 @@ func (m *Manager) Configure(p Preferences) error {
 	defer m.operation.Unlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.clearing {
+		return errors.New("Atlas cache is being cleared")
+	}
 	s := m.state
 	s.Preferences = p
 	if e := m.save(s); e != nil {
 		return e
 	}
 	m.state = s
+	if p.Disabled {
+		m.networkCancel()
+		m.networkCtx, m.networkCancel = context.WithCancel(m.ctx)
+	} else if m.networkCtx.Err() != nil {
+		m.networkCtx, m.networkCancel = context.WithCancel(m.ctx)
+	}
 	m.viewPending = false
 	m.viewKey = ""
 	if m.viewCancel != nil {
@@ -250,6 +264,15 @@ func (m *Manager) fetch(ctx context.Context, path string, limit int64, expected 
 	defer cancel()
 	stop := context.AfterFunc(m.ctx, cancel)
 	defer stop()
+	m.mu.Lock()
+	network := m.networkCtx
+	clearing := m.clearing
+	m.mu.Unlock()
+	if clearing {
+		return nil, "", false, errors.New("Atlas cache is being cleared")
+	}
+	stopNetwork := context.AfterFunc(network, cancel)
+	defer stopNetwork()
 	req, e := http.NewRequestWithContext(requestCtx, "GET", Origin+"/atlas/"+path, nil)
 	if e != nil {
 		return nil, "", false, e
@@ -305,7 +328,11 @@ func (m *Manager) Check(ctx context.Context, automatic bool) error {
 	defer m.operation.Unlock()
 	m.mu.Lock()
 	s := m.state
-	if automatic && (!s.Automatic || s.Metered || m.now().Sub(s.LastAttempt) < 24*time.Hour) {
+	if m.clearing {
+		m.mu.Unlock()
+		return errors.New("Atlas cache is being cleared")
+	}
+	if automatic && (!s.Automatic || s.Metered || s.Disabled || m.now().Sub(s.LastAttempt) < 24*time.Hour) {
 		m.mu.Unlock()
 		return nil
 	}
@@ -400,7 +427,7 @@ func validAsset(a Asset, limit int64) bool {
 }
 func (m *Manager) StartInstall() error {
 	m.mu.Lock()
-	if m.ctx.Err() != nil {
+	if m.ctx.Err() != nil || m.clearing {
 		m.mu.Unlock()
 		return errors.New("Atlas service stopped")
 	}

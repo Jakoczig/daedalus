@@ -15,8 +15,9 @@ async function main () {
     host = await fixture('G2E', '', path.join(root, 'tests/testdata/g2e')); origin = host.url
     for (const [name, width, height] of [['desktop', 1366, 768], ['launcher', 680, 580]]) {
       await c.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
-      await navigate('/launcher', 'NATIVE COMPANION')
-      await evaluate('Array.from(document.querySelectorAll(".go-launcher-actions button")).find(b=>b.textContent==="Settings").click()')
+      await navigate('/ship/status', 'POWER DISTRIBUTION')
+      await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()')
+      await evaluate('Array.from(document.querySelectorAll("summary")).find(s=>s.textContent==="Advanced local tools").parentElement.open=true')
       await waitFor(() => evaluate('!!document.querySelector(".go-data-history")'))
       await evaluate('document.querySelector(".go-data-history").open=true')
       await waitFor(() => evaluate('document.querySelector(".go-history-health")?.innerText.includes("verified")&&!!document.querySelector(".go-history-rows details")'))

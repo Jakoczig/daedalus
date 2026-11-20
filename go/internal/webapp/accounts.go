@@ -2,8 +2,10 @@ package webapp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Jakoczig/eridion/go/internal/privatefs"
 )
 
 func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessage) (any, error) {
@@ -11,8 +13,34 @@ func (s *Server) accountRPC(ctx context.Context, name string, raw json.RawMessag
 		return nil, errors.New("Journal service unavailable")
 	}
 	if name == "setGoAvatar" {
-		if e := s.saveAvatar(raw); e != nil {
-			return nil, e
+		return nil, errors.New("Use Change portrait in the native launcher")
+	}
+	if name == "chooseGoAvatar" {
+		var q struct {
+			FID string `json:"fid"`
+		}
+		if strictDecode(raw, &q) != nil || s.chooseAvatar == nil {
+			return nil, errors.New("Native launcher portrait selection required")
+		}
+		found := false
+		for _, c := range s.game.AccountCards() {
+			if c.FID == q.FID {
+				found = true
+			}
+		}
+		if !found {
+			return nil, errors.New("Choose a verified local commander")
+		}
+		data, err := s.chooseAvatar()
+		if err != nil {
+			return nil, err
+		}
+		image, err := avatarPNG(base64.StdEncoding.EncodeToString(data))
+		if err != nil {
+			return nil, err
+		}
+		if err = privatefs.Write(s.profile, "avatar-"+tokenHash(q.FID)+".png", image); err != nil {
+			return nil, err
 		}
 		return map[string]bool{"saved": true}, nil
 	}

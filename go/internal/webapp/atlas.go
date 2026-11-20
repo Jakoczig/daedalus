@@ -52,6 +52,16 @@ func (s *Server) atlasRPC(ctx context.Context, name string, raw json.RawMessage,
 		if e := s.atlas.ClearDetails(); e != nil {
 			return nil, e
 		}
+	case "clearGoAtlas":
+		var q struct {
+			Confirm bool `json:"confirm"`
+		}
+		if strictDecode(raw, &q) != nil || !q.Confirm {
+			return nil, errors.New("Confirm deletion of downloaded atlas data")
+		}
+		if e := s.atlas.ClearAll(); e != nil {
+			return nil, e
+		}
 	default:
 		return nil, errors.New("Unknown atlas operation")
 	}
