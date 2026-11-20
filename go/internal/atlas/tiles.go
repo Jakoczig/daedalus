@@ -300,6 +300,14 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 				m.viewCancel()
 			}
 			m.visible = map[string]bool{}
+			// A visible high-LOD cell may currently use a cached lower-LOD tile.
+			// Keep that actual source as well as its pending replacement.
+			for _, tile := range v.Tiles {
+				if tile.SourceLevel > 4 {
+					name := strings.TrimPrefix(tile.URL, "/atlas/assets/"+r.index.ID+"/")
+					m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(name))] = true
+				}
+			}
 			for _, w := range desired {
 				if w.level > 4 {
 					m.visible[filepath.Join(r.dir, "details", filepath.FromSlash(fmt.Sprintf("tiles/%s/%d/%d-%d.png", w.axes, w.level, w.x, w.y)))] = true

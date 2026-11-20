@@ -463,3 +463,31 @@ func BenchmarkAtlasCachedStartup(b *testing.B) {
 		m.Close()
 	}
 }
+
+func TestClearUnusedKeepsVisibleFallback(t *testing.T) {
+	m, _, _ := fixtureManager(t)
+	installFixture(t, m)
+	if e := m.downloadTile(context.Background(), m.current, wanted{"xz", 5, 0, 0}); e != nil {
+		t.Fatal(e)
+	}
+	q := ViewRequest{Frame: Frame{"x": {-65000, -64000}, "y": {-15000, 15000}, "z": {94000, 95000}}, Pixels: 1024}
+	v, e := m.View(q, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	found := false
+	for _, tile := range v.Tiles {
+		if tile.Axes == "xz" && tile.SourceLevel == 5 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("fixture did not select the verified fallback")
+	}
+	if e = m.ClearDetails(); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = m.Asset(v.Installed, "tiles/xz/5/0-0.png"); e != nil {
+		t.Fatal("clear-unused deleted a visible fallback", e)
+	}
+}
