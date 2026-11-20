@@ -263,7 +263,7 @@ func TestG2MCNewSourcePreludePersistsAcrossRestart(t *testing.T) {
 	if err := os.WriteFile(file, prefix, 0600); err != nil {
 		t.Fatal(err)
 	}
-	waitState(t, s, func(v Summary) bool { return v.EventsRead == 9 })
+	waitState(t, s, func(v Summary) bool { return !v.ImportInProgress && v.EventsRead == 9 })
 	if s.Workspace().Parity.Materials.State == "known" {
 		t.Fatal("unbound prefix published")
 	}
@@ -280,7 +280,9 @@ func TestG2MCNewSourcePreludePersistsAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitState(t, s, func(v Summary) bool { return v.EventsRead == 11 })
+	// Event ingestion can reach 11 while catch-up still exposes the held cached
+	// workspace. Assert the reconstructed fields only after replay completion.
+	waitState(t, s, func(v Summary) bool { return !v.ImportInProgress && v.EventsRead == 11 })
 	requireStartup(t, s)
 }
 

@@ -69,6 +69,12 @@ both passed 25 repetitions locally. Near-full cold files are explicitly sparse
 on Windows (Unix truncation already creates holes), retaining real logical sizes
 without bulk zero-fill I/O competing with journal/SQLite packages. No journal
 assertion or timeout changed; the final CI evidence remains the acceptance gate.
+The Linux race gate also reproduced an existing G2M-C test synchronization defect:
+the event count could reach its target while catch-up intentionally still exposed
+the held cached workspace. That test now waits for replay completion before both
+restart boundaries; all data/identity assertions and timeouts remain unchanged.
+The original test failed repeated race-enabled runs; the corrected test passed
+100 consecutive race-enabled runs locally. No journal runtime behavior changed.
 
 ## Evidence and measurements
 
