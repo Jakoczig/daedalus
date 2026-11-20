@@ -366,6 +366,12 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				break
 			}
 			response["message"] = s.systemView(readCtx, q.Name, request.Name == "lookupGoSystem")
+		case "getGoAtlasView", "getGoAtlasStatus", "configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails":
+			if value, err := s.atlasRPC(readCtx, request.Name, request.Message, principal.role == "owner"); err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
 		case "getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar":
 			if principal.role != "owner" {
 				response["error"] = "Local owner required"
@@ -558,6 +564,10 @@ func (s *Server) handler(assets http.Handler) http.Handler {
 		}
 		if len(r.URL.Path) >= 6 && r.URL.Path[:6] == "/auth/" {
 			http.Error(w, "Forbidden", 403)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/atlas/assets/") {
+			s.atlasAsset(w, r, s.sessions.valid(s.sessions.token(r)))
 			return
 		}
 		assets.ServeHTTP(w, r)

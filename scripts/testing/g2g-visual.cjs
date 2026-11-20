@@ -62,7 +62,8 @@ async function main () {
       await navigate('/nav/galaxy', 'GALAXY MAP'); await waitFor(() => evaluate('document.querySelectorAll(\'[data-marker="current"]\').length===3'))
       if (viewport !== 'portrait' && !await evaluate('Array.from(document.querySelectorAll(\'.go-galaxy-plane svg\')).every(e=>{const r=e.getBoundingClientRect();return r.height>30&&r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth})')) throw new Error('Galaxy projections exceed the visible dashboard')
       const projections = await evaluate('Array.from(document.querySelectorAll(\'[data-marker="current"]\')).map(e=>({axes:e.dataset.axes,position:e.dataset.position}))')
-      if (new Set(projections.map(p => p.axes)).size !== 3 || !await evaluate('document.body.innerText.includes(\'Illustrative spiral-arm concept\')&&!!Array.from(document.querySelectorAll(\'button\')).find(b=>b.disabled&&b.textContent===\'Navigate (coming later)\')')) throw new Error('Galaxy projection/provenance missing')
+      await waitFor(() => evaluate('document.body.innerText.includes(\'Galaxy atlas not installed\')'))
+      if (new Set(projections.map(p => p.axes)).size !== 3 || !await evaluate('document.querySelector(\'.go-galaxy-source\').innerText.includes(\'EDSM\')&&document.querySelector(\'.go-galaxy-source\').innerText.includes(\'not a complete census\')&&!document.querySelector(\'.go-galaxy-plane image\')&&!!Array.from(document.querySelectorAll(\'button\')).find(b=>b.disabled&&b.textContent===\'Navigate (coming later)\')')) throw new Error('Galaxy projection/provenance missing')
       await screenshot('galaxy-' + viewport); report.pages.push({ viewport, page: 'galaxy', projections })
     }
     // Use the ordinary owner-authenticated WebSocket, with no Wails bindings.

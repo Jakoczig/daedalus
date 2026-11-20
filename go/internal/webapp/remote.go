@@ -428,5 +428,16 @@ func (m *remoteManager) serve(epoch uint64, w http.ResponseWriter, r *http.Reque
 		}})
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, "/atlas/assets/") {
+		cookie, e := r.Cookie(viewerCookie)
+		valid := false
+		m.mu.Lock()
+		if e == nil {
+			_, valid = m.findLocked(cookie.Value)
+		}
+		m.mu.Unlock()
+		m.server.atlasAsset(w, r, valid)
+		return
+	}
 	m.assets.ServeHTTP(w, r)
 }
