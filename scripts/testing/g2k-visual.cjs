@@ -46,7 +46,7 @@ async function main () {
       const previous = written; host.child.stdin.write(deployed ? 'status-deployed\n' : 'status-stowed\n')
       await waitFor(() => written && written !== previous)
       await waitFor(() => evaluate(`document.querySelector('.go-stats-evidence')?.textContent.includes(${JSON.stringify(written)})`))
-      await waitFor(() => evaluate(`document.body.innerText.includes('Observed hardpoints: ${deployed ? 'deployed' : 'stowed'}')`))
+      await waitFor(() => evaluate(`document.body.innerText.includes('Hardpoints: ${deployed ? 'deployed' : 'stowed'}')`))
     }
     await status(false)
     const requestsBefore = statsRequests; const start = sample(host.child.pid)
