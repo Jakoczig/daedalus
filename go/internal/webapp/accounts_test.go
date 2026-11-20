@@ -23,7 +23,7 @@ func TestPairedAccountGrantCannotFollowGlobalProfile(t *testing.T) {
 	conn := pairedSocket(t, client, remoteURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	for _, name := range []string{"getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar", "setGoFrontierClient", "completeGoFrontierReturn"} {
+	for _, name := range []string{"getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar", "chooseGoAvatar", "setGoFrontierClient", "completeGoFrontierReturn"} {
 		raw, _ := json.Marshal(map[string]any{"name": name, "requestId": name, "message": map[string]any{}})
 		if e := conn.Write(ctx, websocket.MessageText, raw); e != nil {
 			t.Fatal(e)

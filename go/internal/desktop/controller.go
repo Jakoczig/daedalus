@@ -9,11 +9,27 @@ import (
 )
 
 type Controller struct {
-	mu          sync.Mutex
-	handle      func(string) error
-	clipboard   func(string) bool
-	saveCSV     func(string, string) error
-	quitOnClose atomic.Bool
+	mu           sync.Mutex
+	handle       func(string) error
+	clipboard    func(string) bool
+	saveCSV      func(string, string) error
+	chooseAvatar func() ([]byte, error)
+	quitOnClose  atomic.Bool
+}
+
+func (c *Controller) BindAvatar(f func() ([]byte, error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.chooseAvatar = f
+}
+func (c *Controller) ChooseAvatar() ([]byte, error) {
+	c.mu.Lock()
+	f := c.chooseAvatar
+	c.mu.Unlock()
+	if f == nil {
+		return nil, errors.New("Use the native launcher to change portraits")
+	}
+	return f()
 }
 
 func (c *Controller) BindCSV(f func(string, string) error) {

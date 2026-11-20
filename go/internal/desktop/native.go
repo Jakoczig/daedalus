@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -58,6 +59,25 @@ func newNativeHost(stop func()) (windowHost, error) {
 func (h *nativeHost) Bind(c *Controller) {
 	h.controller = c
 	c.Bind(h.Action)
+	c.BindAvatar(func() ([]byte, error) {
+		if !h.started.Load() || h.stopped.Load() || !h.launcher.IsFocused() {
+			return nil, errors.New("Focus the native launcher before choosing a portrait")
+		}
+		path, err := h.app.Dialog.OpenFile().SetTitle("Choose commander portrait").AddFilter("PNG or JPEG", "*.png;*.jpg;*.jpeg").PromptForSingleSelection()
+		if err != nil || path == "" {
+			return nil, errors.New("Portrait selection cancelled")
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, errors.New("Cannot open selected portrait")
+		}
+		defer f.Close()
+		info, err := f.Stat()
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 512<<10 {
+			return nil, errors.New("Choose a PNG or JPEG under 512 KiB")
+		}
+		return io.ReadAll(io.LimitReader(f, (512<<10)+1))
+	})
 	c.BindClipboard(func(name string) bool {
 		if !h.started.Load() || h.stopped.Load() {
 			return false

@@ -48,7 +48,7 @@ test('missing route target is explicit', async () => {
 
 test('successful Frontier read wording separates observed success from fixture evidence', async () => {
   const value = { state: 'last_request_succeeded', lastSuccess: '2026-11-19T10:00:00Z', config: { read: true }, capability: { id: 'frontier', read: ['profile'], upload: [], evidence: 'Contract-fixture tested; live authentication/publication acceptance not established', intervalSeconds: 60 } }
-  const h = harness('go-provider-settings', name => name === 'getGoProviders' ? [value] : {})
+  const h = harness('go-provider-settings', name => name === 'getGoProviders' ? [value] : {}, 'ProviderDiagnostics')
   try {
     h.html(); await h.flush()
     const html = h.html(); assert.match(html, /authorized read succeeded/i)

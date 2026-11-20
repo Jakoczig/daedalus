@@ -234,7 +234,7 @@ func (m *Manager) asset(r *release, name string) ([]byte, error) {
 func (m *Manager) Asset(id, name string) ([]byte, error) {
 	m.mu.Lock()
 	r := m.current
-	if r == nil || id != r.index.ID {
+	if r == nil || id != r.index.ID || m.state.Disabled || m.clearing {
 		m.mu.Unlock()
 		return nil, errors.New("atlas release not active")
 	}
@@ -247,6 +247,9 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 	}
 	m.mu.Lock()
 	r := m.current
+	if m.state.Disabled || m.clearing {
+		r = nil
+	}
 	m.mu.Unlock()
 	v := View{Tiles: []Tile{}, Source: sourceURL}
 	if r == nil {
@@ -276,7 +279,7 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 	// One lock order: m.mu -> cacheMu. File selection plus publication is atomic
 	// with eviction, so an asset cannot disappear between verification and pinning.
 	m.mu.Lock()
-	if m.current != r || m.ctx.Err() != nil {
+	if m.current != r || m.ctx.Err() != nil || m.state.Disabled || m.clearing {
 		m.mu.Unlock()
 		return v, errors.New("Atlas view changed; retry")
 	}

@@ -21,6 +21,7 @@ type Options struct {
 	DesktopAction     func(string) error
 	CopyWaypoint      func(string) error
 	SaveFieldCSV      func(string, string) error
+	ChooseAvatar      func() ([]byte, error)
 	DesktopCloseMode  func(string)
 	// CommunityClient is injectable for offline tests; no endpoint is browser-configurable.
 	CommunityClient   *http.Client

@@ -22,7 +22,7 @@ async function main () {
     if (await evaluate('!!document.querySelector(".go-galaxy-plane image")')) throw Error('Uninstalled map shows illustrative density')
     const status = await rpc('getGoAtlasStatus'); if (status.automatic || status.details || status.installed) throw Error('Unexpected default networking or installation')
     await shot('uninstalled-overlays')
-    await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()'); await evaluate('document.querySelector(".go-atlas-settings").open=true'); await waitFor(() => evaluate('document.querySelector(".go-atlas-settings").textContent.includes("Install verified overview")')); await shot('owner-atlas-settings')
+    await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()'); await evaluate('Array.from(document.querySelectorAll(".go-companion-settings>button")).find(b=>b.textContent==="Galaxy Atlas").click()'); await waitFor(() => evaluate('document.querySelector(".go-atlas-settings").textContent.includes("Install verified overview")')); await shot('owner-atlas-settings')
     await evaluate('document.querySelector(\'[aria-label="Owner settings"]\').click()')
     if (live) {
       await rpc('checkGoAtlas'); await rpc('installGoAtlas'); await waitFor(async () => { const s = await rpc('getGoAtlasStatus'); if (!s.busy && s.error) throw Error(s.error); return !s.busy && s.installed }); report.install = await rpc('getGoAtlasStatus')

@@ -96,6 +96,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	}()
 	var writeMu sync.Mutex
 	var journalRequested atomic.Bool
+	var providerRequested atomic.Bool
 	var contextRequested atomic.Bool
 	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
 	var shipRequested, shipDelivered atomic.Bool
@@ -127,11 +128,21 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			var previous any
+			var previousProviders any
 			for {
 				select {
 				case <-readCtx.Done():
 					return
 				case <-ticker.C:
+					if principal.role == "owner" && providerRequested.Load() && s.providers != nil {
+						v := s.providers.Status()
+						if !reflect.DeepEqual(previousProviders, v) {
+							previousProviders = v
+							if send(map[string]any{"name": "goProviderStatusChanged", "message": v}) != nil {
+								return
+							}
+						}
+					}
 					if !contextRequested.Load() {
 						continue
 					}
@@ -328,6 +339,9 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				response["message"] = value
 			}
 		case "previewGoHistorical", "confirmGoHistorical", "getGoProviders", "configureGoProvider", "setGoProviderCredential", "disconnectGoProvider", "readGoProvider", "connectGoFrontier", "completeGoFrontierReturn", "setGoFrontierClient":
+			if request.Name == "getGoProviders" && principal.role == "owner" {
+				providerRequested.Store(true)
+			}
 			if principal.role != "owner" {
 				response["error"] = "Owner permission required"
 				break
@@ -366,13 +380,13 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				break
 			}
 			response["message"] = s.systemView(readCtx, q.Name, request.Name == "lookupGoSystem")
-		case "getGoAtlasView", "getGoAtlasStatus", "configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails":
+		case "getGoAtlasView", "getGoAtlasStatus", "configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails", "clearGoAtlas":
 			if value, err := s.atlasRPC(readCtx, request.Name, request.Message, principal.role == "owner"); err != nil {
 				response["error"] = err.Error()
 			} else {
 				response["message"] = value
 			}
-		case "getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar":
+		case "getGoAccounts", "setGoAccounts", "getGoCommanderOverview", "setGoAvatar", "chooseGoAvatar":
 			if principal.role != "owner" {
 				response["error"] = "Local owner required"
 				break

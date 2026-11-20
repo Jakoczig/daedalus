@@ -23,6 +23,7 @@ type Server struct {
 	accountConfirmed          atomic.Bool
 	copyWaypoint              func(string) error
 	saveFieldCSV              func(string, string) error
+	chooseAvatar              func() ([]byte, error)
 	providers                 *providers.Manager
 	openAuthorization         func(string) error
 	companion                 *companionState

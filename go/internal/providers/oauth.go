@@ -56,8 +56,11 @@ func (m *Manager) BeginAuthorization(base string) (string, error) {
 	if m.clientID() == "" {
 		return "", errors.New("Frontier developer application approval required")
 	}
-	if m.opts.RequireHistory && (m.accountFID == "" || m.accountFID != m.fid) {
-		return "", errors.New("Start the selected journal commander before connecting Frontier")
+	// Explicit authorization may bind to a verified persisted profile after the
+	// game has shut down. This does not establish a live journal identity or relax
+	// Read/Observe attribution. Pending selection and a different live FID fail closed.
+	if m.opts.RequireHistory && (m.accountFID == "" || (m.fid != "" && m.accountFID != m.fid) || (m.pinnedAccount != "" && m.pinnedAccount != m.accountFID)) {
+		return "", errors.New("Select a verified commander in Journal & Commander before connecting Frontier")
 	}
 	if !s.config.Read || s.config.Paused {
 		return "", errors.New("Enable Frontier read consent first")
