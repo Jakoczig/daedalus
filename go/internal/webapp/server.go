@@ -3,6 +3,7 @@ package webapp
 import (
 	"context"
 	"errors"
+	"github.com/Jakoczig/eridion/go/internal/atlas"
 	"github.com/Jakoczig/eridion/go/internal/community"
 	"github.com/Jakoczig/eridion/go/internal/gamestate"
 	"github.com/Jakoczig/eridion/go/internal/providers"
@@ -17,6 +18,7 @@ import (
 )
 
 type Server struct {
+	atlas                     *atlas.Manager
 	accountMu                 sync.Mutex
 	accountConfirmed          atomic.Bool
 	copyWaypoint              func(string) error
@@ -99,6 +101,7 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 		}
 		server.remote = manager
 		if opts.EnableParity {
+			server.atlas = atlas.New(ctx, dir)
 			opts.ProviderOptions.RequireHistory = opts.EnableJournal
 			server.providers = providers.New(ctx, dir, opts.ProviderOptions)
 			if opts.CommunityClient == nil {
@@ -151,6 +154,9 @@ func (s *Server) JournalClientReady() <-chan struct{}    { return s.journalReady
 func (s *Server) NavigationClientReady() <-chan struct{} { return s.navigationReady }
 func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
+		if s.atlas != nil {
+			s.atlas.Close()
+		}
 		if s.providers != nil {
 			s.providers.Close()
 		}
