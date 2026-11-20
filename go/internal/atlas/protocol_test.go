@@ -33,6 +33,7 @@ func TestPythonPublisherGolden(t *testing.T) {
 	if _, e = verifyEnvelope(g.Envelope, key); e == nil {
 		t.Fatal("accepted wrong key")
 	}
+	key[0] ^= 1 // Test payload/signature tampering with the correct trusted key.
 	for _, bad := range []string{strings.Replace(string(g.Envelope), "Ed25519", "RSA", 1), strings.Replace(string(g.Envelope), "unicode", "wrong", 1)} {
 		if _, e = verifyEnvelope([]byte(bad), key); e == nil {
 			t.Fatal("accepted tampering")
