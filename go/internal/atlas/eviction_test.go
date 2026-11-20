@@ -35,6 +35,10 @@ func fillColdCache(t *testing.T, m *Manager, target int64) []string {
 		if e != nil {
 			t.Fatal(e)
 		}
+		if e = sparseColdFile(f); e != nil {
+			f.Close()
+			t.Fatal(e)
+		}
 		if e = f.Truncate(size); e != nil {
 			f.Close()
 			t.Fatal(e)

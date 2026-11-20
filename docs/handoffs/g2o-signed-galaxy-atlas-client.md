@@ -64,6 +64,11 @@ acquisition without relying on sleeps. Focused race tests passed; the final PR
 ledger records the corrected implementation commit, comprehensive exact-head CI
 and independently verified refreshed previews. Prior live publisher evidence
 below is retained; this correction makes no additional production-provider calls.
+The initial Windows CI attempt timed out in two unchanged G2J journal tests;
+both passed 25 repetitions locally. Near-full cold files are explicitly sparse
+on Windows (Unix truncation already creates holes), retaining real logical sizes
+without bulk zero-fill I/O competing with journal/SQLite packages. No journal
+assertion or timeout changed; the final CI evidence remains the acceptance gate.
 
 ## Evidence and measurements
 
