@@ -50,9 +50,9 @@ Both real volumes are 200 x 100 x 200 LY. Sol: [-100,-50,-100] to [100,50,100], 
 
 ## Performance evidence
 
-Public HTTPS direct Go test installed manifest and Bubble in 832 ms; first Sol decode/query took 14.93 ms (single samples). Browser/WebSocket round trips including 9,238-position JSON transfer measured 46.72 ms at Sol and 5.70 ms for 43 positions at Beagle Point. Regional cache after this route was 20,349 bytes; permanent Bubble 3,144,891 bytes. Total spatial received bytes 7,754,923 include manifest, Bubble, signatures and sparse assets. Re-reading offline Sol returned all 9,238 positions without increasing downloaded bytes.
+Public HTTPS direct Go test installed manifest and Bubble in 832 ms; first Sol decode/query took 14.93 ms (single samples). Browser/WebSocket round trips including 9,238-position JSON transfer measured 47.78 ms at Sol and 6.19 ms for 43 positions at Beagle Point. Regional cache after this route was 20,349 bytes; permanent Bubble 3,144,891 bytes. Total spatial received bytes 7,754,923 include manifest, Bubble, signatures and sparse assets. Re-reading offline Sol returned all 9,238 positions without increasing downloaded bytes.
 
-Windows Chromium 1.5-second idle samples, single run and sequential scene order: density baseline renderer heap 8,731,424 bytes / main-thread busy 1.474% / synthetic Go host RSS 55,459,840 bytes; local Sol 6,315,344 / 1.614% / 51,499,008; local sparse 6,638,804 / 1.953% / 53,514,240. Synthetic backend one-core CPU sample was 1.704% at Sol, 0% in the other short samples (sampling resolution, not a zero-CPU claim). This measures the fixture's real Go service and Chromium, not total Wails RAM/CPU. Cache history and GC affect RSS; no statistical speedup or causal resource reduction is claimed.
+Windows Chromium 1.5-second scene samples, single run and sequential order: density baseline renderer heap 6,395,324 bytes / main-thread busy 1.482% / synthetic Go host RSS 57,135,104 bytes; local Sol 8,059,596 / 1.506% / 50,946,048; local sparse 7,994,924 / 1.624% / 54,349,824. Synthetic backend one-core CPU samples were 5.09%, 5.97% and 7.66%, respectively. These short samples can include route-prefetch/notification settling and are not established steady-state idle or throughput measurements. This measures the fixture's real Go service and Chromium, not total Wails RAM/CPU. Cache history and GC affect RSS; no statistical speedup or causal resource reduction is claimed.
 
 ## Acceptance checklist and limitations
 
@@ -63,3 +63,5 @@ Windows Chromium 1.5-second idle samples, single run and sequential scene order:
 5. Exercise offline/metered pause, a cache miss and an over-dense volume: expect an honest labeled fallback, never empty-space claims. Test rollback/removal using a disposable profile first.
 
 Boundary-straddling Bubble volumes can need regional cache or a smaller selection. Provider catalogue incompleteness, absent names/classes and 80k-volume limits are intentional. Real network interruptions, actual gameplay and physical laptop checks remain manual. No live Frontier sign-in, production uploads, legacy replacement, merge, release or deployment was performed.
+
+Transition regression: explicit Overview XYZ bounds now carry into Local Volume without silently clamping or squaring X/Z. Independent X width, Z depth and Y thickness retain rectangular scale; oversized selections produce the existing bounded fallback. Equal light-year geometry and round markers are tested for asymmetric volumes and the browser tests exercise a 400 x 50 x 100 LY round trip.

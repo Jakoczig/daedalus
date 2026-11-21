@@ -17,6 +17,7 @@
       "height": 262.921875
     }
   ],
+  "rectangularTransition": true,
   "install": {
     "downloads": true,
     "automatic": false,
@@ -28,13 +29,15 @@
     "bubbleBytes": 3144891,
     "bubbleHash": "c486fb3124df68417c3a9fd1d1b79a2d459d24d4793e9632024676e59049053a",
     "bubbleSystems": 248264,
+    "bubbleSource": "EDSM-2026-11-21",
+    "bubbleUpdate": false,
     "busy": false,
     "pending": false,
     "cacheBytes": 0,
     "cacheBudget": 67108864,
     "downloaded": 7734574,
     "error": "",
-    "lastCheck": "2026-11-21T13:42:35.3096282+01:00"
+    "lastCheck": "2026-11-21T13:56:22.4135403+01:00"
   },
   "Sol": {
     "query": {
@@ -55,12 +58,12 @@
     "source": "EDSM reported XYZ · 1/32 LY · EDSM-2026-11-21 · source 0131b1b69531",
     "release": "f5eca8346b2e637325449c1a",
     "resources": {
-      "rendererHeapBytes": 6315344,
-      "mainThreadPercent": 1.61425271226691,
-      "backendRSSBytes": 51499008,
-      "backendCPUPercentOneCore": 1.7039773175263848
+      "rendererHeapBytes": 8059596,
+      "mainThreadPercent": 1.506044594617437,
+      "backendRSSBytes": 50946048,
+      "backendCPUPercentOneCore": 5.970019394989637
     },
-    "warmRPCMilliseconds": 46.722900000000664
+    "warmRPCMilliseconds": 47.77950000000055
   },
   "Beagle-Point": {
     "query": {
@@ -81,18 +84,18 @@
     "source": "EDSM reported XYZ · 1/32 LY · EDSM-2026-11-21 · source 0131b1b69531",
     "release": "f5eca8346b2e637325449c1a",
     "resources": {
-      "rendererHeapBytes": 6638804,
-      "mainThreadPercent": 1.9528124291718836,
-      "backendRSSBytes": 53514240,
-      "backendCPUPercentOneCore": 0
+      "rendererHeapBytes": 7994924,
+      "mainThreadPercent": 1.6244715119806985,
+      "backendRSSBytes": 54349824,
+      "backendCPUPercentOneCore": 7.6609481445469605
     },
-    "warmRPCMilliseconds": 5.70299999999952
+    "warmRPCMilliseconds": 6.189800000000105
   },
   "densityBaseline": {
-    "rendererHeapBytes": 8731424,
-    "mainThreadPercent": 1.473558853893684,
-    "backendRSSBytes": 55459840,
-    "backendCPUPercentOneCore": 0
+    "rendererHeapBytes": 6395324,
+    "mainThreadPercent": 1.4819290539506769,
+    "backendRSSBytes": 57135104,
+    "backendCPUPercentOneCore": 5.0921934149221295
   },
   "offline": {
     "complete": true,
@@ -108,18 +111,20 @@
       "bubbleBytes": 3144891,
       "bubbleHash": "c486fb3124df68417c3a9fd1d1b79a2d459d24d4793e9632024676e59049053a",
       "bubbleSystems": 248264,
+      "bubbleSource": "EDSM-2026-11-21",
+      "bubbleUpdate": false,
       "busy": false,
       "pending": false,
       "cacheBytes": 20349,
       "cacheBudget": 67108864,
       "downloaded": 7754923,
       "error": "",
-      "lastCheck": "2026-11-21T13:42:35.3096282+01:00"
+      "lastCheck": "2026-11-21T13:56:22.4135403+01:00"
     }
   },
   "idle": {
-    "rendererHeapBytes": 6379768,
-    "mainThreadPercent": 1.9456836316936077
+    "rendererHeapBytes": 6843624,
+    "mainThreadPercent": 1.9651985027183756
   },
   "passed": true
 }

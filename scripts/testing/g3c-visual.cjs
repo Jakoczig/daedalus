@@ -17,6 +17,7 @@ async function main () {
   await c.call('Network.enable'); await c.call('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
   const setCenter = async center => { for (let i = 0; i < 3; i++) await evaluate(`(()=>{const e=document.querySelector('[aria-label="Local center ${'XYZ'[i]}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(String(center[i]))});e.dispatchEvent(new Event('input',{bubbles:true}))})()`) }
   const volume = center => ({ low: center.map((v, i) => v - (i === 1 ? 50 : 100)), high: center.map((v, i) => v + (i === 1 ? 50 : 100)) })
+  const select = (label, value) => evaluate(`(()=>{const e=document.querySelector('[aria-label="${label}"]');e.value=${JSON.stringify(String(value))};e.dispatchEvent(new Event('change',{bubbles:true}))})()`)
   const backendUsage = async () => {
     if (process.platform === 'win32') { const r = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${host.child.pid}) | Select-Object CPU,WorkingSet64 | ConvertTo-Json -Compress`], { windowsHide: true }); const v = JSON.parse(r.stdout); return { cpuSeconds: v.CPU, rssBytes: v.WorkingSet64 } }
     const text = await fs.readFile(`/proc/${host.child.pid}/status`, 'utf8'); return { rssBytes: Number(/VmRSS:\s+(\d+)/.exec(text)?.[1] || 0) * 1024 }
@@ -36,6 +37,10 @@ async function main () {
     await evaluate(toggle + '.click()'); if (await evaluate('!!document.querySelector(".go-galaxy-route")')) throw Error('Local hide route failed')
     if (await evaluate('document.querySelectorAll("[data-marker=current]").length') !== 3) throw Error('Route visibility hid player')
     await evaluate(toggle + '.click()')
+    await select('Local inspection width', 400); await select('Local inspection depth', 100); await select('Local vertical thickness', 50)
+    await click('Galaxy Overview'); await waitFor(() => evaluate('!!document.querySelector(".go-galaxy-controls")')); await click('Local Volume · actual XYZ')
+    await waitFor(() => evaluate('["Local inspection width","Local inspection depth","Local vertical thickness"].map(label=>document.querySelector("[aria-label=\'"+label+"\']").value).join(",")==="400,100,50"'))
+    report.rectangularTransition = true; await click('Fit Local Region')
     await waitFor(() => evaluate('document.body.innerText.includes("Density fallback")')); if (await evaluate('!!document.querySelector("[data-spatial-projection]")')) throw Error('Missing spatial cache pretended to contain points')
     await shot('synthetic-local-fallback')
     await click('Galaxy Overview'); await waitFor(() => evaluate('!!document.querySelector(".go-galaxy-controls")')); await click('Local Volume · actual XYZ')

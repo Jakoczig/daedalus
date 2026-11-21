@@ -11,3 +11,5 @@ Cached data and Bubble work offline. Bubble is read lazily from the verified ZIP
 Acceptance: test following a real jump, route replacement, destination/waypoint inspection and return to Overview. Confirm all three panels use the same XYZ box, route visibility and markers; inspect Sol and a sparse region; restart offline after Bubble install. On a paired laptop confirm cached positions update but all download/settings/removal operations remain owner-only. Real gameplay and physical-device acceptance remain manual.
 
 Reference: Galaxy Painter spatial.py/local_view.py and synthetic fixtures at 5d1cbf1aee7a707259000e57ea963175f7cd4f3b (GPL-3.0); signed G3B distribution at e3c6e40. EDSM supplies reported community positions, not a full census. No new uploads, game actions, spectral predictions, publisher or production infrastructure changes are included.
+
+Explicit Overview selections retain their XYZ bounds when switching modes. X width, Z depth and Y thickness can be adjusted independently. A too-large inherited volume is labeled over budget; choose Fit Local Region or reduce its dimensions.
