@@ -20,7 +20,7 @@ test('route visibility preserves coordinates and markers, using thin constant-pi
   const h = harness('go-galaxy', null, 'Projection')
   h.props.axes = 'xz'; h.props.frame = { x: [-10, 10], y: [-10, 10], z: [-10, 10] }; h.props.current = { name: 'Fixture', coordinates: [0, 0, 0] }; h.props.route = [h.props.current, { coordinates: [5, 0, 5] }]
   try {
-    const before = h.html(); assert.match(before, /go-galaxy-route/); assert.match(before, /non-scaling-stroke/); assert.match(before, /data-position="0.5,0.5"/)
+    const before = h.html(); assert.match(before, /data-marker="waypoint" data-axes="xz" data-position="0.5,0.5"/); assert.match(before, /go-galaxy-route/); assert.match(before, /non-scaling-stroke/); assert.match(before, /data-position="0.5,0.5"/)
     h.props.showRoute = false; const hidden = h.html(); assert.doesNotMatch(hidden, /go-galaxy-route/); assert.match(hidden, /data-marker="current"/); assert.match(hidden, /data-position="0.5,0.5"/)
   } finally { h.unmount() }
 })

@@ -19,3 +19,5 @@ Painter comparison uses identical verified PNGs and its unmodified renderer. Mea
 Single 1.5-second idle Chromium sample: 8,074,668-byte JS heap, 1.593% renderer main-thread busy. This is not total native RAM/CPU or a statistical speedup. Synthetic pan reused one source fetch. No external frontend requests or browser errors. No comparative native resource claim is made.
 
 Manual acceptance: test real route at matching zoom on Windows and paired laptop; compare all three projection alignment; pan/resize, hide route, verify destination remains; enable owner detail consent and observe honest fallback/refinement; restart offline; confirm viewers cannot change Atlas settings. Native real-game gameplay and physical laptop acceptance remain owner tests.
+
+Final CI initially exposed missing coordinate metadata on the new waypoint markers in the retained G2H framing assertion. Added the same axis/normalized-position metadata as existing map markers, with a failing-then-passing regression; no assertion was removed or relaxed.
