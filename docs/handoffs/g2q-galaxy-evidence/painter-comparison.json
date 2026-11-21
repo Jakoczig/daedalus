@@ -1,0 +1,27 @@
+{
+  "referenceBlob": "75551b7ef96f3d8d5b09950688206c6def35d3b5",
+  "publisher": "8207cdfe6be22603c1f18b06",
+  "projection": "xz",
+  "frame": {
+    "x": [
+      -47,
+      53
+    ],
+    "y": [
+      -46,
+      54
+    ],
+    "z": [
+      -47.5,
+      52.5
+    ]
+  },
+  "size": [
+    349,
+    349
+  ],
+  "zoom": 1300.0,
+  "meanAbsoluteRGBDifference": 9.367145316267244,
+  "brightPixelMaskIoU": 0.8601938557581732,
+  "note": "Same verified PNGs, coordinates, bin centres and radius rule. Canvas antialiasing differs from Pillow ellipse rasterization; pixel-exact equivalence is not claimed."
+}

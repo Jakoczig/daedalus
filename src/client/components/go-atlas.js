@@ -1,20 +1,28 @@
 import { useEffect, useState } from 'react'
+import AtlasBinCanvas, { safeTileURL, tileGeometry, useBinSymbols } from './go-atlas-canvas'
 
 export const atlasExtents = { x: [-65000, 65000], y: [-15000, 15000], z: [-35000, 95000] }
-export function safeTileURL (url) { return typeof url === 'string' && /^\/atlas\/assets\/[a-f0-9]{24}\/(tiles\/)?(xz|xy|yz)\/[0-7]\/(0|[1-9][0-9]{0,2})-(0|[1-9][0-9]{0,2})\.png$/.test(url) }
-export function AtlasTiles ({ atlas, axes, frame, width, height }) {
+export { safeTileURL } from './go-atlas-canvas'
+export function atlasLODLabel (atlas) {
+  const tiles = atlas?.tiles || []; const requested = Math.max(0, ...tiles.map(t => t.level), ...Object.values(atlas?.requestedLevels || {})); const levels = [...new Set(tiles.map(t => t.sourceLevel))].sort((a, b) => a - b)
+  const displayed = levels.length ? levels.map(n => `L${n}`).join('–') : 'none'; const fallback = tiles.some(t => t.sourceLevel < t.level)
+  return `Requested L${requested} · Displayed ${displayed}${fallback ? ' fallback' : ''} · ${atlas?.missing || 0} ${atlas?.pending ? 'pending' : 'unavailable'} visible tiles`
+}
+export function AtlasTiles ({ atlas, axes, frame, width, height, pixels = 320, pixelHeight = pixels * height / width }) {
+  const [readyKey, setReadyKey] = useState('')
   const extents = atlas?.extents
   if (!extents) return null
-  return (atlas.tiles || []).filter(t => t.axes === axes && safeTileURL(t.url)).map(t => {
-    const size = 256 * 2 ** t.level; const pw = axes === 'yz' ? size / 4 : size; const ph = axes === 'xy' ? size / 4 : size
-    const a = extents[axes[0]]; const b = extents[axes[1]]; const fx = frame[axes[0]]; const fy = frame[axes[1]]
-    const tileW = Math.min(256, pw - t.x * 256); const tileH = Math.min(256, ph - t.y * 256)
-    const x = width * (a[0] + (a[1] - a[0]) * t.x * 256 / pw - fx[0]) / (fx[1] - fx[0]); const y = height * (fy[1] - (b[1] - (b[1] - b[0]) * t.y * 256 / ph)) / (fy[1] - fy[0])
-    const w = width * (a[1] - a[0]) * tileW / pw / (fx[1] - fx[0]); const h = height * (b[1] - b[0]) * tileH / ph / (fy[1] - fy[0])
-    const scale = 2 ** (t.level - t.sourceLevel); const sx = (t.x / scale - t.sourceX) * 256; const sy = (t.y / scale - t.sourceY) * 256
-    const sourceSize = 256 * 2 ** t.sourceLevel; const iw = Math.min(256, (axes === 'yz' ? sourceSize / 4 : sourceSize) - t.sourceX * 256); const ih = Math.min(256, (axes === 'xy' ? sourceSize / 4 : sourceSize) - t.sourceY * 256)
-    return <svg key={`${axes}-${t.level}-${t.x}-${t.y}`} data-atlas-level={t.level} data-source-level={t.sourceLevel} x={x} y={y} width={w} height={h} viewBox={`${sx} ${sy} ${tileW / scale} ${tileH / scale}`} preserveAspectRatio='none' overflow='hidden'><image href={t.url} x='0' y='0' width={iw} height={ih} preserveAspectRatio='none' /></svg>
-  })
+  const tiles = (atlas.tiles || []).filter(t => t.axes === axes && safeTileURL(t.url))
+  const fine = tiles.filter(t => { const g = tileGeometry(t, extents, frame, pixels, pixelHeight); return useBinSymbols(t, g.w / g.sw, g.h / g.sh) })
+  const viewKey = JSON.stringify([axes, frame, pixels, pixelHeight, fine.map(t => t.url)])
+  return (
+    <>{tiles.map(t => {
+      if (readyKey === viewKey && fine.includes(t)) return null
+      const g = tileGeometry(t, extents, frame, width, height)
+      return <svg key={`${axes}-${t.level}-${t.x}-${t.y}`} data-atlas-level={t.level} data-source-level={t.sourceLevel} x={g.x} y={g.y} width={g.w} height={g.h} viewBox={`${g.sx} ${g.sy} ${g.sw} ${g.sh}`} preserveAspectRatio='none' overflow='hidden'><image href={t.url} x='0' y='0' width={g.iw} height={g.ih} preserveAspectRatio='none' style={{ imageRendering: t.sourceLevel < t.level ? 'pixelated' : 'auto' }} /></svg>
+    })}{fine.length > 0 && <AtlasBinCanvas key={viewKey} tiles={fine} extents={extents} frame={frame} width={width} height={height} viewKey={viewKey} onReady={setReadyKey} />}
+    </>
+  )
 }
 const mib = v => `${((v || 0) / 1048576).toFixed(2)} MiB`
 export function AtlasSettings ({ role, sendEvent }) {
