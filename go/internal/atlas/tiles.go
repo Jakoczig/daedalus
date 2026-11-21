@@ -24,9 +24,10 @@ const maxWorkingSetBytes = int64(3*maxProjectionTiles*2) * (4 << 20)
 
 type Frame map[string][2]float64
 type ViewRequest struct {
-	Frame   Frame `json:"frame"`
-	Pixels  int   `json:"pixels"`
-	Compact bool  `json:"compact"`
+	ProjectionPixels map[string][2]int `json:"projectionPixels,omitempty"`
+	Frame            Frame             `json:"frame"`
+	Pixels           int               `json:"pixels"`
+	Compact          bool              `json:"compact"`
 }
 type Tile struct {
 	Axes        string `json:"axes"`
@@ -39,13 +40,15 @@ type Tile struct {
 	URL         string `json:"url"`
 }
 type View struct {
-	Installed   string                `json:"installed"`
-	Extents     map[string][2]float64 `json:"extents,omitempty"`
-	Tiles       []Tile                `json:"tiles"`
-	Pending     bool                  `json:"pending"`
-	Source      string                `json:"source"`
-	Attribution string                `json:"attribution"`
-	MaxLevel    int                   `json:"maxLevel"`
+	RequestedLevels map[string]int        `json:"requestedLevels,omitempty"`
+	Missing         int                   `json:"missing"`
+	Installed       string                `json:"installed"`
+	Extents         map[string][2]float64 `json:"extents,omitempty"`
+	Tiles           []Tile                `json:"tiles"`
+	Pending         bool                  `json:"pending"`
+	Source          string                `json:"source"`
+	Attribution     string                `json:"attribution"`
+	MaxLevel        int                   `json:"maxLevel"`
 }
 type catalog struct {
 	Protocol string  `json:"protocol"`
@@ -62,6 +65,14 @@ type wanted struct {
 }
 
 func selectTiles(meta Metadata, q ViewRequest) ([]wanted, error) {
+	if len(q.ProjectionPixels) > 3 {
+		return nil, errors.New("invalid projection sizes")
+	}
+	for axes, p := range q.ProjectionPixels {
+		if (axes != "xz" && axes != "xy" && axes != "yz") || p[0] < 1 || p[1] < 1 || p[0] > 2048 || p[1] > 2048 {
+			return nil, errors.New("invalid projection size")
+		}
+	}
 	if len(q.Frame) != 3 || q.Pixels < 64 || q.Pixels > 2048 {
 		return nil, errors.New("invalid atlas viewport")
 	}
@@ -80,16 +91,7 @@ func selectTiles(meta Metadata, q ViewRequest) ([]wanted, error) {
 		a, b := string(axes[0]), string(axes[1])
 		ex, ey := meta.Extents[a], meta.Extents[b]
 		fx, fy := q.Frame[a], q.Frame[b]
-		w, h := dimensions(axes, 0)
-		pw, ph := float64(q.Pixels), float64(q.Pixels)
-		if axes == "xy" {
-			ph /= 8
-		}
-		if axes == "yz" {
-			pw /= 8
-		}
-		need := math.Max(pw*(ex[1]-ex[0])/(fx[1]-fx[0])/float64(w), ph*(ey[1]-ey[0])/(fy[1]-fy[0])/float64(h))
-		n := max(0, min(7, int(math.Ceil(math.Log2(math.Max(1, need))))))
+		n := viewportLevel(meta, q, axes)
 		l := meta.Views[axes].Levels[strconv.Itoa(n)]
 		x0 := max(0, int(math.Floor((fx[0]-ex[0])/(ex[1]-ex[0])*float64(l.Width)/256)))
 		x1 := min(l.Columns-1, int(math.Ceil((fx[1]-ex[0])/(ex[1]-ex[0])*float64(l.Width)/256))-1)
@@ -122,6 +124,23 @@ func selectTiles(meta Metadata, q ViewRequest) ([]wanted, error) {
 		}
 	}
 	return out, nil
+}
+func viewportLevel(meta Metadata, q ViewRequest, axes string) int {
+	w, h := dimensions(axes, 0)
+	pw, ph := float64(q.Pixels), float64(q.Pixels)
+	if axes == "xy" {
+		ph /= 8
+	}
+	if axes == "yz" {
+		pw /= 8
+	}
+	if p, ok := q.ProjectionPixels[axes]; ok {
+		pw, ph = float64(p[0]), float64(p[1])
+	}
+	ex, ey := meta.Extents[string(axes[0])], meta.Extents[string(axes[1])]
+	fx, fy := q.Frame[string(axes[0])], q.Frame[string(axes[1])]
+	need := math.Max(pw*(ex[1]-ex[0])/(fx[1]-fx[0])/float64(w), ph*(ey[1]-ey[0])/(fy[1]-fy[0])/float64(h))
+	return max(0, min(7, int(math.Ceil(math.Log2(math.Max(1, need))))))
 }
 func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
 func (m *Manager) catalog(r *release, axes string, level int, online bool, ctx context.Context) (map[string]Asset, error) {
@@ -263,6 +282,12 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 	v.Extents = r.meta.Extents
 	v.MaxLevel = 7
 	v.Attribution = r.index.Attribution
+	v.RequestedLevels = map[string]int{}
+	for _, axes := range []string{"xz", "xy", "yz"} {
+		if !q.Compact || axes == "xz" {
+			v.RequestedLevels[axes] = viewportLevel(r.meta, q, axes)
+		}
+	}
 	missing := []wanted{}
 	cats := map[string]map[string]Asset{}
 	// Load catalog metadata before either manager/cache lock. A catalog download
@@ -311,6 +336,9 @@ func (m *Manager) View(q ViewRequest, owner bool) (View, error) {
 			v.Tiles = append(v.Tiles, Tile{Axes: w.axes, Level: w.level, X: w.x, Y: w.y, SourceLevel: n, SourceX: x, SourceY: y, URL: "/atlas/assets/" + r.index.ID + "/" + name})
 			found = n == w.level
 			break
+		}
+		if !found {
+			v.Missing++
 		}
 		if !found && w.level > 4 {
 			missing = append(missing, w)
