@@ -1,0 +1,47 @@
+{
+  "galaxy_systems": 8,
+  "bubble_350_systems": 5,
+  "bubble_350_sha256": "0ec1cfb361adeb4b862cd1327be9634546308c0e157f32f5fc61aa1b021443ba",
+  "bubble_boundary_inside_ly": [
+    350,
+    0,
+    0
+  ],
+  "bubble_boundary_outside_ly": [
+    350.03125,
+    0,
+    0
+  ],
+  "local_box_low_ly": [
+    -2,
+    -2,
+    -2
+  ],
+  "local_box_high_ly": [
+    2,
+    2,
+    2
+  ],
+  "local_box_points_ly": [
+    [
+      -0.03125,
+      -0.0625,
+      -0.125
+    ],
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      0.03125,
+      0.0625,
+      0.125
+    ],
+    [
+      1.8125,
+      1.25,
+      1.71875
+    ]
+  ]
+}

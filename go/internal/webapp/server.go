@@ -19,6 +19,7 @@ import (
 
 type Server struct {
 	atlas                     *atlas.Manager
+	spatial                   *atlas.SpatialManager
 	accountMu                 sync.Mutex
 	accountConfirmed          atomic.Bool
 	copyWaypoint              func(string) error
@@ -103,6 +104,7 @@ func StartLocalWithOptions(ctx context.Context, assets fs.FS, opts Options) (*Se
 		server.remote = manager
 		if opts.EnableParity {
 			server.atlas = atlas.New(ctx, dir)
+			server.spatial = atlas.NewSpatial(ctx, dir)
 			opts.ProviderOptions.RequireHistory = opts.EnableJournal
 			server.providers = providers.New(ctx, dir, opts.ProviderOptions)
 			if opts.CommunityClient == nil {
@@ -157,6 +159,9 @@ func (s *Server) Close(ctx context.Context) error {
 	s.once.Do(func() {
 		if s.atlas != nil {
 			s.atlas.Close()
+		}
+		if s.spatial != nil {
+			s.spatial.Close()
 		}
 		if s.providers != nil {
 			s.providers.Close()

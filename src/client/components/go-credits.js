@@ -1,7 +1,7 @@
 const credits = [
   ['Elite Dangerous', 'Frontier Developments', 'Game journal and consented account reference.', 'https://www.frontier.co.uk/'],
   ['EDSM', 'EDSM community', 'Community system references and atlas source data.', 'https://www.edsm.net/'],
-  ['Galaxy Painter', 'Jakoczig', 'Signed offline galaxy density tiles.', 'https://github.com/Jakoczig/Eridion-Galaxy-Painter'],
+  ['Galaxy Painter', 'Jakoczig', 'Signed offline density and actual XYZ spatial atlas. G3A v1 decoder, fixtures and projection reference: GPL-3.0, commit 5d1cbf1aee7a707259000e57ea963175f7cd4f3b; G3B distribution reference e3c6e40.', 'https://github.com/Jakoczig/Eridion-Galaxy-Painter'],
   ['Spansh', 'Spansh', 'Manual route planning and reference lookups.', 'https://spansh.co.uk/'],
   ['EDAstro', 'EDAstro community', 'Optional galaxy community layers.', 'https://edastro.com/'],
   ['FDevIDs', 'EDCD contributors', 'Game identifier reference data.', 'https://github.com/EDCD/FDevIDs'],

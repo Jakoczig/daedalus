@@ -35,12 +35,12 @@ test('both desktop OSes have blocking build, security and real executable gates'
   assert.match(job.steps.find(step => step.name === 'Native journal smoke').run, /--desktop-journal-smoke-test/)
   assert.match(job.steps.find(step => step.name === 'Go tests').run, /-count=1/, 'idle/reconnect acceptance must execute freshly on both OSes')
   const pack = job.steps.findIndex(step => step.name === 'Package experimental preview')
-  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('eridion-g2q-') && String(step.with?.name).endsWith('-x64-experimental-unsigned-preview'))
+  const upload = job.steps.findIndex(step => String(step.uses).startsWith('actions/upload-artifact@') && String(step.with?.name).startsWith('eridion-g3c-') && String(step.with?.name).endsWith('-x64-experimental-unsigned-preview'))
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native React smoke'), 'packaging must follow all security/native gates')
   assert.ok(pack > job.steps.findIndex(step => step.name === 'Native journal smoke'), 'artifact must wait for G2A native data validation')
   assert.ok(upload > pack, 'missing gated artifact upload')
   assert.equal(job.steps[upload].if, undefined, 'artifact upload must use default success gating')
-  assert.match(job.steps[upload].with.name, /g2q-.*experimental-unsigned-preview/)
+  assert.match(job.steps[upload].with.name, /g3c-.*experimental-unsigned-preview/)
   assert.equal(job.steps[upload].with['if-no-files-found'], 'error')
   assert.match(job.steps[upload].with.path, /^\$\{\{ steps\.preview\.outputs\.directory \}\}$/)
 })
@@ -185,4 +185,17 @@ test('G2O stacked target, offline visual gate and cache benchmark are mandatory'
   assert.ok(legacy.on.pull_request.branches.includes('go/g2n-commander-fleet-completion'))
   const visual = w.jobs.desktop.steps.find(s => s.name === 'G2O offline atlas controls and projection browser verification')
   assert.ok(visual); assert.equal(visual.if, undefined); assert.doesNotMatch(visual.run, /--live/)
+})
+
+test('G3C stacks on G2Q and keeps spatial browser verification offline and mandatory', () => {
+  for (const name of ['go-desktop.yml', 'ci.yml']) {
+    const w = YAML.parse(fs.readFileSync(path.join(__dirname, '../../.github/workflows', name), 'utf8'))
+    assert.ok(w.on.pull_request.branches.includes('go/g2q-galaxy-map-fidelity'))
+    if (name === 'go-desktop.yml') {
+      const index = w.jobs.desktop.steps.findIndex(s => s.name === 'G3C hybrid spatial map geometry and exact-coordinate Canvas')
+      assert.ok(index > 0 && index < w.jobs.desktop.steps.findIndex(s => s.name === 'Package experimental preview'))
+      assert.equal(w.jobs.desktop.steps[index].if, undefined)
+      assert.doesNotMatch(w.jobs.desktop.steps[index].run, /--live/)
+    }
+  }
 })

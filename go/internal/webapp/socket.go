@@ -98,6 +98,7 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 	var journalRequested atomic.Bool
 	var providerRequested atomic.Bool
 	var contextRequested atomic.Bool
+	var spatialRequested atomic.Bool
 	var navRequested, surveyRequested, navDelivered, surveyDelivered atomic.Bool
 	var shipRequested, shipDelivered atomic.Bool
 	var workspaceRequested, workspaceDelivered atomic.Bool
@@ -129,11 +130,21 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 			defer ticker.Stop()
 			var previous any
 			var previousProviders any
+			var spatialRevision uint64
 			for {
 				select {
 				case <-readCtx.Done():
 					return
 				case <-ticker.C:
+					if spatialRequested.Load() && s.spatial != nil {
+						revision := s.spatial.Revision()
+						if revision != spatialRevision {
+							spatialRevision = revision
+							if send(map[string]any{"name": "goSpatialChanged", "message": map[string]any{"revision": revision}}) != nil {
+								return
+							}
+						}
+					}
 					if principal.role == "owner" && providerRequested.Load() && s.providers != nil {
 						v := s.providers.Status()
 						if !reflect.DeepEqual(previousProviders, v) {
@@ -380,6 +391,15 @@ func (s *Server) serveSocket(w http.ResponseWriter, r *http.Request, principal s
 				break
 			}
 			response["message"] = s.systemView(readCtx, q.Name, request.Name == "lookupGoSystem")
+		case "getGoSpatialView", "getGoSpatialStatus", "configureGoSpatial", "installGoSpatial", "installGoBubble", "removeGoBubble", "rollbackGoSpatial", "retryGoSpatial":
+			if request.Name == "getGoSpatialView" {
+				spatialRequested.Store(true)
+			}
+			if value, err := s.spatialRPC(readCtx, request.Name, request.Message, principal.role == "owner"); err != nil {
+				response["error"] = err.Error()
+			} else {
+				response["message"] = value
+			}
 		case "getGoAtlasView", "getGoAtlasStatus", "configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails", "clearGoAtlas":
 			if value, err := s.atlasRPC(readCtx, request.Name, request.Message, principal.role == "owner"); err != nil {
 				response["error"] = err.Error()

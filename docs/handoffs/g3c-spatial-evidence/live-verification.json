@@ -1,0 +1,125 @@
+{
+  "scope": "Verified public signed spatial/density assets; disposable synthetic-navigation profile, not gameplay",
+  "layout": [
+    {
+      "axes": "xz",
+      "width": 262.921875,
+      "height": 262.921875
+    },
+    {
+      "axes": "xy",
+      "width": 262.921875,
+      "height": 131.46875
+    },
+    {
+      "axes": "yz",
+      "width": 131.46875,
+      "height": 262.921875
+    }
+  ],
+  "install": {
+    "downloads": true,
+    "automatic": false,
+    "offline": false,
+    "metered": false,
+    "installed": "f5eca8346b2e637325449c1a",
+    "previous": "",
+    "bubbleInstalled": true,
+    "bubbleBytes": 3144891,
+    "bubbleHash": "c486fb3124df68417c3a9fd1d1b79a2d459d24d4793e9632024676e59049053a",
+    "bubbleSystems": 248264,
+    "busy": false,
+    "pending": false,
+    "cacheBytes": 0,
+    "cacheBudget": 67108864,
+    "downloaded": 7734574,
+    "error": "",
+    "lastCheck": "2026-11-21T13:42:35.3096282+01:00"
+  },
+  "Sol": {
+    "query": {
+      "low": [
+        -100,
+        -50,
+        -100
+      ],
+      "high": [
+        100,
+        50,
+        100
+      ]
+    },
+    "count": 9238,
+    "blocks": 8,
+    "decodedBytes": 1159264,
+    "source": "EDSM reported XYZ · 1/32 LY · EDSM-2026-11-21 · source 0131b1b69531",
+    "release": "f5eca8346b2e637325449c1a",
+    "resources": {
+      "rendererHeapBytes": 6315344,
+      "mainThreadPercent": 1.61425271226691,
+      "backendRSSBytes": 51499008,
+      "backendCPUPercentOneCore": 1.7039773175263848
+    },
+    "warmRPCMilliseconds": 46.722900000000664
+  },
+  "Beagle-Point": {
+    "query": {
+      "low": [
+        -1211.5625,
+        -184.21875,
+        65169.75
+      ],
+      "high": [
+        -1011.5625,
+        -84.21875,
+        65369.75
+      ]
+    },
+    "count": 43,
+    "blocks": 1,
+    "decodedBytes": 33392,
+    "source": "EDSM reported XYZ · 1/32 LY · EDSM-2026-11-21 · source 0131b1b69531",
+    "release": "f5eca8346b2e637325449c1a",
+    "resources": {
+      "rendererHeapBytes": 6638804,
+      "mainThreadPercent": 1.9528124291718836,
+      "backendRSSBytes": 53514240,
+      "backendCPUPercentOneCore": 0
+    },
+    "warmRPCMilliseconds": 5.70299999999952
+  },
+  "densityBaseline": {
+    "rendererHeapBytes": 8731424,
+    "mainThreadPercent": 1.473558853893684,
+    "backendRSSBytes": 55459840,
+    "backendCPUPercentOneCore": 0
+  },
+  "offline": {
+    "complete": true,
+    "positions": 9238,
+    "status": {
+      "downloads": true,
+      "automatic": false,
+      "offline": true,
+      "metered": false,
+      "installed": "f5eca8346b2e637325449c1a",
+      "previous": "",
+      "bubbleInstalled": true,
+      "bubbleBytes": 3144891,
+      "bubbleHash": "c486fb3124df68417c3a9fd1d1b79a2d459d24d4793e9632024676e59049053a",
+      "bubbleSystems": 248264,
+      "busy": false,
+      "pending": false,
+      "cacheBytes": 20349,
+      "cacheBudget": 67108864,
+      "downloaded": 7754923,
+      "error": "",
+      "lastCheck": "2026-11-21T13:42:35.3096282+01:00"
+    }
+  },
+  "idle": {
+    "rendererHeapBytes": 6379768,
+    "mainThreadPercent": 1.9456836316936077
+  },
+  "passed": true
+}

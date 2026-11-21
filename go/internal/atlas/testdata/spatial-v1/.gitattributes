@@ -1,0 +1,7 @@
+source.json text eol=lf
+route.csv text eol=lf
+expected.json text eol=lf
+spatial.json -text
+indexes/*.json -text
+*.zip binary
+blocks/*.z binary
