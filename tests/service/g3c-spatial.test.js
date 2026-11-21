@@ -26,3 +26,16 @@ test('local side panels preserve world aspect and round navigation markers', () 
     assert.match(h.html(), /viewBox="0 0 25 50"/)
   } finally { h.unmount() }
 })
+test('a queued Galaxy Map resize callback is harmless after view unmount', async () => {
+  const original = global.window; let callback
+  global.window = { devicePixelRatio: 1, addEventListener () {}, removeEventListener () {}, ResizeObserver: class { constructor (cb) { callback = cb } observe () {} disconnect () {} } }
+  const h = harness('go-galaxy', {})
+  try {
+    h.html()
+    const area = h.elements('div').find(e => e.props.className === 'go-galaxy-area').ref
+    area.current = { clientWidth: 600, clientHeight: 500, querySelectorAll: () => [] }
+    await h.flush(); assert.equal(typeof callback, 'function')
+    h.unmount(); area.current = null
+    assert.doesNotThrow(() => callback())
+  } finally { h.unmount(); global.window = original }
+})
