@@ -1,0 +1,15 @@
+# G3C experimental unsigned preview
+
+Windows x64 requires Microsoft WebView2 Runtime. Linux x64 requires GTK 4 and WebKitGTK 6 runtime libraries (Ubuntu 24.04: libgtk-4-1, libwebkitgtk-6.0-4). Extract the archive and verify executable and README against SHA256SUMS. Run eridion.exe, or chmod +x eridion && ./eridion. This is not an installer or release. Keep a normal profile backup; the legacy application is unchanged.
+
+Navigation > Galaxy Map retains Galaxy Overview. Choose Local Volume for actual EDSM-reported XYZ positions. It follows the current system unless you select a waypoint, destination, manual center or drag to inspect. Fit Local Region sets 200 x 100 x 200 LY. Width and Y thickness controls share one volume across all three panels. Overlapping pixels aggregate positions; names/classes are not present in coordinate packages.
+
+Owner: Settings > Galaxy Atlas > Spatial Atlas. Downloads are OFF by default. Enable selective spatial downloads explicitly. Requests reveal approximate regions to eridion.fitoserver.org; no commander identity, journal, credentials or tokens are sent. Install the signed spatial index first. Then confirm the displayed exact Bubble size (current release 3,144,891 bytes) and install the permanent 350 LY Bubble. A changed Bubble digest/size requires renewed confirmation. Installation is asynchronous. Offline and metered modes pause spatial network access; they do not change other provider preferences.
+
+Cached data and Bubble work offline. Bubble is read lazily from the verified ZIP, not extracted into RAM. Regional cache is separate from the permanent Bubble and the 128 MiB density detail cache. Missing, corrupt or over-budget volumes explicitly fall back to full line-of-sight density; they do not mean empty space. Retry cached view after a failure/backoff. Owners can roll back the spatial index and explicitly remove the offline Bubble.
+
+Acceptance: test following a real jump, route replacement, destination/waypoint inspection and return to Overview. Confirm all three panels use the same XYZ box, route visibility and markers; inspect Sol and a sparse region; restart offline after Bubble install. On a paired laptop confirm cached positions update but all download/settings/removal operations remain owner-only. Real gameplay and physical-device acceptance remain manual.
+
+Reference: Galaxy Painter spatial.py/local_view.py and synthetic fixtures at 5d1cbf1aee7a707259000e57ea963175f7cd4f3b (GPL-3.0); signed G3B distribution at e3c6e40. EDSM supplies reported community positions, not a full census. No new uploads, game actions, spectral predictions, publisher or production infrastructure changes are included.
+
+Explicit Overview selections retain their XYZ bounds when switching modes. X width, Z depth and Y thickness can be adjusted independently. A too-large inherited volume is labeled over budget; choose Fit Local Region or reduce its dimensions.

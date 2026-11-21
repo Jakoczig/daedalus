@@ -1,0 +1,11 @@
+[
+{"id":1,"name":"Synthetic origin","coords":{"x":0,"y":0,"z":0}},
+{"id":2,"name":"Synthetic sub-bin A","coords":{"x":0.03125,"y":0.0625,"z":0.125}},
+{"id":3,"name":"Synthetic sub-bin B","coords":{"x":1.8125,"y":1.25,"z":1.71875}},
+{"id":4,"name":"Synthetic negative ticks","coords":{"x":-0.03125,"y":-0.0625,"z":-0.125}},
+{"id":5,"name":"Synthetic Bubble boundary","coords":{"x":350,"y":0,"z":0}},
+{"id":6,"name":"Synthetic outside Bubble","coords":{"x":350.03125,"y":0,"z":0}},
+{"id":7,"name":"Synthetic positive root boundary","coords":{"x":800,"y":0,"z":0}},
+{"id":8,"name":"Synthetic negative root boundary","coords":{"x":-800,"y":0,"z":0}},
+{"id":9,"name":"Synthetic repeated position","coords":{"x":0,"y":0,"z":0}}
+]

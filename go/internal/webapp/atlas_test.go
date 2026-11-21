@@ -14,7 +14,7 @@ func TestAtlasControlsRequireOwner(t *testing.T) {
 	s, _, viewer, url, _ := g2eFixture(t)
 	c := pairedSocket(t, viewer, url)
 	defer c.CloseNow()
-	for _, name := range []string{"configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails", "clearGoAtlas"} {
+	for _, name := range []string{"configureGoAtlas", "checkGoAtlas", "installGoAtlas", "rollbackGoAtlas", "clearGoAtlasDetails", "clearGoAtlas", "getGoSpatialStatus", "configureGoSpatial", "installGoSpatial", "installGoBubble", "removeGoBubble", "rollbackGoSpatial", "retryGoSpatial"} {
 		if len(rpcMessage(t, ctx, c, name, nil)["error"]) == 0 {
 			t.Fatal("viewer reached atlas control", name)
 		}
